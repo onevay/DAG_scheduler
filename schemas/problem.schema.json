@@ -1,0 +1,361 @@
+{
+  "$defs": {
+    "ClusterIn": {
+      "additionalProperties": false,
+      "properties": {
+        "workers": {
+          "items": {
+            "$ref": "#/$defs/WorkerIn"
+          },
+          "minItems": 1,
+          "title": "Workers",
+          "type": "array"
+        }
+      },
+      "required": [
+        "workers"
+      ],
+      "title": "ClusterIn",
+      "type": "object"
+    },
+    "EventIn": {
+      "additionalProperties": false,
+      "properties": {
+        "task": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TaskIn"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "time": {
+          "minimum": 0,
+          "title": "Time",
+          "type": "integer"
+        },
+        "type": {
+          "enum": [
+            "worker_down",
+            "worker_up",
+            "submit_task"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "worker": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Worker"
+        }
+      },
+      "required": [
+        "time",
+        "type"
+      ],
+      "title": "EventIn",
+      "type": "object"
+    },
+    "PolicyIn": {
+      "additionalProperties": false,
+      "properties": {
+        "aging": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 360,
+          "title": "Aging"
+        },
+        "max_preemptions_per_task": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Max Preemptions Per Task",
+          "type": "integer"
+        },
+        "min_runtime_before_preempt": {
+          "default": 30,
+          "minimum": 0,
+          "title": "Min Runtime Before Preempt",
+          "type": "integer"
+        },
+        "name": {
+          "default": "priority_backfill",
+          "enum": [
+            "fifo",
+            "fifo_skip",
+            "priority",
+            "priority_backfill",
+            "cpsat"
+          ],
+          "title": "Name",
+          "type": "string"
+        },
+        "objective": {
+          "default": "lexicographic",
+          "enum": [
+            "lexicographic",
+            "weighted"
+          ],
+          "title": "Objective",
+          "type": "string"
+        },
+        "preemption": {
+          "default": "deadline_only",
+          "enum": [
+            "never",
+            "deadline_only",
+            "priority"
+          ],
+          "title": "Preemption",
+          "type": "string"
+        },
+        "validation_mode": {
+          "default": "lenient",
+          "enum": [
+            "strict",
+            "lenient"
+          ],
+          "title": "Validation Mode",
+          "type": "string"
+        }
+      },
+      "title": "PolicyIn",
+      "type": "object"
+    },
+    "TaskIn": {
+      "additionalProperties": false,
+      "properties": {
+        "checkpoint_interval": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Checkpoint Interval"
+        },
+        "constraints": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "title": "Constraints",
+          "type": "object"
+        },
+        "deadline": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Deadline"
+        },
+        "dependencies": {
+          "default": [],
+          "items": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+            "type": "string"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "duration": {
+          "minimum": 1,
+          "title": "Duration",
+          "type": "integer"
+        },
+        "id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "default": "other",
+          "enum": [
+            "data",
+            "train",
+            "eval",
+            "infer",
+            "other"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "max_retries": {
+          "default": 2,
+          "maximum": 20,
+          "minimum": 0,
+          "title": "Max Retries",
+          "type": "integer"
+        },
+        "preemptible": {
+          "default": false,
+          "title": "Preemptible",
+          "type": "boolean"
+        },
+        "priority": {
+          "default": 1,
+          "maximum": 10,
+          "minimum": 0,
+          "title": "Priority",
+          "type": "integer"
+        },
+        "release_time": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Release Time",
+          "type": "integer"
+        },
+        "resources": {
+          "default": {},
+          "patternProperties": {
+            "^[a-z][a-z0-9_]{0,31}$": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "title": "Resources",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "duration"
+      ],
+      "title": "TaskIn",
+      "type": "object"
+    },
+    "WorkerIn": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "title": "Labels",
+          "type": "object"
+        },
+        "resources": {
+          "patternProperties": {
+            "^[a-z][a-z0-9_]{0,31}$": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "title": "Resources",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "resources"
+      ],
+      "title": "WorkerIn",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "cluster": {
+      "$ref": "#/$defs/ClusterIn"
+    },
+    "events": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/EventIn"
+      },
+      "title": "Events",
+      "type": "array"
+    },
+    "mode": {
+      "default": "simulate",
+      "enum": [
+        "simulate",
+        "emulate",
+        "shadow",
+        "replay"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "policy": {
+      "$ref": "#/$defs/PolicyIn",
+      "default": {
+        "aging": 360,
+        "max_preemptions_per_task": 1,
+        "min_runtime_before_preempt": 30,
+        "name": "priority_backfill",
+        "objective": "lexicographic",
+        "preemption": "deadline_only",
+        "validation_mode": "lenient"
+      }
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "seed": {
+      "default": 0,
+      "title": "Seed",
+      "type": "integer"
+    },
+    "tasks": {
+      "items": {
+        "$ref": "#/$defs/TaskIn"
+      },
+      "maxItems": 100000,
+      "title": "Tasks",
+      "type": "array"
+    },
+    "time_unit": {
+      "default": "minute",
+      "enum": [
+        "minute",
+        "hour",
+        "second"
+      ],
+      "title": "Time Unit",
+      "type": "string"
+    }
+  },
+  "required": [
+    "cluster",
+    "tasks"
+  ],
+  "title": "ProblemIn",
+  "type": "object"
+}
