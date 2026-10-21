@@ -4,14 +4,15 @@
 решений с проверкой (guard). Всё, что происходит, записывается в журнал. Решать имеет смысл только
 в моменты событий: старт задачи возможен лишь тогда, когда что-то освободилось или стало готовым.
 
-События узлов, подача задач, PREEMPT и RESERVE пока дают NotImplementedError.
+События узлов, PREEMPT и RESERVE пока дают NotImplementedError.
 """
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
-from expsched.domain.models import Event, Problem
+from expsched.domain.models import Event, EvType, Problem, Task
 from expsched.domain.snapshot import Decision, Policy, RunInfo
 from expsched.domain.states import FINAL_STATUSES, TaskStatus
 from expsched.engine.errors import InvalidDecision
@@ -19,6 +20,8 @@ from expsched.engine.events import EventQueue, Finish, Payload, Release
 from expsched.engine.journal import Journal
 from expsched.engine.snapshot import build_snapshot
 from expsched.engine.state import SimState
+from expsched.validation.graph import validate_graph
+from expsched.validation.resources import validate_resources
 
 
 class Simulator:
@@ -72,7 +75,35 @@ class Simulator:
             self._external(payload)
 
     def _external(self, event: Event) -> None:
-        raise NotImplementedError(f"event {event.type.value} is not supported yet")
+        if event.type is not EvType.SUBMIT:
+            raise NotImplementedError(f"event {event.type.value} is not supported yet")
+        if event.task is None:
+            raise ValueError("submit_task event without a task")
+        self._submit(event.task)
+
+    def _submit(self, task: Task) -> None:
+        """Задача, поданная во время прогона. Задача с ошибками получает INFEASIBLE и диагностику."""
+        s = self.state
+        if task.id in s.tasks:
+            self.journal.append("DIAGNOSTIC", self.t, code="DUPLICATE_TASK_ID", task=task.id)
+            return
+        s.add_task(task)
+        self.journal.append("SUBMIT", self.t, task=task.id, priority=task.priority, deadline=task.deadline)
+
+        # Проверяется только новая задача: у остальных ошибок либо нет, либо они уже учтены до запуска.
+        alone = replace(s.problem, tasks={task.id: task})
+        problems = [
+            d for d in validate_graph(s.tasks) if d.detail.get("task") == task.id and d.level == "error"
+        ]
+        problems += validate_resources(alone)
+        if problems:
+            s.status[task.id] = TaskStatus.INFEASIBLE
+            for diagnostic in problems:
+                self.journal.append("DIAGNOSTIC", self.t, task=task.id, **diagnostic.to_dict())
+        elif task.release > self.t:
+            self.queue.push(task.release, Release(task.id))
+        else:
+            self._try_ready(task.id)
 
     def _finish(self, event: Finish) -> None:
         s = self.state
@@ -97,15 +128,18 @@ class Simulator:
             and self.t >= s.tasks[key].release
         ):
             s.status[key] = TaskStatus.READY
+            s.ready.add(key)
             s.ready_since[key] = self.t
             self.journal.append("READY", self.t, task=key)
 
     # ---- решения ----
 
     def _decide(self) -> None:
-        if TaskStatus.READY not in self.state.status.values():
-            return  # построение снимка дорогое, а решать нечего
-        for decision in self.policy.decide(build_snapshot(self.state, self.t)):
+        if not self.state.ready:
+            return
+        # Снимок смотрит на живое состояние, поэтому решения собираются целиком до их применения.
+        decisions = list(self.policy.decide(build_snapshot(self.state, self.t)))
+        for decision in decisions:
             if decision.action == "START":
                 self._start(decision)
             elif decision.action in ("PREEMPT", "RESERVE"):
@@ -128,6 +162,7 @@ class Simulator:
 
         s.free[worker] = s.free[worker] - task.resources
         s.status[key] = TaskStatus.RUNNING
+        s.ready.discard(key)
         s.attempt[key] += 1
         end = self.t + s.rem[key]
         s.run[key] = RunInfo(worker, self.t, s.attempt[key], end)

@@ -23,6 +23,8 @@ class GreedyPolicy:
         out = []
         for key in snapshot.ready:
             need = snapshot.tasks[key].resources
+            if need and not any(free.values()):
+                break  # все узлы заполнены: задачам с требованиями места нет
             for worker in snapshot.eligible[key]:
                 if snapshot.up[worker] and need.fits(free[worker]):
                     free[worker] = free[worker] - need

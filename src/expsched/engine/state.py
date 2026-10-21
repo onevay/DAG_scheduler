@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from expsched.domain.analysis import Analysis
 from expsched.domain.models import Problem, Task
 from expsched.domain.resources import Resources
 from expsched.domain.snapshot import RunInfo
@@ -23,11 +24,17 @@ class SimState:
     free: dict[str, Resources]
     up: dict[str, bool]
     run: dict[str, RunInfo] = field(default_factory=dict)
+    ready: set[str] = field(default_factory=set)  # задачи в статусе READY
     ready_since: dict[str, int] = field(default_factory=dict)
     preempt_count: dict[str, int] = field(default_factory=dict)  # сколько раз задачу вытесняли
+    # Ранги и поздние сроки не меняются, когда задачи завершаются, поэтому анализ пересчитывается
+    # только при изменении графа или остатков работы. None — нужен пересчёт.
+    analysis: Analysis | None = None
 
     @classmethod
     def from_problem(cls, problem: Problem) -> SimState:
+        """Все словари заполняются в порядке id, чтобы порядок их обхода не зависел от порядка во входе."""
+        workers = sorted(problem.workers)
         state = cls(
             problem=problem,
             tasks={},
@@ -37,15 +44,15 @@ class SimState:
             eligible={},
             waiting_preds={},
             successors={},
-            free={w.id: w.capacity for w in problem.workers.values()},
-            up={w: True for w in problem.workers},
+            free={w: problem.workers[w].capacity for w in workers},
+            up={w: True for w in workers},
         )
         for key in sorted(problem.tasks):
             state.add_task(problem.tasks[key])
         return state
 
     def add_task(self, task: Task) -> None:
-        """Добавляет задачу в статусе PENDING.
+        """Добавляет задачу в статусе PENDING; уже завершённые зависимости её не держат.
 
         Неизвестная зависимость или самоссылка никогда не завершится, поэтому такая задача не станет READY.
         """
@@ -55,6 +62,7 @@ class SimState:
         self.rem[task.id] = task.duration
         self.attempt[task.id] = 0
         self.eligible[task.id] = self.problem.eligible(task)
-        self.waiting_preds[task.id] = len(deps)
+        self.waiting_preds[task.id] = sum(self.status.get(d) is not TaskStatus.SUCCEEDED for d in deps)
         for dep in sorted(deps):
             self.successors.setdefault(dep, []).append(task.id)
+        self.analysis = None
