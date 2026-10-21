@@ -30,6 +30,7 @@ packages = [
     "expsched.analysis",
     "expsched.validation",
     "expsched.engine",
+    "expsched.policies",
 ]
 plugins = ["pydantic.mypy"]
 
