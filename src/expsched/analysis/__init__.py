@@ -1,3 +1,3 @@
-from expsched.analysis.analyze import Analysis, analyze
+from expsched.analysis.analyze import analyze
 
-__all__ = ["Analysis", "analyze"]
+__all__ = ["analyze"]

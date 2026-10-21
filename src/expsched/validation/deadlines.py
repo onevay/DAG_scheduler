@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from expsched.analysis.analyze import Analysis
+from expsched.domain.analysis import Analysis
 from expsched.domain.models import Problem
 from expsched.validation.diagnostics import Code, Diagnostic
 
