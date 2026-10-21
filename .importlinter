@@ -3,7 +3,7 @@ root_package = expsched
 
 # Слои из docs: «стрелка — зависит от», обратные импорты запрещены.
 # Слои в скобках необязательны: они появятся вместе со своими этапами.
-# Куда встанут analysis, verify, optimize, emulation, решается при их создании.
+# Куда встанут verify, optimize, emulation, решается при их создании.
 [importlinter:contract:layers]
 name = Слои ядра
 type = layers
@@ -11,6 +11,6 @@ layers =
     (expsched.api) | (expsched.cli) | (expsched.io)
     (expsched.explain) | (expsched.metrics)
     (expsched.engine) | (expsched.policies)
-    (expsched.validation)
-    expsched.contract
+    expsched.validation
+    expsched.analysis | expsched.contract
     expsched.domain
