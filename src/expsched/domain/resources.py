@@ -43,7 +43,7 @@ class Resources:
         return self._items
 
     def fits(self, capacity: Resources) -> bool:
-        """self <= capacity покомпонентно. Порядок частичный: возможны a.fits(b) и b.fits(a) == False."""
+        """Каждая компонента не больше, чем в `capacity`; два вектора могут быть несравнимы."""
         return all(v <= capacity.get(k) for k, v in self._items)
 
     def __add__(self, other: Resources) -> Resources:
@@ -53,7 +53,7 @@ class Resources:
         return Resources(total)
 
     def __sub__(self, other: Resources) -> Resources:
-        """Вычитание с проверкой: отрицательный результат — баг вызывающего, а не значение."""
+        """Разность векторов; если компонента уходит ниже нуля — ValueError."""
         diff = dict(self._items)
         for k, v in other._items:
             left = diff.get(k, 0) - v

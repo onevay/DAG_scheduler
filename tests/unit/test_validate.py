@@ -128,8 +128,8 @@ def test_warnings_do_not_fail_strict_mode_and_duplicates_are_removed(make_task, 
     assert result is not None and result.tasks["b"].deps == ("a",)
 
 
-def test_s5_infeasible_resources_and_deadline(demo_problem):
-    """E020 с деталями и ровно один E030 (спецификация, S5)."""
+def test_resource_error_and_unreachable_deadline_together(demo_problem):
+    """Задача на 8 GPU даёт E020, недостижимый дедлайн после distill — ровно одну E030."""
     tasks = dict(demo_problem.tasks)
     tasks["huge"] = Task("huge", 2, Resources({"gpu": 8}))
     tasks["late_report"] = Task("late_report", 2, Resources({"gpu": 1}), deps=("distill",), deadline=19)

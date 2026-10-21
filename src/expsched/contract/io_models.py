@@ -26,12 +26,12 @@ class Strict(BaseModel):
 class TaskIn(Strict):
     id: Id
     kind: Literal["data", "train", "eval", "infer", "other"] = "other"
-    duration: Annotated[int, Field(ge=1)]  # E070
+    duration: Annotated[int, Field(ge=1)]
     resources: ResMap = {}
     priority: Annotated[int, Field(ge=0, le=10)] = 1
     deadline: Annotated[int, Field(ge=0)] | None = None
     release_time: Annotated[int, Field(ge=0)] = 0
-    dependencies: list[Id] = []  # дубликаты и самоссылки разбирает валидация графа (W060, E011)
+    dependencies: list[Id] = []  # повторы и самоссылки здесь допустимы: о них сообщает validation
     preemptible: bool = False
     checkpoint_interval: Annotated[int, Field(ge=1)] | None = None
     max_retries: Annotated[int, Field(ge=0, le=20)] = 2
@@ -118,7 +118,7 @@ def to_domain(p: ProblemIn) -> Problem:
 
 
 def load(raw: bytes, max_bytes: int = MAX_BODY_BYTES) -> ProblemIn:
-    """Граница доверия: размер -> JSON -> схема. Глубину вложенности ограничивают сами модели."""
+    """Разбор недоверенного входа: сначала размер, затем JSON и схема. InputTooLarge при превышении лимита."""
     if len(raw) > max_bytes:
         raise InputTooLarge(f"input is {len(raw)} bytes, limit is {max_bytes}")
     return ProblemIn.model_validate_json(raw)
@@ -129,5 +129,5 @@ def dump_schema() -> str:
 
 
 if __name__ == "__main__":
-    # Пишем байты: CI сравнивает схему через diff.
+    # Байты вместо print: на Windows print дал бы CRLF, и сравнение схемы в CI не совпало бы.
     sys.stdout.buffer.write((dump_schema() + "\n").encode("utf-8"))

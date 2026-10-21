@@ -1,4 +1,4 @@
-# Работает в Linux и в Git Bash под Windows. Цели добавляются вместе с этапами (см. docs/DEVLOG.md).
+# Работает в Linux и в Git Bash под Windows: все команды запускаются через uv.
 RUN := uv run
 
 .PHONY: setup lint types test test-all schema

@@ -1,7 +1,6 @@
-"""Результат статического анализа графа. Считает его `expsched.analysis.analyze`.
+"""Результат статического анализа графа (вычисляет `expsched.analysis.analyze`).
 
-Тип лежит в domain, потому что входит в Snapshot, который видят политики: они не должны знать ни о движке,
-ни о пакете, вычисляющем анализ.
+Лежит в domain, потому что входит в Snapshot.
 """
 
 from __future__ import annotations
@@ -17,7 +16,7 @@ class Analysis:
     lft: dict[str, int | None]  # самое позднее окончание; None — дедлайнов ниже по графу нет
     lst: dict[str, int | None]  # самый поздний старт; запас задачи = lst - est
     rank: dict[str, int]  # длина критического пути до стока
-    lb_path: int
-    lb_energy: dict[str, int]
-    lb_thr: int
-    lb: int  # нижняя граница makespan: максимум из трёх
+    lb_path: int  # нижняя граница makespan по критическому пути
+    lb_energy: dict[str, int]  # по суммарной загрузке каждого ресурса
+    lb_thr: int  # по задачам, которым нужны крупные по GPU узлы
+    lb: int  # итоговая нижняя граница: максимум из трёх

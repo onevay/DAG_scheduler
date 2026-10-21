@@ -1,4 +1,4 @@
-"""Шаг «схема»: ошибки Pydantic превращаются в диагностики E001 (и E070 для длительности)."""
+"""Ошибки схемы входа в виде диагностик: E070 для длительности, E001 для всего остального."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pydantic_core import ErrorDetails
 
 from expsched.validation.diagnostics import Code, Diagnostic
 
-# Входной файл может содержать сколько угодно ошибок; ответ при этом не должен расти без границ.
+# Ограничивает размер ответа на вход с огромным числом ошибок.
 MAX_SCHEMA_DIAGNOSTICS = 50
 
 

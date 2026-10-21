@@ -1,7 +1,6 @@
-"""Нижние границы makespan: путевая, энергетическая по ресурсам, пороговая по GPU.
+"""Нижние границы makespan: по критическому пути, по загрузке ресурсов и по крупным GPU-задачам.
 
-Границы нужны, чтобы оценивать качество там, где оптимум неизвестен: gap = (Cmax - LB) / LB.
-Отказы узлов не учитываются: это границы для кластера без отказов.
+По ним оценивают расписание, когда оптимум неизвестен: gap = (makespan - LB) / LB. Отказы узлов не учтены.
 """
 
 from __future__ import annotations
@@ -14,14 +13,14 @@ THRESHOLD_RESOURCE = "gpu"
 
 
 def path_bound(eft: Mapping[str, int], now: int) -> int:
-    """Критический путь: ни одна задача не закончится раньше своего EFT."""
+    """Ни одна задача не закончится раньше своего самого раннего окончания (EFT)."""
     return max(eft.values(), default=now)
 
 
 def energy_bounds(
     tasks: Mapping[str, Task], remaining: Mapping[str, int], workers: Iterable[Worker], now: int
 ) -> dict[str, int]:
-    """По каждому ресурсу: суммарная «энергия» R·r не может превысить суммарную ёмкость за время bound."""
+    """По каждому ресурсу: вся работа (остаток × требование) должна уместиться в суммарную ёмкость узлов."""
     capacity: dict[str, int] = {}
     for worker in workers:
         for resource, amount in worker.capacity.items():

@@ -68,7 +68,7 @@ def test_submit_event_carries_task():
         problem(cluster={"workers": []}),
         problem(events=[{"time": 1, "type": "worker_down"}]),  # нет worker
         problem(events=[{"time": 1, "type": "submit_task"}]),  # нет task
-        problem(events=[{"time": 1, "type": "cancel_task", "worker": "node-A"}]),  # пока не в контракте
+        problem(events=[{"time": 1, "type": "cancel_task", "worker": "node-A"}]),  # неизвестный тип события
         b"{not json",
     ],
 )

@@ -1,4 +1,4 @@
-"""Режим lenient: задачи с ошибками выводятся из плана, остальная лаборатория продолжает работать."""
+"""Режим lenient: задачи с ошибками убираются из плана, остальные планируются как обычно."""
 
 from __future__ import annotations
 
@@ -16,21 +16,20 @@ _TASK_CODES = frozenset({Code.E010, Code.E011, Code.E020, Code.E021})
 
 @dataclass(frozen=True)
 class Quarantine:
-    problem: Problem  # то, что можно планировать: ацикличный подграф, замкнутый по предшественникам
-    excluded: dict[str, TaskStatus]  # INFEASIBLE — виновники, BLOCKED — их потомки
+    problem: Problem  # задачи, которые можно планировать
+    excluded: dict[str, TaskStatus]  # INFEASIBLE — задачи с ошибками, BLOCKED — их потомки
 
 
 def quarantine(problem: Problem, diagnostics: Iterable[Diagnostic]) -> Quarantine:
-    """Виновники (E010, E011, E012, E020, E021) получают INFEASIBLE, все их потомки — BLOCKED.
+    """Задачи с ошибками (E010, E011, E012, E020, E021) получают INFEASIBLE, все их потомки — BLOCKED.
 
-    Оставшийся подграф ацикличен и содержит вместе с задачей всех её предшественников: любой цикл
-    целиком лежит в удалённой компоненте сильной связности, а потомок удалённой задачи удалён сам.
+    Оставшиеся задачи образуют ацикличный граф, в котором у каждой задачи есть все её предшественники.
     """
     graph = TaskGraph(problem.tasks)
     diagnostics = list(diagnostics)
     guilty = {d.detail["task"] for d in diagnostics if d.code in _TASK_CODES}
     if any(d.code is Code.E012 for d in diagnostics):
-        # Диагностика называет один цикл компоненты, а выводить из плана нужно всю компоненту.
+        # E012 называет один цикл, а убрать нужно всю компоненту сильной связности.
         guilty |= {key for component in graph.cyclic_components() for key in component}
 
     blocked = graph.descendants(guilty) - guilty

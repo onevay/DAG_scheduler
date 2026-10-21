@@ -1,8 +1,4 @@
-"""Диагностики: ошибки и предупреждения входа. Это данные результата, а не исключения.
-
-Код начинается с E (ошибка) или W (предупреждение). Новые коды добавляются вместе с проверкой,
-которая их выдаёт; любое изменение набора кодов — contract-change.
-"""
+"""Диагностики входа: ошибки (коды E) и предупреждения (коды W). Это данные результата, а не исключения."""
 
 from __future__ import annotations
 
@@ -54,7 +50,7 @@ class Diagnostic:
         return "error" if self.code.startswith("E") else "warning"
 
     def to_dict(self) -> dict[str, Any]:
-        """Форма записи в result.diagnostics[]."""
+        """Сериализуемая форма для результата прогона."""
         return {"code": str(self.code), "level": self.level, "detail": self.detail, "hint": self.hint}
 
 
