@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
 
@@ -26,19 +27,22 @@ class RunInfo:
 
 @dataclass(frozen=True)
 class Snapshot:
-    """Неизменяемое состояние на момент решения."""
+    """Состояние на момент решения, только для чтения.
+
+    Словари — представления состояния движка, а не копии: снимок действителен только во время `decide`.
+    """
 
     t: int
-    tasks: dict[str, Task]
+    tasks: Mapping[str, Task]
     ready: tuple[str, ...]  # задачи READY, отсортированные по id
-    running: dict[str, RunInfo]
-    rem: dict[str, int]  # остаток работы по задаче
-    free: dict[str, Resources]  # свободные ресурсы узла (у недоступного узла пусто)
-    up: dict[str, bool]
-    eligible: dict[str, tuple[str, ...]]  # допустимые узлы задачи
-    analysis: Analysis
-    ready_since: dict[str, int]
-    preempt_count: dict[str, int]
+    running: Mapping[str, RunInfo]
+    rem: Mapping[str, int]  # остаток работы по задаче
+    free: Mapping[str, Resources]  # свободные ресурсы узла (у недоступного узла пусто)
+    up: Mapping[str, bool]
+    eligible: Mapping[str, tuple[str, ...]]  # допустимые узлы задачи
+    analysis: Analysis  # ранние сроки и границы — на момент последнего пересчёта
+    ready_since: Mapping[str, int]
+    preempt_count: Mapping[str, int]
 
 
 Action = Literal["START", "PREEMPT", "RESERVE"]

@@ -128,15 +128,18 @@ class Simulator:
             and self.t >= s.tasks[key].release
         ):
             s.status[key] = TaskStatus.READY
+            s.ready.add(key)
             s.ready_since[key] = self.t
             self.journal.append("READY", self.t, task=key)
 
     # ---- решения ----
 
     def _decide(self) -> None:
-        if TaskStatus.READY not in self.state.status.values():
-            return  # построение снимка дорогое, а решать нечего
-        for decision in self.policy.decide(build_snapshot(self.state, self.t)):
+        if not self.state.ready:
+            return
+        # Снимок смотрит на живое состояние, поэтому решения собираются целиком до их применения.
+        decisions = list(self.policy.decide(build_snapshot(self.state, self.t)))
+        for decision in decisions:
             if decision.action == "START":
                 self._start(decision)
             elif decision.action in ("PREEMPT", "RESERVE"):
@@ -159,6 +162,7 @@ class Simulator:
 
         s.free[worker] = s.free[worker] - task.resources
         s.status[key] = TaskStatus.RUNNING
+        s.ready.discard(key)
         s.attempt[key] += 1
         end = self.t + s.rem[key]
         s.run[key] = RunInfo(worker, self.t, s.attempt[key], end)

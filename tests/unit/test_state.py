@@ -1,3 +1,5 @@
+import pytest
+
 from expsched.domain.resources import Resources
 from expsched.domain.snapshot import RunInfo
 from expsched.domain.states import TaskStatus
@@ -48,7 +50,7 @@ def test_finished_dependency_of_a_late_task_is_not_waited_for(demo_problem, make
 
 def test_snapshot_reflects_state_and_sorts_ready(demo_problem):
     s = SimState.from_problem(demo_problem)
-    s.status["train_asr"] = s.status["prep_data"] = TaskStatus.READY
+    s.ready = {"train_asr", "prep_data"}
     s.run["pretrain_vit"] = RunInfo("node-A", 2, 1, 10)
     snap = build_snapshot(s, 2)
     assert snap.t == 2 and snap.ready == ("prep_data", "train_asr")
@@ -56,12 +58,21 @@ def test_snapshot_reflects_state_and_sorts_ready(demo_problem):
     assert snap.eligible == s.eligible and snap.up == s.up
 
 
-def test_snapshot_is_detached_from_the_state(demo_problem):
+def test_snapshot_cannot_change_the_state(demo_problem):
+    snap = build_snapshot(SimState.from_problem(demo_problem), 0)
+    with pytest.raises(TypeError):
+        snap.free["node-A"] = Resources()  # type: ignore[index]
+    with pytest.raises(TypeError):
+        snap.rem["prep_data"] = 0  # type: ignore[index]
+
+
+def test_analysis_is_cached_until_a_task_is_added(demo_problem, make_task):
     s = SimState.from_problem(demo_problem)
-    snap = build_snapshot(s, 0)
-    snap.free["node-A"] = Resources()
-    snap.rem["prep_data"] = 0
-    assert s.free["node-A"] == Resources({"gpu": 4}) and s.rem["prep_data"] == 2
+    first = build_snapshot(s, 0).analysis
+    s.status["prep_data"] = TaskStatus.SUCCEEDED  # окончание задачи кеш не сбрасывает
+    assert build_snapshot(s, 2).analysis is first
+    s.add_task(make_task("late", 1, "eval_asr"))
+    assert "late" in build_snapshot(s, 3).analysis.order
 
 
 def test_snapshot_analysis_uses_remaining_work_and_skips_finished_tasks(demo_problem):
