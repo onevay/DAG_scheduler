@@ -1,28 +1,14 @@
-"""Статический анализ: структура Analysis для политик и сертификатов дедлайнов."""
+"""Статический анализ графа: окна, ранги, нижние границы."""
 
 from __future__ import annotations
 
 from collections.abc import Collection, Mapping
-from dataclasses import dataclass
 
 from expsched.analysis.bounds import energy_bounds, path_bound, threshold_bound
 from expsched.analysis.ranks import backward_pass, forward_pass
+from expsched.domain.analysis import Analysis
 from expsched.domain.graph import TaskGraph
 from expsched.domain.models import Problem
-
-
-@dataclass(frozen=True)
-class Analysis:
-    order: tuple[str, ...]  # топологический порядок задач, вошедших в анализ
-    est: dict[str, int]  # самый ранний старт
-    eft: dict[str, int]  # самое раннее окончание
-    lft: dict[str, int | None]  # самое позднее окончание; None — дедлайнов ниже по графу нет
-    lst: dict[str, int | None]  # самый поздний старт; запас задачи = lst - est
-    rank: dict[str, int]  # длина критического пути до стока
-    lb_path: int
-    lb_energy: dict[str, int]
-    lb_thr: int
-    lb: int  # нижняя граница makespan: максимум из трёх
 
 
 def analyze(
