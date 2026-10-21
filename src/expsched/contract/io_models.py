@@ -1,5 +1,4 @@
-"""Контракт входа (problem.json) на Pydantic v2 и единственный источник JSON Schema.
-"""
+"""Контракт входа (problem.json) на Pydantic v2 и единственный источник JSON Schema."""
 
 from __future__ import annotations
 
