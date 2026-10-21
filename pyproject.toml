@@ -25,7 +25,13 @@ select = ["E", "F", "W", "B", "I", "UP", "SIM"]
 [tool.mypy]
 strict = true
 mypy_path = "src"
-packages = ["expsched.domain", "expsched.contract", "expsched.analysis", "expsched.validation"]
+packages = [
+    "expsched.domain",
+    "expsched.contract",
+    "expsched.analysis",
+    "expsched.validation",
+    "expsched.engine",
+]
 plugins = ["pydantic.mypy"]
 
 [tool.pytest.ini_options]
