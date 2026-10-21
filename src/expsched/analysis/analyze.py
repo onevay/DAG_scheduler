@@ -1,4 +1,4 @@
-"""Статический анализ графа: окна, ранги, нижние границы."""
+"""Статический анализ графа: сроки, ранги и нижние границы makespan."""
 
 from __future__ import annotations
 
@@ -17,9 +17,9 @@ def analyze(
     now: int = 0,
     done: Collection[str] = (),
 ) -> Analysis:
-    """Анализ графа над остатками работы. Завершённые задачи (`done`) исключаются, ссылки на них игнорируются.
+    """Анализ в момент `now` по остаткам работы `remaining` (по умолчанию — полные длительности).
 
-    Предполагает корректный граф: циклы должна отсечь валидация (validate_graph + quarantine).
+    Задачи из `done` и ссылки на них не учитываются. Граф должен быть ацикличным, иначе ValueError.
     """
     tasks = {k: t for k, t in problem.tasks.items() if k not in done}
     rest = {k: (remaining or {}).get(k, t.duration) for k, t in tasks.items()}

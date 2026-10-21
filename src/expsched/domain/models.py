@@ -1,8 +1,6 @@
-"""Доменные сущности: узел, задача, внешнее событие, экземпляр задачи планирования.
+"""Неизменяемые входные сущности: задача, узел, внешнее событие, экземпляр задачи планирования.
 
-Все объекты неизменяемы. Изменяемое состояние симуляции живёт в engine и наружу
-передаётся снимком. Структурные ошибки входа (циклы, неизвестные зависимости,
-самоссылки) сюда не относятся: их выявляет валидация графа и сообщает диагностиками.
+Конструкторы проверяют только значения полей; корректность графа (циклы, ссылки) проверяет validation.
 """
 
 from __future__ import annotations
@@ -32,15 +30,15 @@ class Task:
     kind: str = "other"
     priority: int = 1
     deadline: int | None = None
-    release: int = 0
-    deps: tuple[str, ...] = ()
+    release: int = 0  # раньше этого момента задача не стартует
+    deps: tuple[str, ...] = ()  # id задач, которые должны успешно завершиться раньше
     preemptible: bool = False
     ckpt: int | None = None  # интервал чекпоинта; None — чекпоинтов нет
-    max_retries: int = 2
-    constraints: Labels = ()
+    max_retries: int = 2  # сколько раз задачу можно перезапустить после отказа узла
+    constraints: Labels = ()  # метки, которые обязаны быть у узла
 
     def __post_init__(self) -> None:
-        if self.duration < 1:  # E070: иначе нет завершимости симуляции
+        if self.duration < 1:  # с нулевой длительностью симуляция может не завершиться
             raise ValueError(f"task {self.id!r}: duration must be >= 1, got {self.duration}")
         if self.release < 0:
             raise ValueError(f"task {self.id!r}: release must be >= 0, got {self.release}")
@@ -50,7 +48,7 @@ class Task:
             raise ValueError(f"task {self.id!r}: ckpt must be >= 1, got {self.ckpt}")
         if self.max_retries < 0:
             raise ValueError(f"task {self.id!r}: max_retries must be >= 0, got {self.max_retries}")
-        priority_class(self.priority)  # проверка диапазона
+        priority_class(self.priority)  # бросает ValueError вне диапазона
 
     @property
     def cls(self) -> PriorityClass:
@@ -80,7 +78,7 @@ class Problem:
     seed: int = 0
 
     def eligible(self, task: Task) -> tuple[str, ...]:
-        """Допустимые узлы задачи: хватает ёмкости и все constraints есть среди меток узла."""
+        """Узлы, у которых хватает ёмкости и есть все метки из `constraints`, по возрастанию id."""
         return tuple(
             sorted(
                 w.id

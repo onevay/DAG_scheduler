@@ -1,4 +1,4 @@
-"""Фабрики для тестов: маленькие задачи и демонстрационный DAG из спецификации (раздел 17)."""
+"""Общие фикстуры: фабрики задач и экземпляров, демонстрационный DAG, тестовая политика."""
 
 from collections.abc import Callable
 from typing import Any
@@ -7,9 +7,33 @@ import pytest
 
 from expsched.domain.models import Problem, Task, Worker
 from expsched.domain.resources import Resources
+from expsched.domain.snapshot import Decision, Snapshot
 
 TaskFactory = Callable[..., Task]
 ProblemFactory = Callable[..., Problem]
+
+
+class GreedyPolicy:
+    """Простейшая политика для тестов движка: готовые задачи по id, каждой — первый подходящий узел."""
+
+    name = "greedy-test"
+
+    def decide(self, snapshot: Snapshot) -> list[Decision]:
+        free = dict(snapshot.free)
+        out = []
+        for key in snapshot.ready:
+            need = snapshot.tasks[key].resources
+            for worker in snapshot.eligible[key]:
+                if snapshot.up[worker] and need.fits(free[worker]):
+                    free[worker] = free[worker] - need
+                    out.append(Decision("START", key, worker, {"code": "GREEDY"}))
+                    break
+        return out
+
+
+@pytest.fixture
+def greedy() -> GreedyPolicy:
+    return GreedyPolicy()
 
 
 @pytest.fixture
@@ -22,7 +46,7 @@ def make_task() -> TaskFactory:
 
 @pytest.fixture
 def make_problem(make_task: TaskFactory) -> ProblemFactory:
-    """make_problem(tasks, gpus=(4,)): узлы n0, n1, ... с указанным числом GPU."""
+    """make_problem(tasks, gpus=(4,)) создаёт узлы n0, n1, ... с указанным числом GPU."""
 
     def make(tasks: list[Task], gpus: tuple[int, ...] = (4,), **fields: Any) -> Problem:
         workers = {f"n{i}": Worker(f"n{i}", Resources({"gpu": g})) for i, g in enumerate(gpus)}
@@ -33,7 +57,7 @@ def make_problem(make_task: TaskFactory) -> ProblemFactory:
 
 @pytest.fixture
 def demo_problem(make_task: TaskFactory) -> Problem:
-    """Демо спецификации в «офлайн» виде: срочная задача входит в набор с release = 9."""
+    """Демо-DAG: 11 задач на узлах с 4, 4 и 2 GPU; срочная urgent_eval появляется в t = 9 с дедлайном 14."""
     tasks = [
         make_task("prep_data", 2),
         make_task("pretrain_vit", 8, "prep_data", gpu=4, priority=2, ckpt=2),

@@ -11,10 +11,9 @@ from expsched.engine.state import SimState
 
 
 def build_snapshot(state: SimState, now: int) -> Snapshot:
-    """Снимок с копиями словарей: политика, изменив их, не испортит состояние движка.
+    """Снимок с копиями словарей, чтобы политика не могла изменить состояние движка.
 
-    Анализ пересчитывается целиком над остатками работы, завершённые задачи исключаются (как в эталоне;
-    инкрементальный пересчёт — задача промышленной версии).
+    Анализ пересчитывается полностью по остаткам работы, без завершённых задач.
     """
     done = {k for k, s in state.status.items() if s is TaskStatus.SUCCEEDED}
     analysis = analyze(replace(state.problem, tasks=state.tasks), remaining=state.rem, now=now, done=done)

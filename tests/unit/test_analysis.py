@@ -7,7 +7,7 @@ from expsched.analysis.bounds import energy_bounds, path_bound, threshold_bound
 
 
 def test_demo_analysis_offline(demo_problem):
-    """Значения из таблицы «Статический анализ демо (офлайн)» спецификации, раздел 17."""
+    """Сроки и ранги демо-DAG, посчитанные по длительностям и зависимостям."""
     a = analyze(demo_problem)
     assert a.est == {
         "prep_data": 0,

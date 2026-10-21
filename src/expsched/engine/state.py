@@ -1,4 +1,4 @@
-"""Изменяемое состояние симуляции. Живёт только в движке; наружу уходит снимком (engine/snapshot.py)."""
+"""Изменяемое состояние симуляции. Политика видит его только через снимок."""
 
 from __future__ import annotations
 
@@ -12,19 +12,19 @@ from expsched.domain.states import TaskStatus
 
 @dataclass
 class SimState:
-    problem: Problem  # узлы и исходный вход; задачи из submit_task добавляются в `tasks`
+    problem: Problem  # исходный вход; задачи, поданные позже, есть только в `tasks`
     tasks: dict[str, Task]
     status: dict[str, TaskStatus]
     rem: dict[str, int]  # остаток работы
     attempt: dict[str, int]  # номер последней начатой попытки (0 — не запускалась)
-    eligible: dict[str, tuple[str, ...]]  # допустимые узлы; узлы и ёмкости не меняются, поэтому кешируется
-    waiting_preds: dict[str, int]  # число незавершённых предшественников: READY возможен при 0
-    successors: dict[str, list[str]]  # кому уменьшать счётчик при FINISH
+    eligible: dict[str, tuple[str, ...]]  # допустимые узлы; узлы не меняются, поэтому считается один раз
+    waiting_preds: dict[str, int]  # сколько предшественников ещё не завершено
+    successors: dict[str, list[str]]  # кому уменьшить счётчик, когда задача завершится
     free: dict[str, Resources]
     up: dict[str, bool]
     run: dict[str, RunInfo] = field(default_factory=dict)
     ready_since: dict[str, int] = field(default_factory=dict)
-    preempt_count: dict[str, int] = field(default_factory=dict)  # заполняется вытеснением (Э5)
+    preempt_count: dict[str, int] = field(default_factory=dict)  # сколько раз задачу вытесняли
 
     @classmethod
     def from_problem(cls, problem: Problem) -> SimState:
@@ -45,10 +45,9 @@ class SimState:
         return state
 
     def add_task(self, task: Task) -> None:
-        """Новая задача в статусе PENDING.
+        """Добавляет задачу в статусе PENDING.
 
-        Неизвестная зависимость или самоссылка тоже считаются незавершёнными, поэтому такая задача
-        никогда не станет READY: вход должен пройти валидацию и карантин, движок только не зацикливается.
+        Неизвестная зависимость или самоссылка никогда не завершится, поэтому такая задача не станет READY.
         """
         deps = set(task.deps)
         self.tasks[task.id] = task

@@ -1,4 +1,4 @@
-"""Конвейер валидации: размер -> JSON -> схема -> ссылки и циклы -> ресурсы -> дедлайны."""
+"""Полная проверка входа: размер, JSON и схема, затем граф, ресурсы и дедлайны."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ ValidationMode = Literal["strict", "lenient"]
 
 
 def validate(raw: bytes, mode: ValidationMode) -> tuple[Problem | None, list[Diagnostic]]:
-    """Полный разбор входа. Слишком большое тело (InputTooLarge) — не диагностика, а отказ на границе."""
+    """Проверка сырого входа. Слишком большой вход даёт исключение InputTooLarge, а не диагностику."""
     try:
         parsed = load(raw)
     except ValidationError as error:
@@ -29,14 +29,13 @@ def validate(raw: bytes, mode: ValidationMode) -> tuple[Problem | None, list[Dia
 
 
 def validate_problem(problem: Problem, mode: ValidationMode) -> tuple[Problem | None, list[Diagnostic]]:
-    """Проверки над доменным экземпляром.
+    """Проверка графа, ресурсов и дедлайнов.
 
-    Возвращает (None, диагностики), если в strict найдена хоть одна ошибка: симуляцию запускать нельзя.
-    Иначе возвращает экземпляр без повторов в зависимостях; в lenient с ошибками его нужно пропустить
-    через `quarantine`, чтобы получить планируемую часть. Дедлайны проверяются на планируемой части:
-    у цикла нет ни ранних, ни поздних сроков.
+    В режиме strict при любой ошибке возвращает (None, диагностики). Иначе — экземпляр без повторов
+    в зависимостях; задачи с ошибками из него убирает `quarantine`.
     """
     diagnostics = [*validate_graph(problem.tasks), *validate_resources(problem)]
+    # У задач в цикле нет сроков, поэтому дедлайны проверяются только на планируемой части.
     runnable = quarantine(problem, diagnostics).problem
     diagnostics += deadline_certificates(runnable, analyze(runnable))
     if mode == "strict" and has_errors(diagnostics):

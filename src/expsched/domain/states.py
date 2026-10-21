@@ -1,4 +1,4 @@
-"""Перечисления домена: статусы задач, классы событий и приоритета (спецификация, раздел 4.5)."""
+"""Статусы задач, порядок обработки событий и классы приоритета."""
 
 from __future__ import annotations
 
@@ -6,8 +6,6 @@ from enum import IntEnum, StrEnum
 
 
 class TaskStatus(StrEnum):
-    """Персистентные статусы. REQUEUED/PREEMPTED и WAITING — переходы и производные отметки журнала."""
-
     PENDING = "PENDING"
     READY = "READY"
     RUNNING = "RUNNING"
@@ -18,7 +16,7 @@ class TaskStatus(StrEnum):
     CANCELLED = "CANCELLED"
 
 
-# Финальные статусы поглощающие: из них нет переходов.
+# Из финальных статусов переходов нет.
 FINAL_STATUSES: frozenset[TaskStatus] = frozenset(
     {
         TaskStatus.SUCCEEDED,
@@ -31,13 +29,16 @@ FINAL_STATUSES: frozenset[TaskStatus] = frozenset(
 
 
 class EvClass(IntEnum):
-    """Порядок обработки событий одного момента времени: меньше — раньше."""
+    """Порядок обработки событий одного момента: меньше — раньше.
+
+    Окончания идут первыми, поэтому задача, завершившаяся ровно в момент отказа узла, успешна.
+    """
 
     FINISH = 0
     WORKER_DOWN = 1
     WORKER_UP = 2
-    QUEUE = 3  # SUBMIT, CANCEL, CHANGE_PRIORITY
-    DECIDE = 9
+    QUEUE = 3  # подача задачи, наступление release_time
+    DECIDE = 9  # решение политики — после всех событий момента
 
 
 class PriorityClass(IntEnum):
