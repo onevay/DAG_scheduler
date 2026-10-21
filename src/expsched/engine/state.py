@@ -45,7 +45,7 @@ class SimState:
         return state
 
     def add_task(self, task: Task) -> None:
-        """Добавляет задачу в статусе PENDING.
+        """Добавляет задачу в статусе PENDING; уже завершённые зависимости её не держат.
 
         Неизвестная зависимость или самоссылка никогда не завершится, поэтому такая задача не станет READY.
         """
@@ -55,6 +55,6 @@ class SimState:
         self.rem[task.id] = task.duration
         self.attempt[task.id] = 0
         self.eligible[task.id] = self.problem.eligible(task)
-        self.waiting_preds[task.id] = len(deps)
+        self.waiting_preds[task.id] = sum(self.status.get(d) is not TaskStatus.SUCCEEDED for d in deps)
         for dep in sorted(deps):
             self.successors.setdefault(dep, []).append(task.id)

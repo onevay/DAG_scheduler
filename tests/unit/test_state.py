@@ -39,6 +39,13 @@ def test_add_task_registers_a_late_task(demo_problem, make_task):
     assert s.eligible["late"] == ("node-A", "node-B", "node-C")
 
 
+def test_finished_dependency_of_a_late_task_is_not_waited_for(demo_problem, make_task):
+    s = SimState.from_problem(demo_problem)
+    s.status["prep_data"] = TaskStatus.SUCCEEDED
+    s.add_task(make_task("late", 1, "prep_data", "train_asr"))
+    assert s.waiting_preds["late"] == 1
+
+
 def test_snapshot_reflects_state_and_sorts_ready(demo_problem):
     s = SimState.from_problem(demo_problem)
     s.status["train_asr"] = s.status["prep_data"] = TaskStatus.READY
