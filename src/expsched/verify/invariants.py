@@ -17,7 +17,7 @@ def verify(problem: Problem, log: Sequence[Mapping[str, Any]]) -> list[str]:
     узла не больше ёмкости; I5 старт не раньше release и подачи; I6 узел допустим для задачи;
     I7 после успешной попытки других нет; I12 попытки одной задачи не пересекаются.
     """
-    tasks = dict(problem.tasks) | {e.task.id: e.task for e in problem.events if e.task is not None}
+    tasks = problem.all_tasks()
     submitted = {r["task"]: r["t"] for r in log if r["type"] == "SUBMIT"}
     attempts = attempts_from_log(log)
     unknown = sorted({a.task for a in attempts if a.task not in tasks})

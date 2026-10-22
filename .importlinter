@@ -9,7 +9,7 @@ type = layers
 layers =
     (expsched.api) | (expsched.cli) | (expsched.io)
     (expsched.pipeline)
-    (expsched.explain) | (expsched.metrics)
+    expsched.explain | expsched.metrics
     expsched.verify
     expsched.engine | expsched.policies
     expsched.validation

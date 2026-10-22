@@ -77,6 +77,10 @@ class Problem:
     events: list[Event] = field(default_factory=list)
     seed: int = 0
 
+    def all_tasks(self) -> dict[str, Task]:
+        """Задачи входа вместе с задачами, которые подаются событиями во время прогона."""
+        return dict(self.tasks) | {e.task.id: e.task for e in self.events if e.task is not None}
+
     def eligible(self, task: Task) -> tuple[str, ...]:
         """Узлы, у которых хватает ёмкости и есть все метки из `constraints`, по возрастанию id."""
         return tuple(
