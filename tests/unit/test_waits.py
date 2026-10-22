@@ -8,7 +8,7 @@ from expsched.engine.waits import ready_wait
 from expsched.policies.fifo import FifoPolicy
 from expsched.policies.priority import PriorityPolicy
 
-READY_CODES = {"WAIT_WORKER_DOWN", "WAIT_RESOURCES", "WAIT_PRIORITY"}
+READY_CODES = {"WAIT_WORKER_DOWN", "WAIT_RESOURCES", "WAIT_RESERVATION", "WAIT_PRIORITY"}
 POLICIES = [FifoPolicy(), FifoPolicy(skip=True), PriorityPolicy(aging=3)]
 
 
