@@ -7,7 +7,7 @@ root_package = expsched
 name = Слои ядра
 type = layers
 layers =
-    (expsched.api) | (expsched.cli) | (expsched.io)
+    expsched.api | (expsched.cli) | (expsched.io)
     expsched.pipeline
     expsched.explain | expsched.metrics
     expsched.verify

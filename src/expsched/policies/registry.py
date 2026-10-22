@@ -16,6 +16,10 @@ _FACTORIES: dict[str, Callable[[PolicyIn], Policy]] = {
 }
 
 
+def implemented_policies() -> list[str]:
+    return sorted(_FACTORIES)
+
+
 def make_policy(config: PolicyIn) -> Policy:
     """Политика по имени `config.name`. Для ещё не реализованных имён — NotImplementedError."""
     factory = _FACTORIES.get(config.name)
