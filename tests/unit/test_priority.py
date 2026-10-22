@@ -102,5 +102,5 @@ def test_demo_urgent_task_meets_its_deadline(demo_problem, check_capacity):
 
 
 def test_registry_passes_aging_from_the_settings():
-    policy = make_policy(PolicyIn(name="priority", aging=5))
+    policy = make_policy(PolicyIn(name="priority", aging=5, preemption="never"))
     assert isinstance(policy, PriorityPolicy) and policy.aging == 5
