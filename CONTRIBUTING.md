@@ -8,11 +8,10 @@ make lint      # ruff check, ruff format --check, lint-imports
 make types     # mypy --strict
 make test      # pytest без docker и slow
 make test-all  # все тесты
-make schema    # пересобрать schemas/problem.schema.json
+make schema    # пересобрать JSON Schema входа, результата и записи журнала в schemas/
 ```
 
-CI выполняет `make lint types test` и проверяет, что `schemas/problem.schema.json` совпадает со сгенерированной
-схемой. Перед отправкой изменений должны проходить все три цели.
+CI выполняет `make lint types test` и проверяет, что `schemas/` совпадает со сгенерированными схемами. Перед отправкой изменений должны проходить все три цели.
 
 ## Тесты
 

@@ -1,0 +1,710 @@
+{
+  "$defs": {
+    "BlockedRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "by": {
+          "title": "By",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "t": {
+          "minimum": 0,
+          "title": "T",
+          "type": "integer"
+        },
+        "task": {
+          "title": "Task",
+          "type": "string"
+        },
+        "type": {
+          "const": "BLOCKED",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "t",
+        "type",
+        "task",
+        "by"
+      ],
+      "title": "BlockedRecord",
+      "type": "object"
+    },
+    "DiagnosticRecord": {
+      "additionalProperties": false,
+      "description": "Проблема, найденная во время прогона: STUCK, DUPLICATE_TASK_ID или код диагностики входа.",
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "detail": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Detail"
+        },
+        "hint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hint"
+        },
+        "level": {
+          "anyOf": [
+            {
+              "enum": [
+                "error",
+                "warning"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Level"
+        },
+        "seq": {
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "t": {
+          "minimum": 0,
+          "title": "T",
+          "type": "integer"
+        },
+        "task": {
+          "title": "Task",
+          "type": "string"
+        },
+        "type": {
+          "const": "DIAGNOSTIC",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "t",
+        "type",
+        "code",
+        "task"
+      ],
+      "title": "DiagnosticRecord",
+      "type": "object"
+    },
+    "FinishRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "attempt": {
+          "minimum": 1,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "seq": {
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "t": {
+          "minimum": 0,
+          "title": "T",
+          "type": "integer"
+        },
+        "task": {
+          "title": "Task",
+          "type": "string"
+        },
+        "type": {
+          "const": "FINISH",
+          "title": "Type",
+          "type": "string"
+        },
+        "worker": {
+          "title": "Worker",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "t",
+        "type",
+        "task",
+        "attempt",
+        "worker"
+      ],
+      "title": "FinishRecord",
+      "type": "object"
+    },
+    "InterruptedRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "attempt": {
+          "minimum": 1,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "cause": {
+          "enum": [
+            "WORKER_DOWN",
+            "PREEMPT"
+          ],
+          "title": "Cause",
+          "type": "string"
+        },
+        "lost": {
+          "minimum": 0,
+          "title": "Lost",
+          "type": "integer"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "remaining": {
+          "minimum": 0,
+          "title": "Remaining",
+          "type": "integer"
+        },
+        "saved": {
+          "minimum": 0,
+          "title": "Saved",
+          "type": "integer"
+        },
+        "seq": {
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "t": {
+          "minimum": 0,
+          "title": "T",
+          "type": "integer"
+        },
+        "task": {
+          "title": "Task",
+          "type": "string"
+        },
+        "type": {
+          "const": "INTERRUPTED",
+          "title": "Type",
+          "type": "string"
+        },
+        "worker": {
+          "title": "Worker",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "t",
+        "type",
+        "task",
+        "attempt",
+        "worker",
+        "cause",
+        "saved",
+        "lost",
+        "remaining"
+      ],
+      "title": "InterruptedRecord",
+      "type": "object"
+    },
+    "ReadyRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "seq": {
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "t": {
+          "minimum": 0,
+          "title": "T",
+          "type": "integer"
+        },
+        "task": {
+          "title": "Task",
+          "type": "string"
+        },
+        "type": {
+          "const": "READY",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "t",
+        "type",
+        "task"
+      ],
+      "title": "ReadyRecord",
+      "type": "object"
+    },
+    "ReplanEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "task": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Task"
+        },
+        "type": {
+          "enum": [
+            "worker_down",
+            "worker_up",
+            "submit_task"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "worker": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Worker"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "ReplanEvent",
+      "type": "object"
+    },
+    "ReplanRecord": {
+      "additionalProperties": false,
+      "description": "Как внешние события момента сдвинули прогнозные старты задач.",
+      "properties": {
+        "changes": {
+          "items": {
+            "$ref": "#/$defs/StartShift"
+          },
+          "title": "Changes",
+          "type": "array"
+        },
+        "dropped": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Dropped",
+          "type": "array"
+        },
+        "events": {
+          "items": {
+            "$ref": "#/$defs/ReplanEvent"
+          },
+          "title": "Events",
+          "type": "array"
+        },
+        "new_tasks": {
+          "additionalProperties": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "title": "New Tasks",
+          "type": "object"
+        },
+        "seq": {
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "t": {
+          "minimum": 0,
+          "title": "T",
+          "type": "integer"
+        },
+        "trigger": {
+          "enum": [
+            "worker_down",
+            "worker_up",
+            "submit_task"
+          ],
+          "title": "Trigger",
+          "type": "string"
+        },
+        "type": {
+          "const": "REPLAN",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "t",
+        "type",
+        "trigger",
+        "events",
+        "changes",
+        "new_tasks",
+        "dropped"
+      ],
+      "title": "ReplanRecord",
+      "type": "object"
+    },
+    "ReserveRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "seq": {
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "t": {
+          "minimum": 0,
+          "title": "T",
+          "type": "integer"
+        },
+        "t_res": {
+          "minimum": 0,
+          "title": "T Res",
+          "type": "integer"
+        },
+        "task": {
+          "title": "Task",
+          "type": "string"
+        },
+        "type": {
+          "const": "RESERVE",
+          "title": "Type",
+          "type": "string"
+        },
+        "worker": {
+          "title": "Worker",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "t",
+        "type",
+        "task",
+        "worker",
+        "t_res"
+      ],
+      "title": "ReserveRecord",
+      "type": "object"
+    },
+    "StartRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "attempt": {
+          "minimum": 1,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "reason": {
+          "additionalProperties": true,
+          "title": "Reason",
+          "type": "object"
+        },
+        "resume_from": {
+          "minimum": 0,
+          "title": "Resume From",
+          "type": "integer"
+        },
+        "seq": {
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "t": {
+          "minimum": 0,
+          "title": "T",
+          "type": "integer"
+        },
+        "task": {
+          "title": "Task",
+          "type": "string"
+        },
+        "type": {
+          "const": "START",
+          "title": "Type",
+          "type": "string"
+        },
+        "worker": {
+          "title": "Worker",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "t",
+        "type",
+        "task",
+        "worker",
+        "attempt",
+        "resume_from",
+        "reason"
+      ],
+      "title": "StartRecord",
+      "type": "object"
+    },
+    "StartShift": {
+      "additionalProperties": false,
+      "properties": {
+        "delta": {
+          "title": "Delta",
+          "type": "integer"
+        },
+        "new_start": {
+          "minimum": 0,
+          "title": "New Start",
+          "type": "integer"
+        },
+        "old_start": {
+          "minimum": 0,
+          "title": "Old Start",
+          "type": "integer"
+        },
+        "task": {
+          "title": "Task",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task",
+        "old_start",
+        "new_start",
+        "delta"
+      ],
+      "title": "StartShift",
+      "type": "object"
+    },
+    "SubmitRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "deadline": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Deadline"
+        },
+        "priority": {
+          "title": "Priority",
+          "type": "integer"
+        },
+        "seq": {
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "t": {
+          "minimum": 0,
+          "title": "T",
+          "type": "integer"
+        },
+        "task": {
+          "title": "Task",
+          "type": "string"
+        },
+        "type": {
+          "const": "SUBMIT",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "t",
+        "type",
+        "task",
+        "priority",
+        "deadline"
+      ],
+      "title": "SubmitRecord",
+      "type": "object"
+    },
+    "WaitRecord": {
+      "additionalProperties": false,
+      "description": "Новая причина ожидания задачи; действует до следующей записи WAIT этой задачи или до её старта.",
+      "properties": {
+        "code": {
+          "enum": [
+            "WAIT_DEPS",
+            "WAIT_RELEASE",
+            "WAIT_WORKER_DOWN",
+            "WAIT_RESOURCES",
+            "WAIT_RESERVATION",
+            "WAIT_PRIORITY"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "detail": {
+          "additionalProperties": true,
+          "title": "Detail",
+          "type": "object"
+        },
+        "seq": {
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "t": {
+          "minimum": 0,
+          "title": "T",
+          "type": "integer"
+        },
+        "task": {
+          "title": "Task",
+          "type": "string"
+        },
+        "type": {
+          "const": "WAIT",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "t",
+        "type",
+        "task",
+        "code",
+        "detail"
+      ],
+      "title": "WaitRecord",
+      "type": "object"
+    },
+    "WorkerRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "seq": {
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "t": {
+          "minimum": 0,
+          "title": "T",
+          "type": "integer"
+        },
+        "type": {
+          "enum": [
+            "WORKER_DOWN",
+            "WORKER_UP"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "worker": {
+          "title": "Worker",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "t",
+        "type",
+        "worker"
+      ],
+      "title": "WorkerRecord",
+      "type": "object"
+    }
+  },
+  "discriminator": {
+    "mapping": {
+      "BLOCKED": "#/$defs/BlockedRecord",
+      "DIAGNOSTIC": "#/$defs/DiagnosticRecord",
+      "FINISH": "#/$defs/FinishRecord",
+      "INTERRUPTED": "#/$defs/InterruptedRecord",
+      "READY": "#/$defs/ReadyRecord",
+      "REPLAN": "#/$defs/ReplanRecord",
+      "RESERVE": "#/$defs/ReserveRecord",
+      "START": "#/$defs/StartRecord",
+      "SUBMIT": "#/$defs/SubmitRecord",
+      "WAIT": "#/$defs/WaitRecord",
+      "WORKER_DOWN": "#/$defs/WorkerRecord",
+      "WORKER_UP": "#/$defs/WorkerRecord"
+    },
+    "propertyName": "type"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/SubmitRecord"
+    },
+    {
+      "$ref": "#/$defs/ReadyRecord"
+    },
+    {
+      "$ref": "#/$defs/WaitRecord"
+    },
+    {
+      "$ref": "#/$defs/StartRecord"
+    },
+    {
+      "$ref": "#/$defs/FinishRecord"
+    },
+    {
+      "$ref": "#/$defs/WorkerRecord"
+    },
+    {
+      "$ref": "#/$defs/InterruptedRecord"
+    },
+    {
+      "$ref": "#/$defs/BlockedRecord"
+    },
+    {
+      "$ref": "#/$defs/DiagnosticRecord"
+    },
+    {
+      "$ref": "#/$defs/ReserveRecord"
+    },
+    {
+      "$ref": "#/$defs/ReplanRecord"
+    }
+  ],
+  "title": "EventRecord"
+}

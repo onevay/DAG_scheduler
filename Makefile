@@ -22,7 +22,7 @@ test-all:
 	$(RUN) pytest
 
 schema:
-	$(RUN) python -m expsched.contract.io_models > schemas/problem.schema.json
+	$(RUN) python -m expsched.contract.schemas schemas
 
 api:
 	$(RUN) uvicorn expsched.api.app:app --reload --port 8000

@@ -51,7 +51,9 @@ make api            # uvicorn на http://127.0.0.1:8000, документаци
 Ошибки самого входа (цикл, неизвестная зависимость) не делают запрос ошибочным: прогон возвращает 200
 со статусом PARTIAL или INFEASIBLE и диагностиками в `result.diagnostics`.
 
-`events` — журнал прогона ([формат](scheduling.md#журнал)). `result`:
+`events` — журнал прогона ([формат](scheduling.md#журнал)). Схемы ответа: `result` —
+[`schemas/result.schema.json`](../schemas/result.schema.json), запись журнала —
+[`schemas/event.schema.json`](../schemas/event.schema.json). `result`:
 
 | Поле | |
 |---|---|

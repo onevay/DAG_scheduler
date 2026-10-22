@@ -133,7 +133,8 @@ lost  = elapsed − saved
 
 ## Журнал
 
-Список записей `{seq, t, type, …}` в порядке появления.
+Список записей `{seq, t, type, …}` в порядке появления. Схема записи —
+[`schemas/event.schema.json`](../schemas/event.schema.json).
 
 | `type` | Поля |
 |---|---|
