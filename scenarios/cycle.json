@@ -1,0 +1,115 @@
+{
+  "time_unit": "hour",
+  "cluster": {
+    "workers": [
+      {
+        "id": "node-A",
+        "resources": {
+          "gpu": 4
+        }
+      }
+    ]
+  },
+  "tasks": [
+    {
+      "id": "prep",
+      "duration": 2,
+      "resources": {
+        "gpu": 1
+      },
+      "priority": 1,
+      "dependencies": []
+    },
+    {
+      "id": "a",
+      "duration": 1,
+      "resources": {
+        "gpu": 1
+      },
+      "priority": 1,
+      "dependencies": [
+        "c"
+      ]
+    },
+    {
+      "id": "b",
+      "duration": 1,
+      "resources": {
+        "gpu": 1
+      },
+      "priority": 1,
+      "dependencies": [
+        "a"
+      ]
+    },
+    {
+      "id": "c",
+      "duration": 1,
+      "resources": {
+        "gpu": 1
+      },
+      "priority": 1,
+      "dependencies": [
+        "b",
+        "prep"
+      ]
+    },
+    {
+      "id": "after_cycle",
+      "duration": 2,
+      "resources": {
+        "gpu": 1
+      },
+      "priority": 1,
+      "dependencies": [
+        "c"
+      ]
+    },
+    {
+      "id": "orphan",
+      "duration": 1,
+      "resources": {
+        "gpu": 1
+      },
+      "priority": 1,
+      "dependencies": [
+        "ghost"
+      ]
+    },
+    {
+      "id": "after_orphan",
+      "duration": 1,
+      "resources": {
+        "gpu": 1
+      },
+      "priority": 1,
+      "dependencies": [
+        "orphan"
+      ]
+    },
+    {
+      "id": "free",
+      "duration": 3,
+      "resources": {
+        "gpu": 2
+      },
+      "priority": 1,
+      "dependencies": []
+    },
+    {
+      "id": "report",
+      "duration": 1,
+      "resources": {
+        "gpu": 1
+      },
+      "priority": 1,
+      "dependencies": [
+        "free",
+        "free"
+      ]
+    }
+  ],
+  "policy": {
+    "name": "priority"
+  }
+}

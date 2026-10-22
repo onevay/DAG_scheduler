@@ -7,4 +7,15 @@ UI — отдельный клиент REST API. Он не импортируе�
 - `streamlit/` — интерфейс на Streamlit;
 - `web/` — место для JS-приложения, если интерфейс на него перейдёт.
 
-У каждой реализации свои зависимости и сборка; в `pyproject.toml` ядра они не попадают.
+Зависимости реализаций не входят в зависимости ядра: Streamlit-интерфейс ставится extra `ui`
+(`uv sync --extra ui`), API — extra `api`.
+
+## Streamlit
+
+```bash
+make api   # API на http://127.0.0.1:8000
+make ui    # интерфейс на http://localhost:8501
+```
+
+Адрес API задаёт переменная `EXPSCHED_API`. Логика без Streamlit (таблицы входа, граф, клиент API) лежит
+в `streamlit/expsched_ui/` и проверяется тестами `tests/ui/`.
