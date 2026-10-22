@@ -31,6 +31,7 @@ packages = [
     "expsched.validation",
     "expsched.engine",
     "expsched.policies",
+    "expsched.verify",
 ]
 plugins = ["pydantic.mypy"]
 
