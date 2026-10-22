@@ -5,11 +5,12 @@ import pytest
 from expsched.engine.simulator import Simulator
 from expsched.engine.state import SimState
 from expsched.engine.waits import ready_wait
+from expsched.policies.backfill import BackfillPolicy
 from expsched.policies.fifo import FifoPolicy
 from expsched.policies.priority import PriorityPolicy
 
 READY_CODES = {"WAIT_WORKER_DOWN", "WAIT_RESOURCES", "WAIT_RESERVATION", "WAIT_PRIORITY"}
-POLICIES = [FifoPolicy(), FifoPolicy(skip=True), PriorityPolicy(aging=3)]
+POLICIES = [FifoPolicy(), FifoPolicy(skip=True), PriorityPolicy(aging=3), BackfillPolicy(aging=3)]
 
 
 def waits(log, task):

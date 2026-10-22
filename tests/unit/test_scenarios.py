@@ -56,7 +56,7 @@ def test_urgent_task_during_a_failure():
 
 
 @pytest.mark.parametrize("name", ["demo", "failure", "urgent_failure"])
-@pytest.mark.parametrize("policy", ["fifo", "fifo_skip", "priority"])
+@pytest.mark.parametrize("policy", ["fifo", "fifo_skip", "priority", "priority_backfill"])
 def test_every_policy_produces_a_valid_schedule(name, policy):
     result = outcome(name, policy).result
     assert result["status"] == "OK" and result["violations"] == []

@@ -7,9 +7,10 @@
 У каждой нестартовавшей задачи есть причина ожидания (WAIT_*). Запись WAIT появляется, когда причина
 меняется, и действует до следующей записи WAIT этой задачи или до её старта.
 
-RESERVE — обещание политики начать задачу на узле не позже t_res. Ресурсы резерв не занимает: политика
-пересчитывает его каждую эпоху, а движок только проверяет решение и пишет запись, когда резерв меняется.
-PREEMPT пока даёт NotImplementedError.
+Решения эпохи: PREEMPT применяются первыми, в каком бы порядке их ни вернула политика, затем START и RESERVE
+по порядку. Вытеснение прерывает попытку так же, как отказ узла (работа до чекпоинта сохраняется), но идёт
+в счётчик вытеснений, а не в max_retries. RESERVE — обещание начать задачу на узле не позже t_res: ресурсы
+резерв не занимает, политика пересчитывает его каждую эпоху, а запись пишется, когда резерв меняется.
 """
 
 from __future__ import annotations
@@ -119,8 +120,11 @@ class Simulator:
         s.free[worker] = s.problem.workers[worker].capacity
         self.journal.append("WORKER_UP", self.t, worker=worker)
 
-    def _interrupt(self, key: str, cause: str) -> None:
-        """Прерывает попытку: работа до последнего чекпоинта сохраняется, остальное теряется."""
+    def _interrupt(self, key: str, cause: str, reason: dict[str, Any] | None = None) -> None:
+        """Прерывает попытку: работа до последнего чекпоинта сохраняется, остальное теряется.
+
+        Вытеснение (`cause="PREEMPT"`, `reason` — причина от политики) не расходует ретраи.
+        """
         s = self.state
         task, run = s.tasks[key], s.run.pop(key)
         elapsed = self.t - run.start
@@ -138,9 +142,13 @@ class Simulator:
             saved=saved,
             lost=elapsed - saved,
             remaining=s.rem[key],
+            **({"reason": dict(reason)} if reason is not None else {}),
         )
-        s.failures[key] = s.failures.get(key, 0) + 1
-        if s.failures[key] > task.max_retries:
+        if cause == "PREEMPT":
+            s.preempt_count[key] = s.preempt_count.get(key, 0) + 1
+        else:
+            s.failures[key] = s.failures.get(key, 0) + 1
+        if s.failures.get(key, 0) > task.max_retries:
             s.status[key] = TaskStatus.FAILED
             self._block_descendants(key)
             return
@@ -239,9 +247,14 @@ class Simulator:
         s = self.state
         if not s.ready:
             return
-        free_before = dict(s.free)
         # Снимок смотрит на живое состояние, поэтому решения собираются целиком до их применения.
         decisions = list(self.policy.decide(build_snapshot(s, self.t)))
+        for decision in decisions:
+            if decision.action == "PREEMPT":
+                self._preempt(decision)
+        # Освобождённое вытеснением считается местом, которое было до решений: если его забрали другие,
+        # причина ожидания — WAIT_PRIORITY.
+        free_before = dict(s.free)
         started: list[str] = []
         reserved: dict[str, tuple[str, int]] = {}
         for decision in decisions:
@@ -250,9 +263,7 @@ class Simulator:
                 started.append(decision.task)
             elif decision.action == "RESERVE":
                 reserved[decision.task] = self._reserve(decision)
-            elif decision.action == "PREEMPT":
-                raise NotImplementedError("PREEMPT is not supported yet")
-            else:
+            elif decision.action != "PREEMPT":
                 raise InvalidDecision(decision, "unknown action")
         for key, (worker, t_res) in reserved.items():
             if s.reserved.get(key) != (worker, t_res):
@@ -276,6 +287,17 @@ class Simulator:
             raise InvalidDecision(decision, "worker is unknown or down")
         if decision.worker not in s.eligible[decision.task]:
             raise InvalidDecision(decision, "worker is not eligible for the task")
+
+    def _preempt(self, decision: Decision) -> None:
+        s = self.state
+        run = s.run.get(decision.task)
+        if run is None:
+            raise InvalidDecision(decision, "task is not RUNNING")
+        if run.worker != decision.worker:
+            raise InvalidDecision(decision, f"task runs on {run.worker}")
+        if not s.tasks[decision.task].preemptible:
+            raise InvalidDecision(decision, "task is not preemptible")
+        self._interrupt(decision.task, cause="PREEMPT", reason=decision.reason)
 
     def _reserve(self, decision: Decision) -> tuple[str, int]:
         self._check_target(decision)

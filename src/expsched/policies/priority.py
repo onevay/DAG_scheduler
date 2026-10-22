@@ -48,11 +48,12 @@ class PriorityPolicy:
                 continue
             free[worker] = free[worker] - need
             room = any(free.values())
-            out.append(Decision("START", task_id, worker, _reason(keys[task_id])))
+            out.append(Decision("START", task_id, worker, queue_reason(keys[task_id])))
         return out
 
 
-def _reason(key: QueueKey) -> dict[str, object]:
+def queue_reason(key: QueueKey) -> dict[str, object]:
+    """Причина старта для журнала: из чего сложилось место задачи в очереди."""
     cls, slack, rank, _, _ = key
     # Бесконечный запас пишется как None: в журнале только конечные числа.
     return {

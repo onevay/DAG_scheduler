@@ -73,7 +73,7 @@ def run(problem: ProblemIn, policy: PolicyIn | None = None) -> RunResult:
         "tasks": _task_summaries(validated.all_tasks() | sim.state.tasks, status, log),
         "metrics": metrics(plan.problem, log, lower_bound),
         "diagnostics": found,
-        "violations": verify(plan.problem, log),
+        "violations": verify(plan.problem, log, config.max_preemptions_per_task),
     }
     return RunResult(result, log)
 
