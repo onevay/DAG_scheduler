@@ -4,22 +4,9 @@ import dataclasses
 
 from expsched.analysis import analyze
 from expsched.domain.models import Event, EvType, Problem
-from expsched.domain.resources import Resources
 from expsched.domain.snapshot import Decision
 from expsched.domain.states import TaskStatus
 from expsched.engine.simulator import Simulator
-
-
-def assert_capacity_respected(problem: Problem, log: list[dict]) -> None:
-    """После каждого START загрузка узла не больше ёмкости; окончания в журнале идут раньше стартов."""
-    tasks = dict(problem.tasks) | {e.task.id: e.task for e in problem.events if e.task}
-    load = {w: Resources() for w in problem.workers}
-    for r in log:
-        if r["type"] == "START":
-            load[r["worker"]] = load[r["worker"]] + tasks[r["task"]].resources
-            assert load[r["worker"]].fits(problem.workers[r["worker"]].capacity), r
-        elif r["type"] == "FINISH":
-            load[r["worker"]] = load[r["worker"]] - tasks[r["task"]].resources
 
 
 def online(demo: Problem) -> Problem:
@@ -54,24 +41,24 @@ class FirstFreeWorker:
         return out
 
 
-def test_demo_runs_to_completion_with_a_valid_schedule(demo_problem, greedy):
+def test_demo_runs_to_completion_with_a_valid_schedule(demo_problem, greedy, check_capacity):
     sim = Simulator(demo_problem, greedy)
     log = sim.run_all()
     assert set(sim.state.status.values()) == {TaskStatus.SUCCEEDED}
-    assert_capacity_respected(demo_problem, log)
+    check_capacity(demo_problem, log)
     analysis = analyze(demo_problem)
     starts = {r["task"]: r["t"] for r in log if r["type"] == "START"}
     assert all(starts[k] >= analysis.est[k] for k in starts)  # раньше самого раннего старта нельзя
     assert max(r["t"] for r in log if r["type"] == "FINISH") >= analysis.lb
 
 
-def test_online_demo_with_a_submitted_urgent_task(demo_problem, greedy):
+def test_online_demo_with_a_submitted_urgent_task(demo_problem, greedy, check_capacity):
     problem = online(demo_problem)
     sim = Simulator(problem, greedy)
     log = sim.run_all()
     assert set(sim.state.status.values()) == {TaskStatus.SUCCEEDED}
     assert [r["t"] for r in log if r["type"] == "SUBMIT"] == [9]
-    assert_capacity_respected(problem, log)
+    check_capacity(problem, log)
 
 
 def test_two_runs_give_the_same_journal_hash(demo_problem, greedy):

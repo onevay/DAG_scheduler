@@ -38,6 +38,23 @@ def greedy() -> GreedyPolicy:
     return GreedyPolicy()
 
 
+def _assert_capacity_respected(problem: Problem, log: list[dict[str, Any]]) -> None:
+    tasks = dict(problem.tasks) | {e.task.id: e.task for e in problem.events if e.task}
+    load = {w: Resources() for w in problem.workers}
+    for r in log:
+        if r["type"] == "START":
+            load[r["worker"]] = load[r["worker"]] + tasks[r["task"]].resources
+            assert load[r["worker"]].fits(problem.workers[r["worker"]].capacity), r
+        elif r["type"] == "FINISH":
+            load[r["worker"]] = load[r["worker"]] - tasks[r["task"]].resources
+
+
+@pytest.fixture
+def check_capacity() -> Callable[[Problem, list[dict[str, Any]]], None]:
+    """check_capacity(problem, log): после каждого START загрузка узла не больше его ёмкости."""
+    return _assert_capacity_respected
+
+
 @pytest.fixture
 def make_task() -> TaskFactory:
     def make(key: str, duration: int = 1, *deps: str, gpu: int = 1, **fields: Any) -> Task:
