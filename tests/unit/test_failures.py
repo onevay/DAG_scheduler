@@ -80,3 +80,51 @@ def test_task_waits_while_its_only_worker_is_down(make_task, make_problem, greed
 def test_event_for_an_unknown_worker_is_rejected(make_task, make_problem, greedy):
     with pytest.raises(ValueError, match="unknown worker"):
         run(make_problem([make_task("a")], events=[down(1, "ghost")]), greedy)
+
+
+# ---- ретраи и блокировка ----
+
+
+def test_task_fails_after_its_retries_are_used_up(make_task, make_problem, greedy):
+    # одна повторная попытка разрешена: первое прерывание — повтор, второе — FAILED
+    problem = make_problem([make_task("a", 5, max_retries=1)], events=[down(1), up(2), down(3), up(4)])
+    sim, log = run(problem, greedy)
+    assert sim.state.status["a"] is TaskStatus.FAILED
+    assert [r["t"] for r in records(log, "START")] == [0, 2]  # после второго прерывания стартов нет
+    assert len(records(log, "INTERRUPTED")) == 2
+
+
+def test_failure_blocks_all_descendants(make_task, make_problem, greedy):
+    tasks = [
+        make_task("a", 5, max_retries=0),
+        make_task("b", 1, "a"),
+        make_task("c", 1, "b"),
+        make_task("free", 9),
+    ]
+    sim, log = run(make_problem(tasks, gpus=(4, 4), events=[down(1)]), greedy)
+    assert {k: sim.state.status[k] for k in "abc"} == {
+        "a": TaskStatus.FAILED,
+        "b": TaskStatus.BLOCKED,
+        "c": TaskStatus.BLOCKED,
+    }
+    assert sorted((r["task"], r["by"]) for r in records(log, "BLOCKED")) == [("b", "a"), ("c", "a")]
+    assert sim.state.status["free"] is TaskStatus.SUCCEEDED
+    assert records(log, "DIAGNOSTIC") == []  # заблокированные задачи — финальный статус, а не STUCK
+
+
+def test_task_submitted_after_its_dependency_failed_is_blocked(make_task, make_problem, greedy):
+    submit = Event(3, EvType.SUBMIT, task=make_task("late", 1, "a"))
+    problem = make_problem([make_task("a", 5, max_retries=0)], events=[down(1), up(2), submit])
+    sim, log = run(problem, greedy)
+    assert sim.state.status["late"] is TaskStatus.BLOCKED
+    assert [(r["t"], r["by"]) for r in records(log, "BLOCKED", task="late")] == [(3, "a")]
+
+
+def test_unfinished_tasks_get_e050_or_stuck(make_task, make_problem, greedy):
+    # узел n0 не вернулся: a осталась без работающего узла; b ждёт несуществующую задачу
+    tasks = [make_task("a", 5), make_task("b", 1, "ghost")]
+    _, log = run(make_problem(tasks, events=[down(1)]), greedy)
+    codes = {r["task"]: r["code"] for r in records(log, "DIAGNOSTIC")}
+    assert codes == {"a": "E050", "b": "STUCK"}
+    (e050,) = records(log, "DIAGNOSTIC", code="E050")
+    assert e050["level"] == "error" and e050["detail"] == {"task": "a", "eligible": ["n0"]}

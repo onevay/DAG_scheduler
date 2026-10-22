@@ -28,6 +28,7 @@ class SimState:
     wait_code: dict[str, str] = field(default_factory=dict)  # текущая причина ожидания задачи
     ready_since: dict[str, int] = field(default_factory=dict)
     preempt_count: dict[str, int] = field(default_factory=dict)  # сколько раз задачу вытесняли
+    failures: dict[str, int] = field(default_factory=dict)  # сколько раз задачу прервал отказ узла
     # Ранги и поздние сроки не меняются, когда задачи завершаются, поэтому анализ пересчитывается
     # только при изменении графа или остатков работы. None — нужен пересчёт.
     analysis: Analysis | None = None
