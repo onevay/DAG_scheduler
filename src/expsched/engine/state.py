@@ -29,6 +29,8 @@ class SimState:
     ready_since: dict[str, int] = field(default_factory=dict)
     preempt_count: dict[str, int] = field(default_factory=dict)  # сколько раз задачу вытесняли
     failures: dict[str, int] = field(default_factory=dict)  # сколько раз задачу прервал отказ узла
+    # Резервы последнего решения: задача -> (узел, t_res). Запись RESERVE пишется, когда резерв меняется.
+    reserved: dict[str, tuple[str, int]] = field(default_factory=dict)
     # Ранги и поздние сроки не меняются, когда задачи завершаются, поэтому анализ пересчитывается
     # только при изменении графа или остатков работы. None — нужен пересчёт.
     analysis: Analysis | None = None

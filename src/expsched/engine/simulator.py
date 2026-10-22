@@ -7,7 +7,9 @@
 У каждой нестартовавшей задачи есть причина ожидания (WAIT_*). Запись WAIT появляется, когда причина
 меняется, и действует до следующей записи WAIT этой задачи или до её старта.
 
-PREEMPT и RESERVE пока дают NotImplementedError.
+RESERVE — обещание политики начать задачу на узле не позже t_res. Ресурсы резерв не занимает: политика
+пересчитывает его каждую эпоху, а движок только проверяет решение и пишет запись, когда резерв меняется.
+PREEMPT пока даёт NotImplementedError.
 """
 
 from __future__ import annotations
@@ -241,31 +243,51 @@ class Simulator:
         # Снимок смотрит на живое состояние, поэтому решения собираются целиком до их применения.
         decisions = list(self.policy.decide(build_snapshot(s, self.t)))
         started: list[str] = []
+        reserved: dict[str, tuple[str, int]] = {}
         for decision in decisions:
             if decision.action == "START":
                 self._start(decision)
                 started.append(decision.task)
-            elif decision.action in ("PREEMPT", "RESERVE"):
-                raise NotImplementedError(f"{decision.action} is not supported yet")
+            elif decision.action == "RESERVE":
+                reserved[decision.task] = self._reserve(decision)
+            elif decision.action == "PREEMPT":
+                raise NotImplementedError("PREEMPT is not supported yet")
             else:
                 raise InvalidDecision(decision, "unknown action")
-        # Причина зависит только от требований задачи и её допустимых узлов: у задач одной формы она общая.
-        by_shape: dict[tuple[Resources, tuple[str, ...]], tuple[str, dict[str, Any]]] = {}
+        for key, (worker, t_res) in reserved.items():
+            if s.reserved.get(key) != (worker, t_res):
+                self.journal.append("RESERVE", self.t, task=key, worker=worker, t_res=t_res)
+        s.reserved = reserved
+        # Причина зависит только от требований задачи, её допустимых узлов и того, есть ли резерв у неё
+        # самой: у задач одной формы она общая.
+        by_shape: dict[tuple[Resources, tuple[str, ...], bool], tuple[str, dict[str, Any]]] = {}
         for key in sorted(s.ready):
-            shape = (s.tasks[key].resources, s.eligible[key])
+            shape = (s.tasks[key].resources, s.eligible[key], key in reserved)
             if shape not in by_shape:
-                by_shape[shape] = ready_wait(s, key, free_before, started)
+                by_shape[shape] = ready_wait(s, key, free_before, started, reserved)
             self._set_wait(key, *by_shape[shape])
 
+    def _check_target(self, decision: Decision) -> None:
+        """Задача готова, узел работает и подходит ей."""
+        s = self.state
+        if s.status.get(decision.task) is not TaskStatus.READY:
+            raise InvalidDecision(decision, "task is not READY")
+        if not s.up.get(decision.worker, False):
+            raise InvalidDecision(decision, "worker is unknown or down")
+        if decision.worker not in s.eligible[decision.task]:
+            raise InvalidDecision(decision, "worker is not eligible for the task")
+
+    def _reserve(self, decision: Decision) -> tuple[str, int]:
+        self._check_target(decision)
+        t_res = decision.reason.get("t_res")
+        if not isinstance(t_res, int) or t_res < self.t:
+            raise InvalidDecision(decision, "reservation needs an integer t_res not earlier than now")
+        return decision.worker, t_res
+
     def _start(self, decision: Decision) -> None:
+        self._check_target(decision)
         s = self.state
         key, worker = decision.task, decision.worker
-        if s.status.get(key) is not TaskStatus.READY:
-            raise InvalidDecision(decision, "task is not READY")
-        if not s.up.get(worker, False):
-            raise InvalidDecision(decision, "worker is unknown or down")
-        if worker not in s.eligible[key]:
-            raise InvalidDecision(decision, "worker is not eligible for the task")
         task = s.tasks[key]
         if not task.resources.fits(s.free[worker]):
             raise InvalidDecision(decision, "not enough free resources")
@@ -274,6 +296,7 @@ class Simulator:
         s.status[key] = TaskStatus.RUNNING
         s.ready.discard(key)
         s.wait_code.pop(key, None)
+        s.reserved.pop(key, None)
         s.attempt[key] += 1
         end = self.t + s.rem[key]
         s.run[key] = RunInfo(worker, self.t, s.attempt[key], end)
