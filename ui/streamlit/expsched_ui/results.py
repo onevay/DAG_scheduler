@@ -15,12 +15,15 @@ def gantt_bars(result: Mapping[str, Any], problem: Mapping[str, Any]) -> list[di
     bars = []
     for a in result["attempts"]:
         task = tasks.get(a["task"]) or submitted.get(a["task"], {})
+        interrupted = a.get("outcome") in ("INT", "PRE")
         bars.append(
             {
                 "task": a["task"],
+                "attempt": a["attempt"],
                 "worker": a["worker"],
                 "start": a["start"],
                 "end": a["end"] if a["end"] is not None else a["start"],
+                "lost_from": a["start"] + a["saved"] if interrupted else None,  # дальше работа потеряна
                 "kind": task.get("kind", "other"),
                 "submitted": a["task"] in submitted,
                 "late": (summary.get(a["task"], {}).get("tardiness") or 0) > 0,
@@ -29,8 +32,32 @@ def gantt_bars(result: Mapping[str, Any], problem: Mapping[str, Any]) -> list[di
     return _assign_lanes(bars)
 
 
+def lane_order(bars: Iterable[Mapping[str, Any]], workers: Iterable[str]) -> list[str]:
+    """Дорожки сверху вниз: по узлам, у каждого узла хотя бы одна — чтобы был виден и его простой."""
+    lanes: dict[str, set[int]] = {w: {0} for w in workers}
+    for b in bars:
+        lanes.setdefault(b["worker"], set()).add(b["lane_index"])
+    return [f"{w} · {i + 1}" for w in sorted(lanes) for i in sorted(lanes[w])]
+
+
+def outages(events: Iterable[Mapping[str, Any]], end_of_run: int) -> list[dict[str, Any]]:
+    """Интервалы недоступности узлов из журнала; не вернувшийся узел недоступен до конца прогона."""
+    out: list[dict[str, Any]] = []
+    since: dict[str, int] = {}
+    for r in events:
+        if r["type"] == "WORKER_DOWN":
+            since[r["worker"]] = r["t"]
+        elif r["type"] == "WORKER_UP" and r["worker"] in since:
+            out.append({"worker": r["worker"], "from": since.pop(r["worker"]), "to": r["t"]})
+    out += [{"worker": w, "from": t, "to": max(t, end_of_run)} for w, t in sorted(since.items())]
+    return out
+
+
 def task_rows(result: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """Итог по задачам: сколько ждала и почему дольше всего."""
+    """Итог по задачам: сколько было попыток, сколько ждала и почему дольше всего."""
+    attempts: dict[str, int] = {}
+    for a in result["attempts"]:
+        attempts[a["task"]] = attempts.get(a["task"], 0) + 1
     rows = []
     for key, task in result["tasks"].items():
         totals: dict[str, int] = {}
@@ -40,6 +67,7 @@ def task_rows(result: Mapping[str, Any]) -> list[dict[str, Any]]:
             {
                 "task": key,
                 "status": task["status"],
+                "attempts": attempts.get(key, 0),
                 "start": task["start"],
                 "finish": task["finish"],
                 "deadline": task["deadline"],
@@ -78,6 +106,7 @@ def comparison_rows(results: Mapping[str, Mapping[str, Any]]) -> list[dict[str, 
                 "deadline_misses": sum((m.get("deadline_misses") or {}).values()),
                 "weighted_tardiness": m.get("weighted_tardiness"),
                 "utilization_gpu": m.get("utilization_gpu"),
+                "lost_work_gpu": m.get("lost_work_gpu"),
                 "mean_wait": m.get("mean_wait"),
                 "violations": len(result["violations"]),
             }

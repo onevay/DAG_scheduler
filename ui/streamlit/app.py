@@ -37,10 +37,16 @@ def load(problem: dict[str, Any]) -> None:
         st.session_state.pop(stale, None)
 
 
-def editor(rows: list[dict[str, Any]], columns: tuple[str, ...], name: str) -> list[dict[str, Any]]:
+def editor(
+    rows: list[dict[str, Any]], columns: tuple[str, ...], name: str, config: dict[str, Any] | None = None
+) -> list[dict[str, Any]]:
     frame = pd.DataFrame(rows, columns=list(columns))
     edited = st.data_editor(
-        frame, num_rows="dynamic", width="stretch", key=f"{name}-{st.session_state.revision}"
+        frame,
+        num_rows="dynamic",
+        width="stretch",
+        column_config=config,
+        key=f"{name}-{st.session_state.revision}",
     )
     return list(edited.to_dict("records"))
 
@@ -64,8 +70,8 @@ with st.sidebar:
 problem = st.session_state.problem
 policy_in = problem.get("policy", {})
 st.title("Планировщик вычислительных экспериментов")
-tab_workers, tab_tasks, tab_submits, tab_settings, tab_graph = st.tabs(
-    ["Узлы", "Задачи", "Срочные задачи", "Параметры", "Граф зависимостей"]
+tab_workers, tab_tasks, tab_submits, tab_node_events, tab_settings, tab_graph = st.tabs(
+    ["Узлы", "Задачи", "Срочные задачи", "События узлов", "Параметры", "Граф зависимостей"]
 )
 
 with tab_workers:
@@ -80,6 +86,22 @@ with tab_tasks:
 with tab_submits:
     st.caption("Задачи, которые появляются во время прогона: time — момент подачи.")
     submits = editor(tables.submits_rows(problem), tables.SUBMIT_COLUMNS, "submits")
+with tab_node_events:
+    st.caption(
+        "down — узел отказал: его задачи прерываются и продолжают с последнего чекпоинта на другом узле; "
+        "up — узел вернулся пустым. max_retries у задачи — сколько отказов она переживёт."
+    )
+    node_events = editor(
+        tables.worker_events_rows(problem),
+        tables.WORKER_EVENT_COLUMNS,
+        "node-events",
+        {
+            "worker": st.column_config.SelectboxColumn(
+                options=[str(w["id"]) for w in workers if w.get("id")]
+            ),
+            "event": st.column_config.SelectboxColumn(options=list(tables.WORKER_EVENTS)),
+        },
+    )
 with tab_settings:
     options, rev = policy_options(), st.session_state.revision
     names, modes, units = options["policies"], ["lenient", "strict"], ["minute", "hour", "second"]
@@ -105,7 +127,7 @@ with tab_settings:
     )
 
 settings = {"policy": policy, "aging": int(aging) or None, "validation_mode": mode, "time_unit": time_unit}
-current_problem = tables.build_problem(workers, tasks, submits, settings)
+current_problem = tables.build_problem(workers, tasks, submits, node_events, settings)
 
 with st.sidebar:
     st.download_button(
@@ -168,9 +190,26 @@ KIND_COLORS = {
 LATE, SUBMITTED = "#e45756", "#f2cf5b"
 
 
-def gantt_figure(bars: list[dict[str, Any]]) -> go.Figure:
-    """Полоса — попытка на дорожке узла, цвет — тип задачи; рамка красная — опоздала, жёлтая — срочная."""
+def gantt_figure(bars: list[dict[str, Any]], lanes: list[str], down: list[dict[str, Any]]) -> go.Figure:
+    """Полоса — попытка на дорожке узла, цвет — тип задачи; рамка красная — опоздала, жёлтая — срочная.
+
+    Штриховка — работа прерванной попытки, потерянная после последнего чекпоинта; серое — узел недоступен.
+    """
     figure = go.Figure()
+    order = lanes[::-1]  # первая дорожка — сверху
+    for outage in down:
+        rows = [i for i, lane in enumerate(order) if lane.startswith(f"{outage['worker']} · ")]
+        figure.add_shape(
+            type="rect",
+            x0=outage["from"],
+            x1=outage["to"],
+            y0=min(rows) - 0.5,
+            y1=max(rows) + 0.5,
+            fillcolor="rgba(128,128,128,0.35)",
+            line_width=0,
+            layer="below",
+            label={"text": "недоступен", "font": {"size": 11}},
+        )
     for kind in sorted({b["kind"] for b in bars}):
         group = [b for b in bars if b["kind"] == kind]
         figure.add_bar(
@@ -190,8 +229,22 @@ def gantt_figure(bars: list[dict[str, Any]]) -> go.Figure:
             marker_line_width=3,
             hovertemplate="%{text}: %{base}–%{customdata}<extra></extra>",
         )
-    lanes = list(dict.fromkeys(b["lane"] for b in bars))
-    figure.update_yaxes(categoryorder="array", categoryarray=lanes[::-1], tickmode="array", tickvals=lanes)
+    lost = [b for b in bars if b["lost_from"] is not None and b["end"] > b["lost_from"]]
+    if lost:
+        figure.add_bar(
+            name="потеряно",
+            orientation="h",
+            y=[b["lane"] for b in lost],
+            base=[b["lost_from"] for b in lost],
+            x=[b["end"] - b["lost_from"] for b in lost],
+            customdata=[b["end"] for b in lost],
+            text=[b["task"] for b in lost],
+            textposition="none",  # имя уже на полосе попытки; здесь оно только для подсказки
+            marker_color="rgba(40,40,40,0.55)",
+            marker_pattern_shape="/",
+            hovertemplate="%{text}: потеряно %{base}–%{customdata}<extra></extra>",
+        )
+    figure.update_yaxes(categoryorder="array", categoryarray=order, tickmode="array", tickvals=lanes)
     figure.update_layout(
         barmode="overlay", height=160 + 44 * len(lanes), xaxis_title="время", legend_title="тип задачи"
     )
@@ -205,20 +258,24 @@ if run := st.session_state.get("run"):
     if m is None:
         st.info("Режим strict нашёл ошибки во входе: прогон не выполнялся.")
     else:
-        cols = st.columns(5)
+        cols = st.columns(6)
         above = m["makespan"] - (m["lower_bound"] or m["makespan"])
         cols[0].metric("Makespan", m["makespan"], f"+{above} к нижней границе" if above else None, "inverse")
         cols[1].metric("Нижняя граница", m["lower_bound"])
         cols[2].metric("Пропуски дедлайнов", sum(m["deadline_misses"].values()))
         cols[3].metric("Загрузка GPU", m["utilization_gpu"])
-        cols[4].metric("Среднее ожидание", m["mean_wait"])
+        cols[4].metric("Потерянная работа, GPU·ч", m["lost_work_gpu"])
+        cols[5].metric("Среднее ожидание", m["mean_wait"])
         if result["violations"]:
             st.error(
                 "Проверка расписания нашла нарушения:\n\n" + "\n".join(f"- {v}" for v in result["violations"])
             )
         else:
             st.success("Проверка расписания: нарушений нет.")
-        st.plotly_chart(gantt_figure(results.gantt_bars(result, run["problem"])), width="stretch")
+        bars = results.gantt_bars(result, run["problem"])
+        lanes = results.lane_order(bars, [w["id"] for w in run["problem"]["cluster"]["workers"]])
+        down = results.outages(run["events"], m["makespan"])
+        st.plotly_chart(gantt_figure(bars, lanes, down), width="stretch")
         st.dataframe(pd.DataFrame(results.task_rows(result)), width="stretch", hide_index=True)
         chosen = st.selectbox("Почему ждала задача", sorted(result["tasks"]))
         waits = results.wait_rows(result, chosen)

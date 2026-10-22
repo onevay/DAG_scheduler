@@ -1,7 +1,7 @@
 """Вход планировщика (problem.json) в виде таблиц для редактирования и обратно.
 
-Таблицы показывают основные поля; задачи и узлы собираются из строк заново, поэтому поля, которых
-в таблицах нет (например, max_retries), получают значения по умолчанию. Пустая ячейка — поле не задано.
+Задачи и узлы собираются из строк заново: ресурсы, кроме gpu, cpu и ram_gb, в таблицах не показываются
+и при сборке теряются. Пустая ячейка — поле не задано.
 """
 
 from __future__ import annotations
@@ -23,9 +23,12 @@ TASK_COLUMNS = (
     "dependencies",
     "preemptible",
     "checkpoint_interval",
+    "max_retries",
     "constraints",
 )
 SUBMIT_COLUMNS = ("time", *TASK_COLUMNS)
+WORKER_EVENT_COLUMNS = ("time", "worker", "event")
+WORKER_EVENTS = {"down": "worker_down", "up": "worker_up"}  # значение в таблице -> тип события во входе
 
 EMPTY_PROBLEM: dict[str, Any] = {
     "cluster": {"workers": [{"id": "node-1", "resources": {"gpu": 4}}]},
@@ -48,7 +51,7 @@ def tasks_rows(problem: Mapping[str, Any]) -> list[dict[str, Any]]:
 
 
 def submits_rows(problem: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """Задачи, подаваемые во время прогона. Другие события входа таблица не показывает."""
+    """Задачи, подаваемые во время прогона."""
     return [
         {"time": e["time"], **_task_row(e["task"])}
         for e in problem.get("events", [])
@@ -56,19 +59,41 @@ def submits_rows(problem: Mapping[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
+def worker_events_rows(problem: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Отказы и возвраты узлов."""
+    kinds = {v: k for k, v in WORKER_EVENTS.items()}
+    return [
+        {"time": e["time"], "worker": e["worker"], "event": kinds[e["type"]]}
+        for e in problem.get("events", [])
+        if e["type"] in kinds
+    ]
+
+
 def build_problem(
-    workers: Iterable[Row], tasks: Iterable[Row], submits: Iterable[Row], settings: Mapping[str, Any]
+    workers: Iterable[Row],
+    tasks: Iterable[Row],
+    submits: Iterable[Row],
+    worker_events: Iterable[Row],
+    settings: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """problem.json из строк таблиц. Строки без id пропускаются: это незаполненные новые строки."""
+    """problem.json из строк таблиц. Строки без id (у событий узла — без узла) пропускаются: это
+    незаполненные новые строки.
+    """
+    node_events = [
+        {"time": _number(r.get("time")) or 0, "type": WORKER_EVENTS[r["event"]], "worker": _text(r["worker"])}
+        for r in worker_events
+        if _text(r.get("worker")) and r.get("event") in WORKER_EVENTS
+    ]
+    task_events = [
+        {"time": _number(r.get("time")) or 0, "type": "submit_task", "task": _task(r)}
+        for r in submits
+        if _text(r.get("id"))
+    ]
     return {
         "time_unit": settings["time_unit"],
         "cluster": {"workers": [_worker(r) for r in workers if _text(r.get("id"))]},
         "tasks": [_task(r) for r in tasks if _text(r.get("id"))],
-        "events": [
-            {"time": _number(r.get("time")) or 0, "type": "submit_task", "task": _task(r)}
-            for r in submits
-            if _text(r.get("id"))
-        ],
+        "events": node_events + task_events,
         "policy": {
             "name": settings["policy"],
             "aging": settings["aging"],
@@ -89,6 +114,7 @@ def _task_row(task: Mapping[str, Any]) -> dict[str, Any]:
         "dependencies": ", ".join(task.get("dependencies", [])),
         "preemptible": task.get("preemptible", False),
         "checkpoint_interval": task.get("checkpoint_interval"),
+        "max_retries": task.get("max_retries", 2),
         "constraints": _pairs_text(task.get("constraints", {})),
     }
 
@@ -111,7 +137,7 @@ def _task(row: Row) -> dict[str, Any]:
         "preemptible": False if _missing(preemptible) else bool(preemptible),
         "constraints": _parse_pairs(row.get("constraints")),
     }
-    for field in ("deadline", "checkpoint_interval"):
+    for field in ("deadline", "checkpoint_interval", "max_retries"):
         if _number(row.get(field)) is not None:
             task[field] = _number(row.get(field))
     return task
