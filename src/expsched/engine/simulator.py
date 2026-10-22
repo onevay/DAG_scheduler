@@ -4,6 +4,9 @@
 решений с проверкой (guard). Всё, что происходит, записывается в журнал. Решать имеет смысл только
 в моменты событий: старт задачи возможен лишь тогда, когда что-то освободилось или стало готовым.
 
+У каждой нестартовавшей задачи есть причина ожидания (WAIT_*). Запись WAIT появляется, когда причина
+меняется, и действует до следующей записи WAIT этой задачи или до её старта.
+
 События узлов, PREEMPT и RESERVE пока дают NotImplementedError.
 """
 
@@ -13,6 +16,7 @@ from dataclasses import replace
 from typing import Any
 
 from expsched.domain.models import Event, EvType, Problem, Task
+from expsched.domain.resources import Resources
 from expsched.domain.snapshot import Decision, Policy, RunInfo
 from expsched.domain.states import FINAL_STATUSES, TaskStatus
 from expsched.engine.errors import InvalidDecision
@@ -20,6 +24,7 @@ from expsched.engine.events import EventQueue, Finish, Payload, Release
 from expsched.engine.journal import Journal
 from expsched.engine.snapshot import build_snapshot
 from expsched.engine.state import SimState
+from expsched.engine.waits import ready_wait
 from expsched.validation.graph import validate_graph
 from expsched.validation.resources import validate_resources
 
@@ -38,24 +43,26 @@ class Simulator:
         self.queue = EventQueue()
         self.t = 0
         self._finalized = False
+        self._reported = 0  # сколько записей журнала уже вернул step()
         # Release на каждую задачу: момент готовности задачи без зависимостей и первая эпоха в t = 0.
         for key in sorted(problem.tasks):
             self.queue.push(problem.tasks[key].release, Release(key))
+            self._pending_wait(key)
         for event in problem.events:
             self.queue.push(event.time, event)
 
     def step(self) -> list[dict[str, Any]] | None:
-        """Выполняет одну эпоху и возвращает её записи журнала (список может быть пустым).
+        """Выполняет одну эпоху и возвращает новые записи журнала (список может быть пустым).
 
         None — событий больше нет.
         """
         if not self.queue:
             return None
         self.t, batch = self.queue.pop_batch()
-        first = len(self.journal)
         for payload in batch:
             self._handle(payload)
         self._decide()
+        first, self._reported = self._reported, len(self.journal)
         return list(self.journal.records[first:])
 
     def run_all(self) -> list[dict[str, Any]]:
@@ -100,10 +107,10 @@ class Simulator:
             s.status[task.id] = TaskStatus.INFEASIBLE
             for diagnostic in problems:
                 self.journal.append("DIAGNOSTIC", self.t, task=task.id, **diagnostic.to_dict())
-        elif task.release > self.t:
+            return
+        if task.release > self.t:
             self.queue.push(task.release, Release(task.id))
-        else:
-            self._try_ready(task.id)
+        self._try_ready(task.id)
 
     def _finish(self, event: Finish) -> None:
         s = self.state
@@ -120,32 +127,61 @@ class Simulator:
             self._try_ready(successor)
 
     def _try_ready(self, key: str) -> None:
-        """Переводит задачу в READY, если все предшественники завершены и наступил release_time."""
+        """READY, если предшественники завершены и наступил release_time; иначе — новая причина ожидания."""
         s = self.state
-        if (
-            s.status[key] is TaskStatus.PENDING
-            and s.waiting_preds[key] == 0
-            and self.t >= s.tasks[key].release
-        ):
-            s.status[key] = TaskStatus.READY
-            s.ready.add(key)
-            s.ready_since[key] = self.t
-            self.journal.append("READY", self.t, task=key)
+        if s.status[key] is not TaskStatus.PENDING:
+            return
+        if s.waiting_preds[key] > 0 or self.t < s.tasks[key].release:
+            self._pending_wait(key)
+            return
+        s.status[key] = TaskStatus.READY
+        s.ready.add(key)
+        s.ready_since[key] = self.t
+        s.wait_code.pop(key, None)  # причина ожидания готовой задачи определится после решений эпохи
+        self.journal.append("READY", self.t, task=key)
+
+    # ---- причины ожидания ----
+
+    def _pending_wait(self, key: str) -> None:
+        s = self.state
+        task = s.tasks[key]
+        if s.waiting_preds[key] > 0:
+            if s.wait_code.get(key) != "WAIT_DEPS":
+                pending = sorted(d for d in set(task.deps) if s.status.get(d) is not TaskStatus.SUCCEEDED)
+                self._set_wait(key, "WAIT_DEPS", {"pending": pending})
+        elif self.t < task.release:
+            self._set_wait(key, "WAIT_RELEASE", {"until": task.release})
+
+    def _set_wait(self, key: str, code: str, detail: dict[str, Any]) -> None:
+        if self.state.wait_code.get(key) != code:
+            self.state.wait_code[key] = code
+            self.journal.append("WAIT", self.t, task=key, code=code, detail=dict(detail))
 
     # ---- решения ----
 
     def _decide(self) -> None:
-        if not self.state.ready:
+        s = self.state
+        if not s.ready:
             return
+        free_before = dict(s.free)
         # Снимок смотрит на живое состояние, поэтому решения собираются целиком до их применения.
-        decisions = list(self.policy.decide(build_snapshot(self.state, self.t)))
+        decisions = list(self.policy.decide(build_snapshot(s, self.t)))
+        started: list[str] = []
         for decision in decisions:
             if decision.action == "START":
                 self._start(decision)
+                started.append(decision.task)
             elif decision.action in ("PREEMPT", "RESERVE"):
                 raise NotImplementedError(f"{decision.action} is not supported yet")
             else:
                 raise InvalidDecision(decision, "unknown action")
+        # Причина зависит только от требований задачи и её допустимых узлов: у задач одной формы она общая.
+        by_shape: dict[tuple[Resources, tuple[str, ...]], tuple[str, dict[str, Any]]] = {}
+        for key in sorted(s.ready):
+            shape = (s.tasks[key].resources, s.eligible[key])
+            if shape not in by_shape:
+                by_shape[shape] = ready_wait(s, key, free_before, started)
+            self._set_wait(key, *by_shape[shape])
 
     def _start(self, decision: Decision) -> None:
         s = self.state
@@ -163,6 +199,7 @@ class Simulator:
         s.free[worker] = s.free[worker] - task.resources
         s.status[key] = TaskStatus.RUNNING
         s.ready.discard(key)
+        s.wait_code.pop(key, None)
         s.attempt[key] += 1
         end = self.t + s.rem[key]
         s.run[key] = RunInfo(worker, self.t, s.attempt[key], end)

@@ -25,6 +25,7 @@ class SimState:
     up: dict[str, bool]
     run: dict[str, RunInfo] = field(default_factory=dict)
     ready: set[str] = field(default_factory=set)  # задачи в статусе READY
+    wait_code: dict[str, str] = field(default_factory=dict)  # текущая причина ожидания задачи
     ready_since: dict[str, int] = field(default_factory=dict)
     preempt_count: dict[str, int] = field(default_factory=dict)  # сколько раз задачу вытесняли
     # Ранги и поздние сроки не меняются, когда задачи завершаются, поэтому анализ пересчитывается

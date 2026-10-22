@@ -33,6 +33,7 @@ class Always:
 def test_chain_runs_in_dependency_order(make_task, make_problem, greedy):
     log = Simulator(make_problem([make_task("a", 2), make_task("b", 3, "a")]), greedy).run_all()
     assert brief(log) == [
+        ("WAIT", 0, "b", None),  # b ждёт a
         ("READY", 0, "a", None),
         ("START", 0, "a", "n0"),
         ("FINISH", 2, "a", "n0"),
@@ -110,6 +111,8 @@ def test_task_becomes_ready_exactly_at_max_of_release_and_dependencies(
 def test_cycle_in_input_ends_with_stuck_diagnostics(make_task, make_problem, greedy):
     log = Simulator(make_problem([make_task("a", 1, "b"), make_task("b", 1, "a")]), greedy).run_all()
     assert [(r["type"], r["code"], r["task"]) for r in log] == [
+        ("WAIT", "WAIT_DEPS", "a"),
+        ("WAIT", "WAIT_DEPS", "b"),
         ("DIAGNOSTIC", "STUCK", "a"),
         ("DIAGNOSTIC", "STUCK", "b"),
     ]
