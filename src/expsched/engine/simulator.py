@@ -7,7 +7,7 @@
 У каждой нестартовавшей задачи есть причина ожидания (WAIT_*). Запись WAIT появляется, когда причина
 меняется, и действует до следующей записи WAIT этой задачи или до её старта.
 
-События узлов, PREEMPT и RESERVE пока дают NotImplementedError.
+PREEMPT и RESERVE пока дают NotImplementedError.
 """
 
 from __future__ import annotations
@@ -82,11 +82,59 @@ class Simulator:
             self._external(payload)
 
     def _external(self, event: Event) -> None:
-        if event.type is not EvType.SUBMIT:
-            raise NotImplementedError(f"event {event.type.value} is not supported yet")
-        if event.task is None:
-            raise ValueError("submit_task event without a task")
-        self._submit(event.task)
+        if event.type is EvType.SUBMIT:
+            if event.task is None:
+                raise ValueError("submit_task event without a task")
+            self._submit(event.task)
+        elif event.worker not in self.state.up:
+            raise ValueError(f"{event.type.value} event for unknown worker {event.worker!r}")
+        elif event.type is EvType.WORKER_DOWN:
+            self._worker_down(event.worker)
+        else:
+            self._worker_up(event.worker)
+
+    def _worker_down(self, worker: str) -> None:
+        """Узел перестаёт работать: его попытки прерываются, ресурсов у него больше нет."""
+        s = self.state
+        if not s.up[worker]:
+            return  # узел уже недоступен
+        s.up[worker] = False
+        self.journal.append("WORKER_DOWN", self.t, worker=worker)
+        for key in sorted(k for k, run in s.run.items() if run.worker == worker):
+            self._interrupt(key, cause="WORKER_DOWN")
+        s.free[worker] = Resources()
+
+    def _worker_up(self, worker: str) -> None:
+        """Узел вернулся пустым: все его ресурсы свободны."""
+        s = self.state
+        if s.up[worker]:
+            return
+        s.up[worker] = True
+        s.free[worker] = s.problem.workers[worker].capacity
+        self.journal.append("WORKER_UP", self.t, worker=worker)
+
+    def _interrupt(self, key: str, cause: str) -> None:
+        """Прерывает попытку: работа до последнего чекпоинта сохраняется, остальное теряется."""
+        s = self.state
+        task, run = s.tasks[key], s.run.pop(key)
+        elapsed = self.t - run.start
+        saved = task.ckpt * (elapsed // task.ckpt) if task.ckpt else 0
+        s.rem[key] -= saved
+        s.free[run.worker] = s.free[run.worker] + task.resources
+        s.analysis = None  # остатки работы изменились
+        self.journal.append(
+            "INTERRUPTED",
+            self.t,
+            task=key,
+            attempt=run.attempt,
+            worker=run.worker,
+            cause=cause,
+            saved=saved,
+            lost=elapsed - saved,
+            remaining=s.rem[key],
+        )
+        s.status[key] = TaskStatus.PENDING
+        self._try_ready(key)
 
     def _submit(self, task: Task) -> None:
         """Задача, поданная во время прогона. Задача с ошибками получает INFEASIBLE и диагностику."""
