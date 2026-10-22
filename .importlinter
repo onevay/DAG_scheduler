@@ -8,7 +8,7 @@ name = Слои ядра
 type = layers
 layers =
     (expsched.api) | (expsched.cli) | (expsched.io)
-    (expsched.pipeline)
+    expsched.pipeline
     expsched.explain | expsched.metrics
     expsched.verify
     expsched.engine | expsched.policies
