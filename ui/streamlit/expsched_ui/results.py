@@ -24,6 +24,7 @@ def gantt_bars(result: Mapping[str, Any], problem: Mapping[str, Any]) -> list[di
                 "start": a["start"],
                 "end": a["end"] if a["end"] is not None else a["start"],
                 "lost_from": a["start"] + a["saved"] if interrupted else None,  # дальше работа потеряна
+                "outcome": a.get("outcome"),
                 "kind": task.get("kind", "other"),
                 "submitted": a["task"] in submitted,
                 "late": (summary.get(a["task"], {}).get("tardiness") or 0) > 0,
@@ -51,6 +52,31 @@ def outages(events: Iterable[Mapping[str, Any]], end_of_run: int) -> list[dict[s
             out.append({"worker": r["worker"], "from": since.pop(r["worker"]), "to": r["t"]})
     out += [{"worker": w, "from": t, "to": max(t, end_of_run)} for w, t in sorted(since.items())]
     return out
+
+
+def reservations(events: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Последний резерв каждой задачи: на каком узле и к какому моменту её обещали начать."""
+    last = {r["task"]: r for r in events if r["type"] == "RESERVE"}
+    return [
+        {"task": k, "worker": r["worker"], "t_res": r["t_res"], "since": r["t"]}
+        for k, r in sorted(last.items())
+    ]
+
+
+def replan_rows(replans: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Перепланирования по строке: что случилось и как сдвинулись прогнозные старты."""
+    rows = []
+    for r in replans:
+        rows.append(
+            {
+                "t": r["t"],
+                "events": ", ".join(f"{e['type']} {e.get('task') or e.get('worker')}" for e in r["events"]),
+                "shifted": ", ".join(f"{c['task']} {c['delta']:+d}" for c in r["changes"]),
+                "new": ", ".join(f"{k} → {t}" for k, t in r["new_tasks"].items()),
+                "dropped": ", ".join(r["dropped"]),
+            }
+        )
+    return rows
 
 
 def task_rows(result: Mapping[str, Any]) -> list[dict[str, Any]]:

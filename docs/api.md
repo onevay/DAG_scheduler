@@ -63,5 +63,6 @@ make api            # uvicorn на http://127.0.0.1:8000, документаци
 | `attempts` | попытки: `task`, `attempt`, `worker`, `start`, `end`, `resume_from`, `outcome` (`DONE`, `INT`), `saved` |
 | `tasks` | по id: `status`, `start` (первой попытки), `finish`, `deadline`, `tardiness`, `waits` |
 | `metrics` | [метрики](scheduling.md#метрики); `null` при INFEASIBLE |
+| `replans` | записи `REPLAN` журнала: как внешние события сдвинули план ([формат](scheduling.md#перепланирование)); `null`, если задач больше `max_forecast_tasks` |
 | `diagnostics` | ошибки и предупреждения входа |
 | `violations` | нарушения, найденные проверкой расписания; пустой список — расписание допустимо |

@@ -1,0 +1,17 @@
+{
+  "time_unit": "hour",
+  "cluster": {
+    "workers": [
+      {"id": "node-A", "resources": {"gpu": 2}}
+    ]
+  },
+  "tasks": [
+    {"id": "background", "kind": "train", "duration": 10, "resources": {"gpu": 2}, "priority": 0,
+     "checkpoint_interval": 2, "preemptible": true}
+  ],
+  "events": [
+    {"time": 3, "type": "submit_task",
+     "task": {"id": "urgent", "kind": "eval", "duration": 2, "resources": {"gpu": 2}, "priority": 10, "deadline": 6}}
+  ],
+  "policy": {"name": "priority", "preemption": "deadline_only", "min_runtime_before_preempt": 0}
+}

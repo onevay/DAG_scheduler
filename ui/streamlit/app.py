@@ -16,8 +16,15 @@ from expsched_ui.client import ApiClient, ApiUnavailable
 SCENARIOS = Path(__file__).resolve().parents[2] / "scenarios"
 OFFLINE_POLICIES = {
     "policies": ["fifo", "fifo_skip", "priority", "priority_backfill"],
-    "defaults": {"aging": None},
+    "defaults": {
+        "aging": None,
+        "preemption": "deadline_only",
+        "max_preemptions_per_task": 1,
+        "min_runtime_before_preempt": 30,
+        "max_forecast_tasks": 1000,
+    },
 }
+PREEMPTION_MODES = ["never", "deadline_only"]
 
 st.set_page_config(page_title="Планировщик экспериментов", layout="wide")
 client = ApiClient(os.environ.get("EXPSCHED_API", "http://127.0.0.1:8000"))
@@ -118,6 +125,36 @@ with tab_settings:
         value=policy_in.get("aging", options["defaults"].get("aging")) or 0,
         key=f"a{rev}",
     )
+    defaults = options["defaults"]
+    preemption = policy_in.get("preemption", defaults["preemption"])
+    preemption = st.radio(
+        "Вытеснение",
+        PREEMPTION_MODES,
+        index=PREEMPTION_MODES.index(preemption) if preemption in PREEMPTION_MODES else 1,
+        horizontal=True,
+        help="deadline_only: задача с дедлайном, которая иначе его пропустит, вытесняет задачи класса ниже "
+        "с preemptible = true",
+        key=f"pre{rev}",
+    )
+    left, middle, right = st.columns(3)
+    max_preemptions = left.number_input(
+        "Вытеснений одной задачи не больше",
+        min_value=0,
+        value=policy_in.get("max_preemptions_per_task", defaults["max_preemptions_per_task"]),
+        key=f"k{rev}",
+    )
+    min_runtime = middle.number_input(
+        "Задача работает до вытеснения не меньше",
+        min_value=0,
+        value=policy_in.get("min_runtime_before_preempt", defaults["min_runtime_before_preempt"]),
+        key=f"r{rev}",
+    )
+    max_forecast = right.number_input(
+        "Прогноз перепланирования, если задач не больше (0 — не строить)",
+        min_value=0,
+        value=policy_in.get("max_forecast_tasks", defaults["max_forecast_tasks"]),
+        key=f"f{rev}",
+    )
     mode = st.radio(
         "Режим проверки",
         modes,
@@ -129,7 +166,16 @@ with tab_settings:
         "Единица времени", units, index=units.index(problem.get("time_unit", "minute")), key=f"u{rev}"
     )
 
-settings = {"policy": policy, "aging": int(aging) or None, "validation_mode": mode, "time_unit": time_unit}
+settings = {
+    "policy": policy,
+    "aging": int(aging) or None,
+    "validation_mode": mode,
+    "preemption": preemption,
+    "max_preemptions_per_task": int(max_preemptions),
+    "min_runtime_before_preempt": int(min_runtime),
+    "max_forecast_tasks": int(max_forecast),
+    "time_unit": time_unit,
+}
 current_problem = tables.build_problem(workers, tasks, submits, node_events, settings)
 
 with st.sidebar:
@@ -193,10 +239,16 @@ KIND_COLORS = {
 LATE, SUBMITTED = "#e45756", "#f2cf5b"
 
 
-def gantt_figure(bars: list[dict[str, Any]], lanes: list[str], down: list[dict[str, Any]]) -> go.Figure:
+LOST_CAUSE = {"INT": "отказ узла", "PRE": "вытеснение"}
+
+
+def gantt_figure(
+    bars: list[dict[str, Any]], lanes: list[str], down: list[dict[str, Any]], reserved: list[dict[str, Any]]
+) -> go.Figure:
     """Полоса — попытка на дорожке узла, цвет — тип задачи; рамка красная — опоздала, жёлтая — срочная.
 
-    Штриховка — работа прерванной попытки, потерянная после последнего чекпоинта; серое — узел недоступен.
+    Штриховка — работа прерванной попытки, потерянная после последнего чекпоинта; серое — узел недоступен;
+    треугольник — резерв: задачу обещали начать на этом узле не позже отмеченного момента.
     """
     figure = go.Figure()
     order = lanes[::-1]  # первая дорожка — сверху
@@ -240,12 +292,22 @@ def gantt_figure(bars: list[dict[str, Any]], lanes: list[str], down: list[dict[s
             y=[b["lane"] for b in lost],
             base=[b["lost_from"] for b in lost],
             x=[b["end"] - b["lost_from"] for b in lost],
-            customdata=[b["end"] for b in lost],
+            customdata=[[b["end"], LOST_CAUSE.get(b["outcome"], "")] for b in lost],
             text=[b["task"] for b in lost],
             textposition="none",  # имя уже на полосе попытки; здесь оно только для подсказки
             marker_color="rgba(40,40,40,0.55)",
             marker_pattern_shape="/",
-            hovertemplate="%{text}: потеряно %{base}–%{customdata}<extra></extra>",
+            hovertemplate="%{text}: потеряно %{base}–%{customdata[0]} (%{customdata[1]})<extra></extra>",
+        )
+    if reserved:
+        figure.add_scatter(
+            name="резерв",
+            mode="markers",
+            x=[r["t_res"] for r in reserved],
+            y=[f"{r['worker']} · 1" for r in reserved],
+            text=[r["task"] for r in reserved],
+            marker={"symbol": "triangle-down", "size": 14, "color": "#f2cf5b", "line": {"width": 1}},
+            hovertemplate="резерв %{text}: старт не позже %{x}<extra></extra>",
         )
     figure.update_yaxes(categoryorder="array", categoryarray=order, tickmode="array", tickvals=lanes)
     figure.update_layout(
@@ -278,7 +340,8 @@ if run := st.session_state.get("run"):
         bars = results.gantt_bars(result, run["problem"])
         lanes = results.lane_order(bars, [w["id"] for w in run["problem"]["cluster"]["workers"]])
         down = results.outages(run["events"], m["makespan"])
-        st.plotly_chart(gantt_figure(bars, lanes, down), width="stretch")
+        reserved = results.reservations(run["events"])
+        st.plotly_chart(gantt_figure(bars, lanes, down, reserved), width="stretch")
         st.dataframe(pd.DataFrame(results.task_rows(result)), width="stretch", hide_index=True)
         chosen = st.selectbox("Почему ждала задача", sorted(result["tasks"]))
         waits = results.wait_rows(result, chosen)
@@ -286,6 +349,16 @@ if run := st.session_state.get("run"):
             st.dataframe(pd.DataFrame(waits), width="stretch", hide_index=True)
         else:
             st.caption("Задача не ждала.")
+        st.markdown("**Перепланирования**")
+        if result["replans"] is None:
+            st.caption("Прогноз не строился: задач больше, чем разрешено в параметрах.")
+        elif result["replans"]:
+            st.caption("Как внешние события сдвинули прогнозные старты задач.")
+            st.dataframe(
+                pd.DataFrame(results.replan_rows(result["replans"])), width="stretch", hide_index=True
+            )
+        else:
+            st.caption("Внешних событий не было.")
     left, right = st.columns(2)
     left.download_button(
         "Скачать result.json", json.dumps(result, ensure_ascii=False, indent=2), "result.json"

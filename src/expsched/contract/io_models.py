@@ -65,6 +65,9 @@ class PolicyIn(Strict):
     max_preemptions_per_task: Annotated[int, Field(ge=0)] = 1
     min_runtime_before_preempt: Annotated[int, Field(ge=0)] = 30
     aging: Annotated[int, Field(ge=1)] | None = 360
+    # Прогноз перепланирования стоит как весь остаток прогона на каждом внешнем событии: на больших входах
+    # он не строится. 0 — не строить никогда.
+    max_forecast_tasks: Annotated[int, Field(ge=0)] = 1000
     validation_mode: Literal["strict", "lenient"] = "lenient"
 
 

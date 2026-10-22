@@ -34,6 +34,7 @@ def run(problem: ProblemIn, policy: PolicyIn | None = None) -> RunResult:
     Статус результата: OK — все задачи выполнены; PARTIAL — часть задач не выполнена (ошибки входа,
     блокировка, не дошли до конца); INFEASIBLE — режим strict нашёл ошибки, и симуляция не запускалась.
     Диагностики результата — это ошибки входа; то, что случилось во время прогона, видно в журнале.
+    `replans` — None, если задач больше `max_forecast_tasks` и прогноз не строился.
     """
     config = policy or problem.policy
     base = {
@@ -54,13 +55,15 @@ def run(problem: ProblemIn, policy: PolicyIn | None = None) -> RunResult:
             "attempts": [],
             "tasks": {},
             "metrics": None,
+            "replans": [],
             "diagnostics": found,
             "violations": [],
         }
         return RunResult(result, [])
 
     plan = quarantine(validated, diagnostics)
-    sim = Simulator(plan.problem, make_policy(config))
+    forecast = 0 < len(plan.problem.all_tasks()) <= config.max_forecast_tasks
+    sim = Simulator(plan.problem, make_policy(config), forecast=forecast)
     log = sim.run_all()
     status = {**plan.excluded, **sim.state.status}
     planned = {k: t for k, t in sim.state.tasks.items() if status[k] is not TaskStatus.INFEASIBLE}
@@ -72,6 +75,7 @@ def run(problem: ProblemIn, policy: PolicyIn | None = None) -> RunResult:
         "attempts": [asdict(a) for a in attempts_from_log(log)],
         "tasks": _task_summaries(validated.all_tasks() | sim.state.tasks, status, log),
         "metrics": metrics(plan.problem, log, lower_bound),
+        "replans": [r for r in log if r["type"] == "REPLAN"] if forecast else None,
         "diagnostics": found,
         "violations": verify(plan.problem, log, config.max_preemptions_per_task),
     }

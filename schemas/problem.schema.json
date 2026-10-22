@@ -83,6 +83,12 @@
           "default": 360,
           "title": "Aging"
         },
+        "max_forecast_tasks": {
+          "default": 1000,
+          "minimum": 0,
+          "title": "Max Forecast Tasks",
+          "type": "integer"
+        },
         "max_preemptions_per_task": {
           "default": 1,
           "minimum": 0,
@@ -314,6 +320,7 @@
       "$ref": "#/$defs/PolicyIn",
       "default": {
         "aging": 360,
+        "max_forecast_tasks": 1000,
         "max_preemptions_per_task": 1,
         "min_runtime_before_preempt": 30,
         "name": "priority_backfill",

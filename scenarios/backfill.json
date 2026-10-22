@@ -1,0 +1,15 @@
+{
+  "time_unit": "hour",
+  "cluster": {
+    "workers": [
+      {"id": "node-A", "resources": {"gpu": 4}}
+    ]
+  },
+  "tasks": [
+    {"id": "run", "kind": "train", "duration": 4, "resources": {"gpu": 2}, "priority": 6},
+    {"id": "big", "kind": "train", "duration": 2, "resources": {"gpu": 4}, "priority": 3},
+    {"id": "short", "kind": "eval", "duration": 2, "resources": {"gpu": 1}, "release_time": 1},
+    {"id": "long", "kind": "infer", "duration": 9, "resources": {"gpu": 1}}
+  ],
+  "policy": {"name": "priority_backfill"}
+}
