@@ -75,3 +75,12 @@ def test_task_summary_shows_waits():
     summary = run(problem(tasks)).result["tasks"]["b"]
     assert (summary["start"], summary["finish"]) == (3, 4)
     assert [(w["code"], w["from"], w["to"]) for w in summary["waits"]] == [("WAIT_PRIORITY", 0, 3)]
+
+
+def test_unknown_worker_event_is_dropped_in_lenient_mode():
+    events = [{"time": 1, "type": "worker_down", "worker": "ghost"}]
+    data = {**problem([{"id": "a", "duration": 2}]).model_dump(), "events": events}
+    result = run(ProblemIn.model_validate(data)).result
+    assert result["status"] == "OK" and [d["code"] for d in result["diagnostics"]] == ["E040"]
+    strict = {**data, "policy": {**data["policy"], "validation_mode": "strict"}}
+    assert run(ProblemIn.model_validate(strict)).result["status"] == "INFEASIBLE"
