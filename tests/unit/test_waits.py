@@ -1,10 +1,7 @@
 import itertools
-import random
 
 import pytest
 
-from expsched.domain.models import Problem, Task, Worker
-from expsched.domain.resources import Resources
 from expsched.engine.simulator import Simulator
 from expsched.engine.state import SimState
 from expsched.engine.waits import ready_wait
@@ -34,23 +31,6 @@ def assert_every_waiting_ready_task_has_a_reason(log):
                 assert r["code"] in READY_CODES, r
                 reason[r["task"]] = r["code"]
         assert all(k in reason for k in ready), (t, sorted(ready - reason.keys()))
-
-
-def random_problem(seed: int) -> Problem:
-    rnd = random.Random(seed)
-    tasks = {}
-    for i in range(rnd.randint(5, 20)):
-        tasks[f"t{i}"] = Task(
-            f"t{i}",
-            rnd.randint(1, 5),
-            Resources({"gpu": rnd.choice([1, 1, 2, 4])}),
-            priority=rnd.randint(0, 10),
-            deadline=rnd.choice([None, rnd.randint(5, 30)]),
-            release=rnd.choice([0, 0, rnd.randint(1, 8)]),
-            deps=tuple(f"t{j}" for j in range(i) if rnd.random() < 0.2),
-        )
-    workers = {w: Worker(w, Resources({"gpu": g})) for w, g in (("a", 4), ("b", 4), ("c", 2))}
-    return Problem(tasks, workers)
 
 
 # ---- задачи в PENDING ----
@@ -113,5 +93,12 @@ def test_demo_every_waiting_ready_task_has_a_reason(demo_problem, policy):
 
 @pytest.mark.parametrize("policy", POLICIES, ids=lambda p: p.name)
 @pytest.mark.parametrize("seed", range(20))
-def test_random_dags_every_waiting_ready_task_has_a_reason(seed, policy):
+def test_random_dags_every_waiting_ready_task_has_a_reason(random_problem, seed, policy):
     assert_every_waiting_ready_task_has_a_reason(Simulator(random_problem(seed), policy).run_all())
+
+
+@pytest.mark.parametrize("policy", POLICIES, ids=lambda p: p.name)
+@pytest.mark.parametrize("seed", range(20))
+def test_random_dags_with_failures_every_waiting_ready_task_has_a_reason(random_problem, seed, policy):
+    problem = random_problem(seed, failures=True)
+    assert_every_waiting_ready_task_has_a_reason(Simulator(problem, policy).run_all())
