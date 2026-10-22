@@ -60,5 +60,5 @@ def test_registry_builds_policies_by_name():
 
 
 def test_registry_reports_policies_that_are_not_implemented():
-    with pytest.raises(NotImplementedError, match="priority_backfill"):
-        make_policy(PolicyIn())  # имя по умолчанию
+    with pytest.raises(NotImplementedError, match="cpsat"):
+        make_policy(PolicyIn(name="cpsat"))

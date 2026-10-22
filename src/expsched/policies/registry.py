@@ -6,6 +6,7 @@ from collections.abc import Callable
 
 from expsched.contract.io_models import PolicyIn
 from expsched.domain.snapshot import Policy
+from expsched.policies.backfill import BackfillPolicy
 from expsched.policies.fifo import FifoPolicy
 from expsched.policies.priority import PriorityPolicy
 
@@ -13,6 +14,7 @@ _FACTORIES: dict[str, Callable[[PolicyIn], Policy]] = {
     "fifo": lambda config: FifoPolicy(),
     "fifo_skip": lambda config: FifoPolicy(skip=True),
     "priority": lambda config: PriorityPolicy(aging=config.aging),
+    "priority_backfill": lambda config: BackfillPolicy(aging=config.aging),
 }
 
 

@@ -13,7 +13,7 @@ make api            # uvicorn на http://127.0.0.1:8000, документаци
 Реализованные политики и параметры политики по умолчанию.
 
 ```json
-{"policies": ["fifo", "fifo_skip", "priority"],
+{"policies": ["fifo", "fifo_skip", "priority", "priority_backfill"],
  "defaults": {"name": "priority_backfill", "aging": 360, "validation_mode": "lenient", "...": "..."}}
 ```
 

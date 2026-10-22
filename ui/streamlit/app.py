@@ -14,7 +14,10 @@ from expsched_ui import dag, results, tables
 from expsched_ui.client import ApiClient, ApiUnavailable
 
 SCENARIOS = Path(__file__).resolve().parents[2] / "scenarios"
-OFFLINE_POLICIES = {"policies": ["fifo", "fifo_skip", "priority"], "defaults": {"aging": None}}
+OFFLINE_POLICIES = {
+    "policies": ["fifo", "fifo_skip", "priority", "priority_backfill"],
+    "defaults": {"aging": None},
+}
 
 st.set_page_config(page_title="Планировщик экспериментов", layout="wide")
 client = ApiClient(os.environ.get("EXPSCHED_API", "http://127.0.0.1:8000"))

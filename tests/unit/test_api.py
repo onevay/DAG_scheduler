@@ -1,7 +1,6 @@
 import json
 from pathlib import Path
 
-import pytest
 from fastapi.testclient import TestClient
 
 from expsched.api.app import app
@@ -18,7 +17,7 @@ def with_tasks(tasks):
 
 def test_policies_lists_implemented_ones_and_defaults():
     body = client.get("/v1/policies").json()
-    assert body["policies"] == ["fifo", "fifo_skip", "priority"]
+    assert body["policies"] == ["fifo", "fifo_skip", "priority", "priority_backfill"]
     assert body["defaults"]["validation_mode"] == "lenient"
 
 
@@ -76,7 +75,6 @@ def test_run_with_a_schema_violation_is_422():
     assert [d["code"] for d in response.json()["diagnostics"]] == ["E070"]
 
 
-@pytest.mark.parametrize("name", ["priority_backfill", "cpsat"])
-def test_run_with_a_policy_that_is_not_implemented_is_400(name):
-    response = client.post("/v1/runs", json={"problem": DEMO, "policy": {"name": name}})
-    assert response.status_code == 400 and name in response.json()["error"]
+def test_run_with_a_policy_that_is_not_implemented_is_400():
+    response = client.post("/v1/runs", json={"problem": DEMO, "policy": {"name": "cpsat"}})
+    assert response.status_code == 400 and "cpsat" in response.json()["error"]

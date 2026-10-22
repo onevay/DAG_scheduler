@@ -5,12 +5,13 @@ import pytest
 
 from expsched.domain.models import Event, EvType
 from expsched.engine.simulator import Simulator
+from expsched.policies.backfill import BackfillPolicy
 from expsched.policies.fifo import FifoPolicy
 from expsched.policies.priority import PriorityPolicy
 from expsched.verify.attempts import attempts_from_log, down_intervals
 from expsched.verify.invariants import verify
 
-POLICIES = [FifoPolicy(), FifoPolicy(skip=True), PriorityPolicy(aging=3)]
+POLICIES = [FifoPolicy(), FifoPolicy(skip=True), PriorityPolicy(aging=3), BackfillPolicy(aging=3)]
 
 
 def demo_log(demo_problem):

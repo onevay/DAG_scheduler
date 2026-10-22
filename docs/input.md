@@ -77,8 +77,8 @@
 
 | Поле | По умолчанию | |
 |---|---|---|
-| `name` | `priority_backfill` | реализованы `fifo`, `fifo_skip`, `priority` |
-| `aging` | 360 | для `priority`: класс растёт на 1 за каждые `aging` единиц ожидания; `null` — выключено |
+| `name` | `priority_backfill` | `fifo`, `fifo_skip`, `priority`, `priority_backfill`; `cpsat` пока не реализована |
+| `aging` | 360 | для `priority` и `priority_backfill`: класс растёт на 1 за каждые `aging` единиц ожидания; `null` — выключено |
 | `validation_mode` | `lenient` | `strict` — при любой ошибке входа прогон не запускается |
 
 `objective`, `preemption`, `max_preemptions_per_task`, `min_runtime_before_preempt`, а также `seed` и `mode`
