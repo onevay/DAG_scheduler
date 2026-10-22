@@ -21,15 +21,17 @@ class FifoPolicy:
         free = dict(snapshot.free)
         code = "FIFO_FIRST_FIT" if self.skip else "FIFO_HEAD"
         queue = sorted(snapshot.ready, key=lambda k: (snapshot.ready_since[k], snapshot.tasks[k].release, k))
+        room = any(free.values())
         out: list[Decision] = []
         for key in queue:
             need = snapshot.tasks[key].resources
             # Когда свободных ресурсов не осталось, подбирать узел бессмысленно (важно при длинной очереди).
-            worker = None if need and not any(free.values()) else best_fit(snapshot, key, free)
+            worker = None if need and not room else best_fit(snapshot, key, free)
             if worker is None:
                 if self.skip:
                     continue
                 break
             free[worker] = free[worker] - need
+            room = any(free.values())
             out.append(Decision("START", key, worker, {"code": code}))
         return out
