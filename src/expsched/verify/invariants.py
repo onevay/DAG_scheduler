@@ -11,13 +11,16 @@ from expsched.domain.resources import Resources
 from expsched.verify.attempts import Attempt, attempts_from_log, down_intervals
 
 
-def verify(problem: Problem, log: Sequence[Mapping[str, Any]]) -> list[str]:
+def verify(
+    problem: Problem, log: Sequence[Mapping[str, Any]], max_preemptions: int | None = None
+) -> list[str]:
     """Нарушения вида «I3 node-B t=12: ...»; пустой список — расписание допустимо.
 
     I1 успешная попытка выполнила ровно оставшуюся работу; I2 старт не раньше окончания зависимостей;
     I3 загрузка узла не больше ёмкости; I4 попытка не идёт, пока узел недоступен; I5 старт не раньше release
     и подачи; I6 узел допустим для задачи; I7 после успешной попытки других нет; I11 попытка продолжает
-    ровно с сохранённой работы; I12 попытки одной задачи не пересекаются.
+    ровно с сохранённой работы; I12 попытки одной задачи не пересекаются; C9 вытеснена только вытесняемая
+    задача; C10 вытеснений задачи не больше `max_preemptions` (None — не проверять).
     """
     tasks = problem.all_tasks()
     submitted = {r["task"]: r["t"] for r in log if r["type"] == "SUBMIT"}
@@ -32,6 +35,7 @@ def verify(problem: Problem, log: Sequence[Mapping[str, Any]]) -> list[str]:
         violations += _check_attempt(problem, tasks[a.task], a, finished, submitted.get(a.task, 0))
         violations += _check_outages(a, outages.get(a.worker, []))
     violations += _check_sequences(attempts)
+    violations += _check_preemptions(attempts, tasks, max_preemptions)
     for worker in sorted(problem.workers):
         violations += _check_capacity(worker, problem.workers[worker].capacity, attempts, tasks)
     return violations
@@ -82,6 +86,22 @@ def _check_sequences(attempts: Sequence[Attempt]) -> list[str]:
         done = [a for a in runs if a.outcome == "DONE"]
         if done and any(a.attempt > done[0].attempt for a in runs):
             out.append(f"I7 {key}: attempt after a successful one")
+    return out
+
+
+def _check_preemptions(
+    attempts: Sequence[Attempt], tasks: Mapping[str, Task], limit: int | None
+) -> list[str]:
+    out = []
+    count: dict[str, int] = {}
+    for a in attempts:
+        if a.outcome != "PRE":
+            continue
+        count[a.task] = count.get(a.task, 0) + 1
+        if not tasks[a.task].preemptible:
+            out.append(f"C9 {a.task}#{a.attempt}: preempted, but the task is not preemptible")
+    if limit is not None:
+        out += [f"C10 {k}: {n} preemptions, limit is {limit}" for k, n in sorted(count.items()) if n > limit]
     return out
 
 

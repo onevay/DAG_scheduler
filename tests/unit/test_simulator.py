@@ -141,8 +141,3 @@ def test_guard_rejects_overbooking_a_busy_node(make_task, make_problem):
     policy = Always(Decision("START", "a", "n0"), Decision("START", "b", "n0"))
     with pytest.raises(InvalidDecision, match="not enough free resources"):
         Simulator(problem, policy).run_all()
-
-
-def test_preemption_and_reservation_are_not_supported_yet(make_task, make_problem):
-    with pytest.raises(NotImplementedError, match="PREEMPT"):
-        Simulator(make_problem([make_task("a")]), Always(Decision("PREEMPT", "a", "n0"))).run_all()

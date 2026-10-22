@@ -69,8 +69,8 @@ curl -s localhost:8000/v1/runs -H 'content-type: application/json' \
 ## Ограничения
 
 - Политика `cpsat` пока не реализована.
-- Вытеснение (`preemption`) не выполняется: поля политики `objective`, `preemption`,
-  `max_preemptions_per_task`, `min_runtime_before_preempt` принимаются, но не используются.
+- Движок умеет вытеснять задачи, но ни одна политика этого пока не делает: поля `objective`, `preemption`,
+  `min_runtime_before_preempt` принимаются, но не используются.
 - Поддерживается только режим `simulate`.
 - На широких DAG (10⁴ задач, тысячи готовых одновременно) прогон занимает до 20 с: очередь политики
   пересчитывается каждую эпоху.
