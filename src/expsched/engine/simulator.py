@@ -7,7 +7,7 @@
 У каждой нестартовавшей задачи есть причина ожидания (WAIT_*). Запись WAIT появляется, когда причина
 меняется, и действует до следующей записи WAIT этой задачи или до её старта.
 
-События узлов, PREEMPT и RESERVE пока дают NotImplementedError.
+PREEMPT и RESERVE пока дают NotImplementedError.
 """
 
 from __future__ import annotations
@@ -25,8 +25,12 @@ from expsched.engine.journal import Journal
 from expsched.engine.snapshot import build_snapshot
 from expsched.engine.state import SimState
 from expsched.engine.waits import ready_wait
+from expsched.validation.diagnostics import Code, Diagnostic
 from expsched.validation.graph import validate_graph
 from expsched.validation.resources import validate_resources
+
+# Задачи с таким статусом не будут выполнены: их потомки блокируются.
+UNREACHABLE = frozenset({TaskStatus.FAILED, TaskStatus.BLOCKED, TaskStatus.INFEASIBLE})
 
 
 class Simulator:
@@ -82,11 +86,76 @@ class Simulator:
             self._external(payload)
 
     def _external(self, event: Event) -> None:
-        if event.type is not EvType.SUBMIT:
-            raise NotImplementedError(f"event {event.type.value} is not supported yet")
-        if event.task is None:
-            raise ValueError("submit_task event without a task")
-        self._submit(event.task)
+        if event.type is EvType.SUBMIT:
+            if event.task is None:
+                raise ValueError("submit_task event without a task")
+            self._submit(event.task)
+        elif event.worker not in self.state.up:
+            raise ValueError(f"{event.type.value} event for unknown worker {event.worker!r}")
+        elif event.type is EvType.WORKER_DOWN:
+            self._worker_down(event.worker)
+        else:
+            self._worker_up(event.worker)
+
+    def _worker_down(self, worker: str) -> None:
+        """Узел перестаёт работать: его попытки прерываются, ресурсов у него больше нет."""
+        s = self.state
+        if not s.up[worker]:
+            return  # узел уже недоступен
+        s.up[worker] = False
+        self.journal.append("WORKER_DOWN", self.t, worker=worker)
+        for key in sorted(k for k, run in s.run.items() if run.worker == worker):
+            self._interrupt(key, cause="WORKER_DOWN")
+        s.free[worker] = Resources()
+
+    def _worker_up(self, worker: str) -> None:
+        """Узел вернулся пустым: все его ресурсы свободны."""
+        s = self.state
+        if s.up[worker]:
+            return
+        s.up[worker] = True
+        s.free[worker] = s.problem.workers[worker].capacity
+        self.journal.append("WORKER_UP", self.t, worker=worker)
+
+    def _interrupt(self, key: str, cause: str) -> None:
+        """Прерывает попытку: работа до последнего чекпоинта сохраняется, остальное теряется."""
+        s = self.state
+        task, run = s.tasks[key], s.run.pop(key)
+        elapsed = self.t - run.start
+        saved = task.ckpt * (elapsed // task.ckpt) if task.ckpt else 0
+        s.rem[key] -= saved
+        s.free[run.worker] = s.free[run.worker] + task.resources
+        s.analysis = None  # остатки работы изменились
+        self.journal.append(
+            "INTERRUPTED",
+            self.t,
+            task=key,
+            attempt=run.attempt,
+            worker=run.worker,
+            cause=cause,
+            saved=saved,
+            lost=elapsed - saved,
+            remaining=s.rem[key],
+        )
+        s.failures[key] = s.failures.get(key, 0) + 1
+        if s.failures[key] > task.max_retries:
+            s.status[key] = TaskStatus.FAILED
+            self._block_descendants(key)
+            return
+        s.status[key] = TaskStatus.PENDING
+        self._try_ready(key)
+
+    def _block_descendants(self, key: str) -> None:
+        """Все незавершённые потомки задачи, которая не будет выполнена, получают BLOCKED."""
+        s = self.state
+        stack = list(s.successors.get(key, []))
+        while stack:
+            node = stack.pop()
+            if s.status[node] not in FINAL_STATUSES:
+                s.status[node] = TaskStatus.BLOCKED
+                s.wait_code.pop(node, None)
+                self.journal.append("BLOCKED", self.t, task=node, by=key)
+                stack.extend(s.successors.get(node, []))
 
     def _submit(self, task: Task) -> None:
         """Задача, поданная во время прогона. Задача с ошибками получает INFEASIBLE и диагностику."""
@@ -107,6 +176,11 @@ class Simulator:
             s.status[task.id] = TaskStatus.INFEASIBLE
             for diagnostic in problems:
                 self.journal.append("DIAGNOSTIC", self.t, task=task.id, **diagnostic.to_dict())
+            return
+        lost = sorted(d for d in set(task.deps) if s.status[d] in UNREACHABLE)
+        if lost:
+            s.status[task.id] = TaskStatus.BLOCKED
+            self.journal.append("BLOCKED", self.t, task=task.id, by=lost[0])
             return
         if task.release > self.t:
             self.queue.push(task.release, Release(task.id))
@@ -215,10 +289,24 @@ class Simulator:
         )
 
     def _finalize(self) -> None:
-        """Записывает STUCK для каждой задачи, не дошедшей до финального статуса."""
+        """Диагностика для каждой задачи, не дошедшей до финального статуса.
+
+        E050 — задача готова, но подходящие ей узлы так и не вернулись; STUCK — задача не стартовала по другой
+        причине (например, ждёт зависимость, которая никогда не завершится).
+        """
         if self._finalized:
             return
         self._finalized = True
-        for key in sorted(self.state.status):
-            if self.state.status[key] not in FINAL_STATUSES:
+        s = self.state
+        for key in sorted(s.status):
+            if s.status[key] in FINAL_STATUSES:
+                continue
+            if s.status[key] is TaskStatus.READY and not any(s.up[w] for w in s.eligible[key]):
+                diagnostic = Diagnostic(
+                    Code.E050,
+                    {"task": key, "eligible": list(s.eligible[key])},
+                    "Все подходящие узлы недоступны до конца прогона: добавьте узел или событие его возврата",
+                )
+                self.journal.append("DIAGNOSTIC", self.t, task=key, **diagnostic.to_dict())
+            else:
                 self.journal.append("DIAGNOSTIC", self.t, code="STUCK", task=key)

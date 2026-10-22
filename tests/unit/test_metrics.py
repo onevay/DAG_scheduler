@@ -1,4 +1,7 @@
+import dataclasses
+
 from expsched.analysis import analyze
+from expsched.domain.models import Event, EvType
 from expsched.engine.simulator import Simulator
 from expsched.explain.waits import wait_intervals
 from expsched.metrics.metrics import metrics
@@ -15,6 +18,15 @@ def test_demo_metrics(demo_problem):
     assert m["deadline_misses"] == {"critical": 0, "high": 0, "normal": 0, "low": 0}
     assert m["weighted_tardiness"] == 0
     assert m["utilization_gpu"] == round(87 / (10 * 21), 4)  # полезные GPU·ч / ёмкость за прогон
+
+
+def test_failure_metrics_count_lost_work_and_exclude_downtime(demo_problem):
+    # node-A (4 GPU) лежит с 5 до 15; pretrain_vit теряет 1 час на 4 GPU
+    events = [Event(5, EvType.WORKER_DOWN, worker="node-A"), Event(15, EvType.WORKER_UP, worker="node-A")]
+    problem = dataclasses.replace(demo_problem, events=events)
+    m = metrics(problem, Simulator(problem, PriorityPolicy()).run_all(), analyze(problem).lb)
+    assert (m["makespan"], m["lost_work_gpu"]) == (22, 4)
+    assert m["utilization_gpu"] == round(87 / (4 * (22 - 10) + 4 * 22 + 2 * 22), 4)  # 87 / 180
 
 
 def test_late_task_wait_and_utilization(make_task, make_problem):

@@ -1,4 +1,4 @@
-"""Полная проверка входа: размер, JSON и схема, затем граф, ресурсы и дедлайны."""
+"""Полная проверка входа: размер, JSON и схема, затем граф, ресурсы, события и дедлайны."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from expsched.contract.io_models import load, to_domain
 from expsched.domain.models import Problem
 from expsched.validation.deadlines import deadline_certificates
 from expsched.validation.diagnostics import Diagnostic, has_errors
+from expsched.validation.events import validate_events
 from expsched.validation.graph import dedupe_dependencies, validate_graph
 from expsched.validation.quarantine import quarantine
 from expsched.validation.resources import validate_resources
@@ -29,12 +30,12 @@ def validate(raw: bytes, mode: ValidationMode) -> tuple[Problem | None, list[Dia
 
 
 def validate_problem(problem: Problem, mode: ValidationMode) -> tuple[Problem | None, list[Diagnostic]]:
-    """Проверка графа, ресурсов и дедлайнов.
+    """Проверка графа, ресурсов, событий и дедлайнов.
 
     В режиме strict при любой ошибке возвращает (None, диагностики). Иначе — экземпляр без повторов
-    в зависимостях; задачи с ошибками из него убирает `quarantine`.
+    в зависимостях; задачи и события с ошибками из него убирает `quarantine`.
     """
-    diagnostics = [*validate_graph(problem.tasks), *validate_resources(problem)]
+    diagnostics = [*validate_graph(problem.tasks), *validate_resources(problem), *validate_events(problem)]
     # У задач в цикле нет сроков, поэтому дедлайны проверяются только на планируемой части.
     runnable = quarantine(problem, diagnostics).problem
     diagnostics += deadline_certificates(runnable, analyze(runnable))

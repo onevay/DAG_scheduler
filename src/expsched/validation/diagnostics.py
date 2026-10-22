@@ -16,6 +16,8 @@ class Code(StrEnum):
     E020 = "E020"  # требование больше ёмкости любого подходящего узла
     E021 = "E021"  # нет узла, подходящего по меткам или по совокупности ресурсов
     E030 = "E030"  # дедлайн недостижим даже при бесконечных ресурсах
+    E040 = "E040"  # событие для узла, которого нет во входе
+    E050 = "E050"  # во время прогона не осталось работающего подходящего узла
     E070 = "E070"  # длительность задачи меньше 1
     W060 = "W060"  # дубликат ребра зависимости
 
@@ -28,6 +30,8 @@ TITLES: dict[Code, str] = {
     Code.E020: "RESOURCE_EXCEEDS_ANY_WORKER",
     Code.E021: "NO_MATCHING_WORKER",
     Code.E030: "DEADLINE_UNREACHABLE",
+    Code.E040: "UNKNOWN_WORKER",
+    Code.E050: "NO_LIVE_CAPACITY",
     Code.E070: "DURATION_NOT_POSITIVE",
     Code.W060: "DUPLICATE_EDGE",
 }

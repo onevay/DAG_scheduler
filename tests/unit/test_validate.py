@@ -5,7 +5,7 @@ import pytest
 
 from expsched.analysis import analyze
 from expsched.contract.limits import MAX_BODY_BYTES, InputTooLarge
-from expsched.domain.models import Task
+from expsched.domain.models import Event, EvType, Task
 from expsched.domain.resources import Resources
 from expsched.domain.states import TaskStatus
 from expsched.validation import Code, has_errors, quarantine, validate, validate_problem
@@ -190,3 +190,19 @@ def test_diagnostic_serialises_to_result_shape():
         "hint": diagnostics[0].hint,
     }
     json.dumps(diagnostics[0].to_dict())
+
+
+# ---- события узлов ----
+
+
+def test_event_for_an_unknown_worker_is_e040(make_task, make_problem):
+    events = [Event(3, EvType.WORKER_DOWN, worker="ghost"), Event(4, EvType.WORKER_UP, worker="n0")]
+    problem = make_problem([make_task("a")], events=events)
+    result, diagnostics = validate_problem(problem, "lenient")
+    (d,) = diagnostics
+    assert d.code is Code.E040 and d.level == "error"
+    assert d.detail == {"event": 0, "type": "worker_down", "time": 3, "worker": "ghost"}
+    assert validate_problem(problem, "strict") == (None, diagnostics)
+    assert [e.worker for e in quarantine(result, diagnostics).problem.events] == [
+        "n0"
+    ]  # чужое событие отброшено

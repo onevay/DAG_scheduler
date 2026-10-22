@@ -1,6 +1,5 @@
 import pytest
 
-from expsched.domain.models import Event, EvType
 from expsched.domain.snapshot import Decision
 from expsched.domain.states import TaskStatus
 from expsched.engine.errors import InvalidDecision
@@ -116,12 +115,6 @@ def test_cycle_in_input_ends_with_stuck_diagnostics(make_task, make_problem, gre
         ("DIAGNOSTIC", "STUCK", "a"),
         ("DIAGNOSTIC", "STUCK", "b"),
     ]
-
-
-def test_worker_events_are_not_supported_yet(make_task, make_problem, greedy):
-    problem = make_problem([make_task("a", 5)], events=[Event(2, EvType.WORKER_DOWN, worker="n0")])
-    with pytest.raises(NotImplementedError, match="worker_down"):
-        Simulator(problem, greedy).run_all()
 
 
 # ---- guard ----

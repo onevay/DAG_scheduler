@@ -1,4 +1,4 @@
-"""Режим lenient: задачи с ошибками убираются из плана, остальные планируются как обычно."""
+"""Режим lenient: задачи и события с ошибками убираются из плана, остальное планируется как обычно."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from expsched.domain.graph import TaskGraph
 from expsched.domain.models import Problem
 from expsched.domain.states import TaskStatus
 from expsched.validation.diagnostics import Code, Diagnostic
+from expsched.validation.events import knows_worker
 
 # Диагностики, после которых сама задача не может быть выполнена.
 _TASK_CODES = frozenset({Code.E010, Code.E011, Code.E020, Code.E021})
@@ -21,7 +22,8 @@ class Quarantine:
 
 
 def quarantine(problem: Problem, diagnostics: Iterable[Diagnostic]) -> Quarantine:
-    """Задачи с ошибками (E010, E011, E012, E020, E021) получают INFEASIBLE, все их потомки — BLOCKED.
+    """Задачи с ошибками (E010, E011, E012, E020, E021) получают INFEASIBLE, все их потомки — BLOCKED;
+    события неизвестных узлов (E040) отбрасываются.
 
     Оставшиеся задачи образуют ацикличный граф, в котором у каждой задачи есть все её предшественники.
     """
@@ -36,4 +38,5 @@ def quarantine(problem: Problem, diagnostics: Iterable[Diagnostic]) -> Quarantin
     excluded = {key: TaskStatus.BLOCKED for key in sorted(blocked)}
     excluded.update({key: TaskStatus.INFEASIBLE for key in sorted(guilty)})
     runnable = {k: t for k, t in problem.tasks.items() if k not in excluded}
-    return Quarantine(replace(problem, tasks=runnable), excluded)
+    events = [e for e in problem.events if knows_worker(problem, e)]
+    return Quarantine(replace(problem, tasks=runnable, events=events), excluded)

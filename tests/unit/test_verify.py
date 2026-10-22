@@ -7,7 +7,7 @@ from expsched.domain.models import Event, EvType
 from expsched.engine.simulator import Simulator
 from expsched.policies.fifo import FifoPolicy
 from expsched.policies.priority import PriorityPolicy
-from expsched.verify.attempts import attempts_from_log
+from expsched.verify.attempts import attempts_from_log, down_intervals
 from expsched.verify.invariants import verify
 
 POLICIES = [FifoPolicy(), FifoPolicy(skip=True), PriorityPolicy(aging=3)]
@@ -109,5 +109,60 @@ def test_attempts_are_rebuilt_from_starts_and_finishes():
         {"t": 4, "type": "FINISH", "task": "a", "worker": "w", "attempt": 1},
     ]
     a, b = attempts_from_log(log)
-    assert (a.task, a.start, a.end) == ("a", 0, 4)
-    assert (b.task, b.start, b.end) == ("b", 2, None)
+    assert (a.task, a.start, a.end, a.outcome) == ("a", 0, 4, "DONE")
+    assert (b.task, b.start, b.end, b.outcome) == ("b", 2, None, None)
+
+
+# ---- отказы узлов ----
+
+
+def with_failure(demo_problem):
+    """Демо, в котором node-A падает в t = 5 и возвращается в t = 15."""
+    events = [Event(5, EvType.WORKER_DOWN, worker="node-A"), Event(15, EvType.WORKER_UP, worker="node-A")]
+    return dataclasses.replace(demo_problem, events=events)
+
+
+@pytest.mark.parametrize("policy", POLICIES, ids=lambda p: p.name)
+def test_schedules_with_a_failure_are_valid(demo_problem, policy):
+    problem = with_failure(demo_problem)
+    assert verify(problem, Simulator(problem, policy).run_all()) == []
+
+
+@pytest.mark.parametrize("policy", POLICIES, ids=lambda p: p.name)
+@pytest.mark.parametrize("seed", range(30))
+def test_random_schedules_with_failures_are_valid(random_problem, seed, policy):
+    problem = random_problem(seed, failures=True)
+    assert verify(problem, Simulator(problem, policy).run_all()) == []
+
+
+def test_interrupted_attempt_is_rebuilt_with_its_saved_work(demo_problem):
+    attempts = [
+        a for a in attempts_from_log(demo_log(with_failure(demo_problem))) if a.task == "pretrain_vit"
+    ]
+    assert [(a.attempt, a.worker, a.start, a.end, a.outcome, a.saved) for a in attempts] == [
+        (1, "node-A", 2, 5, "INT", 2),
+        (2, "node-B", 5, 11, "DONE", 0),
+    ]
+
+
+def test_attempt_running_on_a_worker_that_is_down(demo_problem):
+    problem = with_failure(demo_problem)
+    log = Simulator(problem, PriorityPolicy()).run_all()
+    log = changed(log, "START", "eval_asr", worker="node-A")  # eval_asr шла в 8–10, а node-A лежит с 5 до 15
+    log = changed(log, "FINISH", "eval_asr", worker="node-A")
+    assert "I4" in codes(verify(problem, log), "eval_asr")
+
+
+def test_resume_point_must_match_the_saved_work(demo_problem):
+    problem = with_failure(demo_problem)
+    log = changed(Simulator(problem, PriorityPolicy()).run_all(), "INTERRUPTED", "pretrain_vit", saved=1)
+    assert "I11" in codes(verify(problem, log), "pretrain_vit")
+
+
+def test_down_intervals_from_the_journal():
+    log = [
+        {"t": 2, "type": "WORKER_DOWN", "worker": "a"},
+        {"t": 5, "type": "WORKER_UP", "worker": "a"},
+        {"t": 7, "type": "WORKER_DOWN", "worker": "b"},
+    ]
+    assert down_intervals(log) == {"a": [(2, 5)], "b": [(7, None)]}

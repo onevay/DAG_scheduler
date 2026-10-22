@@ -1,11 +1,13 @@
 """Общие фикстуры: фабрики задач и экземпляров, демонстрационный DAG, тестовая политика."""
 
+import random
 from collections.abc import Callable
+from dataclasses import replace
 from typing import Any
 
 import pytest
 
-from expsched.domain.models import Problem, Task, Worker
+from expsched.domain.models import Event, EvType, Problem, Task, Worker
 from expsched.domain.resources import Resources
 from expsched.domain.snapshot import Decision, Snapshot
 
@@ -47,6 +49,45 @@ def _assert_capacity_respected(problem: Problem, log: list[dict[str, Any]]) -> N
             assert load[r["worker"]].fits(problem.workers[r["worker"]].capacity), r
         elif r["type"] == "FINISH":
             load[r["worker"]] = load[r["worker"]] - tasks[r["task"]].resources
+
+
+def _random_problem(seed: int, failures: bool = False) -> Problem:
+    """Случайный DAG (рёбра только к задачам с меньшим номером) на узлах a, b (4 GPU) и c (2 GPU).
+
+    С `failures=True` у задач случайные чекпоинты и max_retries, узлы a и b по разу падают и возвращаются.
+    """
+    rnd = random.Random(seed)
+    tasks = {}
+    for i in range(rnd.randint(5, 20)):
+        tasks[f"t{i}"] = Task(
+            f"t{i}",
+            rnd.randint(1, 5),
+            Resources({"gpu": rnd.choice([1, 1, 2, 4])}),
+            priority=rnd.randint(0, 10),
+            deadline=rnd.choice([None, rnd.randint(5, 30)]),
+            release=rnd.choice([0, 0, rnd.randint(1, 8)]),
+            deps=tuple(f"t{j}" for j in range(i) if rnd.random() < 0.2),
+        )
+    workers = {w: Worker(w, Resources({"gpu": g})) for w, g in (("a", 4), ("b", 4), ("c", 2))}
+    if not failures:
+        return Problem(tasks, workers)
+    tasks = {
+        k: replace(t, ckpt=rnd.choice([None, 1, 2]), max_retries=rnd.choice([0, 1, 2]))
+        for k, t in tasks.items()
+    }
+    events = []
+    for worker in ("a", "b"):
+        start = rnd.randint(1, 10)
+        events += [
+            Event(start, EvType.WORKER_DOWN, worker=worker),
+            Event(start + rnd.randint(1, 8), EvType.WORKER_UP, worker=worker),
+        ]
+    return Problem(tasks, workers, events)
+
+
+@pytest.fixture
+def random_problem() -> Callable[..., Problem]:
+    return _random_problem
 
 
 @pytest.fixture
