@@ -6,7 +6,9 @@ requires-python = ">=3.12"
 dependencies = ["pydantic>=2.7"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.5", "mypy>=1.10", "import-linter>=2.0", "pre-commit>=3.7"]
+api = ["fastapi>=0.111", "uvicorn>=0.30"]
+ui = ["streamlit>=1.36", "plotly>=5.22", "httpx>=0.27"]
+dev = ["pytest>=8", "ruff>=0.5", "mypy>=1.10", "import-linter>=2.0", "pre-commit>=3.7", "httpx>=0.27"]
 
 [build-system]
 requires = ["hatchling"]
@@ -31,12 +33,18 @@ packages = [
     "expsched.validation",
     "expsched.engine",
     "expsched.policies",
+    "expsched.verify",
+    "expsched.metrics",
+    "expsched.explain",
+    "expsched.pipeline",
+    "expsched.api",
 ]
 plugins = ["pydantic.mypy"]
 
 [tool.pytest.ini_options]
 addopts = "-q --strict-markers"
 testpaths = ["tests"]
+pythonpath = ["ui/streamlit"]
 markers = [
     "docker: требует Docker",
     "slow: долгие (ночной CI)",

@@ -7,9 +7,20 @@ root_package = expsched
 name = Слои ядра
 type = layers
 layers =
-    (expsched.api) | (expsched.cli) | (expsched.io)
-    (expsched.explain) | (expsched.metrics)
+    expsched.api | (expsched.cli) | (expsched.io)
+    expsched.pipeline
+    expsched.explain | expsched.metrics
+    expsched.verify
     expsched.engine | expsched.policies
     expsched.validation
     expsched.analysis | expsched.contract
     expsched.domain
+
+# Проверка расписания не должна доверять коду, который она проверяет.
+[importlinter:contract:verify-independent]
+name = Проверка не зависит от движка и политик
+type = forbidden
+source_modules = expsched.verify
+forbidden_modules =
+    expsched.engine
+    expsched.policies

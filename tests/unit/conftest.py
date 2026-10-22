@@ -39,7 +39,7 @@ def greedy() -> GreedyPolicy:
 
 
 def _assert_capacity_respected(problem: Problem, log: list[dict[str, Any]]) -> None:
-    tasks = dict(problem.tasks) | {e.task.id: e.task for e in problem.events if e.task}
+    tasks = problem.all_tasks()
     load = {w: Resources() for w in problem.workers}
     for r in log:
         if r["type"] == "START":
