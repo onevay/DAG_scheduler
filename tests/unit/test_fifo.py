@@ -55,8 +55,8 @@ def test_demo_reaches_the_lower_bound(demo_problem, check_capacity, skip):
 
 
 def test_registry_builds_policies_by_name():
-    assert make_policy(PolicyIn(name="fifo")).name == "fifo"
-    assert make_policy(PolicyIn(name="fifo_skip")).name == "fifo_skip"
+    assert make_policy(PolicyIn(name="fifo", preemption="never")).name == "fifo"
+    assert make_policy(PolicyIn(name="fifo_skip", preemption="never")).name == "fifo_skip"
 
 
 def test_registry_reports_policies_that_are_not_implemented():

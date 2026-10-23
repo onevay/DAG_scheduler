@@ -8,7 +8,16 @@ from expsched_ui import tables
 from expsched.contract.io_models import ProblemIn
 
 SCENARIOS = Path(__file__).resolve().parents[2] / "scenarios"
-SETTINGS = {"policy": "priority", "aging": None, "validation_mode": "lenient", "time_unit": "hour"}
+SETTINGS = {
+    "policy": "priority",
+    "aging": None,
+    "validation_mode": "lenient",
+    "preemption": "deadline_only",
+    "max_preemptions_per_task": 1,
+    "min_runtime_before_preempt": 0,
+    "max_forecast_tasks": 1000,
+    "time_unit": "hour",
+}
 
 
 def scenario(name):
@@ -25,7 +34,7 @@ def rebuild(problem, settings=SETTINGS):
     )
 
 
-@pytest.mark.parametrize("name", ["demo", "urgent_failure"])
+@pytest.mark.parametrize("name", ["demo", "urgent_failure", "preemption"])
 def test_scenario_survives_a_round_trip_through_the_tables(name):
     original = ProblemIn.model_validate(scenario(name))
     rebuilt = ProblemIn.model_validate(rebuild(scenario(name)))
@@ -90,7 +99,15 @@ def test_rows_without_an_id_are_skipped():
 
 def test_settings_become_the_policy_block():
     problem = tables.build_problem([], [], [], [], {**SETTINGS, "policy": "fifo", "aging": 30})
-    assert problem["policy"] == {"name": "fifo", "aging": 30, "validation_mode": "lenient"}
+    assert problem["policy"] == {
+        "name": "fifo",
+        "aging": 30,
+        "validation_mode": "lenient",
+        "preemption": "deadline_only",
+        "max_preemptions_per_task": 1,
+        "min_runtime_before_preempt": 0,
+        "max_forecast_tasks": 1000,
+    }
 
 
 def test_empty_problem_is_valid_input():

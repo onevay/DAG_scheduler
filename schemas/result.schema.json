@@ -1,0 +1,588 @@
+{
+  "$defs": {
+    "AttemptOut": {
+      "additionalProperties": false,
+      "properties": {
+        "attempt": {
+          "minimum": 1,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "End"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "enum": [
+                "DONE",
+                "INT",
+                "PRE"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Outcome"
+        },
+        "resume_from": {
+          "minimum": 0,
+          "title": "Resume From",
+          "type": "integer"
+        },
+        "saved": {
+          "minimum": 0,
+          "title": "Saved",
+          "type": "integer"
+        },
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "integer"
+        },
+        "task": {
+          "title": "Task",
+          "type": "string"
+        },
+        "worker": {
+          "title": "Worker",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task",
+        "attempt",
+        "worker",
+        "start",
+        "resume_from",
+        "end",
+        "outcome",
+        "saved"
+      ],
+      "title": "AttemptOut",
+      "type": "object"
+    },
+    "DeadlineMisses": {
+      "additionalProperties": false,
+      "properties": {
+        "critical": {
+          "title": "Critical",
+          "type": "integer"
+        },
+        "high": {
+          "title": "High",
+          "type": "integer"
+        },
+        "low": {
+          "title": "Low",
+          "type": "integer"
+        },
+        "normal": {
+          "title": "Normal",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "critical",
+        "high",
+        "normal",
+        "low"
+      ],
+      "title": "DeadlineMisses",
+      "type": "object"
+    },
+    "DiagnosticOut": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "pattern": "^[EW]\\d{3}$",
+          "title": "Code",
+          "type": "string"
+        },
+        "detail": {
+          "additionalProperties": true,
+          "title": "Detail",
+          "type": "object"
+        },
+        "hint": {
+          "title": "Hint",
+          "type": "string"
+        },
+        "level": {
+          "enum": [
+            "error",
+            "warning"
+          ],
+          "title": "Level",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "level",
+        "detail",
+        "hint"
+      ],
+      "title": "DiagnosticOut",
+      "type": "object"
+    },
+    "MetricsOut": {
+      "additionalProperties": false,
+      "properties": {
+        "deadline_misses": {
+          "$ref": "#/$defs/DeadlineMisses"
+        },
+        "gap_to_lb": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Gap To Lb"
+        },
+        "lost_work_gpu": {
+          "title": "Lost Work Gpu",
+          "type": "integer"
+        },
+        "lower_bound": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Lower Bound"
+        },
+        "makespan": {
+          "minimum": 0,
+          "title": "Makespan",
+          "type": "integer"
+        },
+        "mean_wait": {
+          "title": "Mean Wait",
+          "type": "number"
+        },
+        "utilization_gpu": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Utilization Gpu"
+        },
+        "weighted_tardiness": {
+          "title": "Weighted Tardiness",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "makespan",
+        "lower_bound",
+        "gap_to_lb",
+        "deadline_misses",
+        "weighted_tardiness",
+        "utilization_gpu",
+        "lost_work_gpu",
+        "mean_wait"
+      ],
+      "title": "MetricsOut",
+      "type": "object"
+    },
+    "ReplanEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "task": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Task"
+        },
+        "type": {
+          "enum": [
+            "worker_down",
+            "worker_up",
+            "submit_task"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "worker": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Worker"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "ReplanEvent",
+      "type": "object"
+    },
+    "ReplanRecord": {
+      "additionalProperties": false,
+      "description": "Как внешние события момента сдвинули прогнозные старты задач.",
+      "properties": {
+        "changes": {
+          "items": {
+            "$ref": "#/$defs/StartShift"
+          },
+          "title": "Changes",
+          "type": "array"
+        },
+        "dropped": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Dropped",
+          "type": "array"
+        },
+        "events": {
+          "items": {
+            "$ref": "#/$defs/ReplanEvent"
+          },
+          "title": "Events",
+          "type": "array"
+        },
+        "new_tasks": {
+          "additionalProperties": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "title": "New Tasks",
+          "type": "object"
+        },
+        "seq": {
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "t": {
+          "minimum": 0,
+          "title": "T",
+          "type": "integer"
+        },
+        "trigger": {
+          "enum": [
+            "worker_down",
+            "worker_up",
+            "submit_task"
+          ],
+          "title": "Trigger",
+          "type": "string"
+        },
+        "type": {
+          "const": "REPLAN",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "seq",
+        "t",
+        "type",
+        "trigger",
+        "events",
+        "changes",
+        "new_tasks",
+        "dropped"
+      ],
+      "title": "ReplanRecord",
+      "type": "object"
+    },
+    "StartShift": {
+      "additionalProperties": false,
+      "properties": {
+        "delta": {
+          "title": "Delta",
+          "type": "integer"
+        },
+        "new_start": {
+          "minimum": 0,
+          "title": "New Start",
+          "type": "integer"
+        },
+        "old_start": {
+          "minimum": 0,
+          "title": "Old Start",
+          "type": "integer"
+        },
+        "task": {
+          "title": "Task",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task",
+        "old_start",
+        "new_start",
+        "delta"
+      ],
+      "title": "StartShift",
+      "type": "object"
+    },
+    "TaskOut": {
+      "additionalProperties": false,
+      "properties": {
+        "deadline": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Deadline"
+        },
+        "finish": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Finish"
+        },
+        "start": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Start"
+        },
+        "status": {
+          "$ref": "#/$defs/TaskStatus"
+        },
+        "tardiness": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Tardiness"
+        },
+        "waits": {
+          "items": {
+            "$ref": "#/$defs/WaitInterval"
+          },
+          "title": "Waits",
+          "type": "array"
+        }
+      },
+      "required": [
+        "status",
+        "start",
+        "finish",
+        "deadline",
+        "tardiness",
+        "waits"
+      ],
+      "title": "TaskOut",
+      "type": "object"
+    },
+    "TaskStatus": {
+      "enum": [
+        "PENDING",
+        "READY",
+        "RUNNING",
+        "SUCCEEDED",
+        "FAILED",
+        "INFEASIBLE",
+        "BLOCKED",
+        "CANCELLED"
+      ],
+      "title": "TaskStatus",
+      "type": "string"
+    },
+    "WaitInterval": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "detail": {
+          "additionalProperties": true,
+          "title": "Detail",
+          "type": "object"
+        },
+        "from": {
+          "minimum": 0,
+          "title": "From",
+          "type": "integer"
+        },
+        "to": {
+          "minimum": 0,
+          "title": "To",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "code",
+        "from",
+        "to",
+        "detail"
+      ],
+      "title": "WaitInterval",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "attempts": {
+      "items": {
+        "$ref": "#/$defs/AttemptOut"
+      },
+      "title": "Attempts",
+      "type": "array"
+    },
+    "diagnostics": {
+      "items": {
+        "$ref": "#/$defs/DiagnosticOut"
+      },
+      "title": "Diagnostics",
+      "type": "array"
+    },
+    "input_hash": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Input Hash",
+      "type": "string"
+    },
+    "metrics": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MetricsOut"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "policy": {
+      "enum": [
+        "fifo",
+        "fifo_skip",
+        "priority",
+        "priority_backfill",
+        "cpsat"
+      ],
+      "title": "Policy",
+      "type": "string"
+    },
+    "replans": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/ReplanRecord"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Replans"
+    },
+    "result_hash": {
+      "anyOf": [
+        {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Result Hash"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "OK",
+        "PARTIAL",
+        "INFEASIBLE"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "tasks": {
+      "additionalProperties": {
+        "$ref": "#/$defs/TaskOut"
+      },
+      "title": "Tasks",
+      "type": "object"
+    },
+    "violations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Violations",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "input_hash",
+    "result_hash",
+    "policy",
+    "status",
+    "attempts",
+    "tasks",
+    "metrics",
+    "diagnostics",
+    "violations",
+    "replans"
+  ],
+  "title": "ResultOut",
+  "type": "object"
+}

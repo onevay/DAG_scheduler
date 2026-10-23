@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>expsched — сборка эксперимента</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&amp;family=Barlow+Condensed:wght@500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E3E7E4}
+a{color:#151716}a:hover{color:#3A403C}
+.lift{transition:transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .35s cubic-bezier(.2,.8,.2,1)}
+.lift:hover{transform:translateY(-2px);box-shadow:0 18px 36px -24px rgba(21,23,22,.45)}
+.node{transition:transform .3s cubic-bezier(.2,.8,.2,1),border-color .25s,box-shadow .3s}
+.node:hover{transform:translateY(-2px) scale(1.02)}
+.rise{animation:rise .7s cubic-bezier(.2,.8,.2,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.draw{stroke-dasharray:400;stroke-dashoffset:400;animation:draw 1.2s .2s cubic-bezier(.2,.8,.2,1) forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.blink{animation:blink 2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+.chip{transition:background-color .2s,color .2s,transform .2s}
+.chip:hover{transform:translateY(-1px)}
+.navlink{transition:background-color .25s,color .25s}
+.navlink:hover{background:#2A2E2C !important;color:#FFFFFF !important}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #5CC8E6;outline-offset:3px}
+input[type=range]{accent-color:#151716}
+@media (max-width:720px){.rail{flex-direction:row !important;width:100% !important;min-height:0 !important;padding:10px 12px !important;overflow-x:auto}.rail-gap{display:none !important}}
+@media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}.draw{stroke-dashoffset:0}}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-wrap: wrap; background: #E3E7E4; font-family: Manrope, system-ui, sans-serif; color: #151716; padding: 14px; gap: 14px; box-sizing: border-box">
+
+  <nav class="rail" aria-label="Разделы" style="flex: 0 0 76px; width: 76px; min-height: calc(100vh - 28px); background: #151716; border-radius: 28px; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px 0; box-sizing: border-box">
+    <a href="Main.dc.html" aria-label="expsched" style="width: 48px; height: 48px; border-radius: 50%; border: 1.5px solid #3A403C; display: flex; align-items: center; justify-content: center; color: #DDF27A; margin-bottom: 18px">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.3 6.3l2.5 2.5M15.2 15.2l2.5 2.5M6.3 17.7l2.5-2.5M15.2 8.8l2.5-2.5"/></svg>
+    </a>
+    <a class="navlink" href="Main.dc.html" aria-label="Обзор" title="Обзор" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z"/></svg>
+    </a>
+    <a class="navlink" href="Builder.dc.html" aria-label="Сборка" title="Сборка" aria-current="page" style="width: 48px; height: 48px; border-radius: 16px; background: #DDF27A; color: #151716; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M7.5 8l3.3 7.8M16.5 8l-3.3 7.8"/></svg>
+    </a>
+    <a class="navlink" href="Cluster.dc.html" aria-label="Кластер" title="Кластер" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="6" rx="2"/><rect x="4" y="14" width="16" height="6" rx="2"/><path d="M8 7h.01M8 17h.01"/></svg>
+    </a>
+    <a class="navlink" href="Run.dc.html" aria-label="Прогон" title="Прогон" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 6h9M8 12h11M4 18h7"/></svg>
+    </a>
+    <a class="navlink" href="Compare.dc.html" aria-label="Сравнение" title="Сравнение" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>
+    </a>
+    <a class="navlink" href="Explain.dc.html" aria-label="Объяснения" title="Объяснения" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/></svg>
+    </a>
+    <a class="navlink" href="Containers.dc.html" aria-label="Контейнеры" title="Контейнеры" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg>
+    </a>
+    <div class="rail-gap" style="flex: 1 1 auto"></div>
+    <a class="navlink" href="System.dc.html" aria-label="Дизайн-система" title="Дизайн-система" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>
+    </a>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px; padding: 14px 10px 24px; box-sizing: border-box">
+
+    <header class="rise" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px">
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <span style="font-size: 13px; color: #5E6561">Сценарии / <span style="color: #151716; font-weight: 600">urgent_failure</span> · черновик сохранён</span>
+        <h1 style="margin: 0; font-size: 44px; font-weight: 500; letter-spacing: -0.03em; line-height: 1.05">Сборка эксперимента</h1>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px">
+        <button type="button" class="lift" style="height: 52px; padding: 0 22px; border-radius: 26px; border: 1.5px solid #151716; background: transparent; font: 500 15px Manrope, sans-serif; color: #151716; cursor: pointer; display: inline-flex; align-items: center; gap: 8px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg>Проверить
+        </button>
+        <a href="Run.dc.html" class="lift" style="height: 52px; padding: 0 26px; border-radius: 26px; background: #151716; color: #FFFFFF; display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-size: 15px; font-weight: 500">
+          Запустить
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+        </a>
+      </div>
+    </header>
+
+    <div role="tablist" aria-label="Части входа" style="display: flex; flex-wrap: wrap; gap: 8px">
+      <button type="button" role="tab" aria-selected="true" style="height: 44px; padding: 0 20px; border-radius: 22px; border: 0; background: #151716; color: #FFFFFF; font: 500 15px Manrope, sans-serif">Задачи · 11</button>
+      <a href="Cluster.dc.html" role="tab" aria-selected="false" style="height: 44px; padding: 0 20px; border-radius: 22px; background: #F7F8F6; color: #151716; font-size: 15px; font-weight: 500; display: inline-flex; align-items: center; text-decoration: none">Узлы · 3</a>
+      <a href="Cluster.dc.html" role="tab" aria-selected="false" style="height: 44px; padding: 0 20px; border-radius: 22px; background: #F7F8F6; color: #151716; font-size: 15px; font-weight: 500; display: inline-flex; align-items: center; text-decoration: none">События · 3</a>
+      <button type="button" role="tab" aria-selected="false" style="height: 44px; padding: 0 20px; border-radius: 22px; border: 0; background: #F7F8F6; color: #151716; font: 500 15px Manrope, sans-serif">Политика</button>
+      <span style="flex: 1 1 auto"></span>
+      <span style="height: 44px; padding: 0 16px; border-radius: 22px; background: #F7F8F6; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #3A403C">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/></svg>
+        Найти задачу
+      </span>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start">
+      <div style="flex: 999 1 600px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+
+        <div aria-label="Добавить задачу" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+          <span style="font-size: 13px; color: #5E6561; margin-right: 4px">Перетащите на холст</span>
+          <sc-for list="{{palette}}" as="k" hint-placeholder-count="5">
+            <button type="button" class="chip" style="height: 40px; padding: 0 14px 0 8px; border-radius: 20px; border: 0; background: #F7F8F6; display: inline-flex; align-items: center; gap: 8px; font: 500 14px Manrope, sans-serif; color: #151716; cursor: grab">
+              <span style="{{k.swatch}}"></span>{{k.label}}
+            </button>
+          </sc-for>
+        </div>
+
+        <section aria-label="Граф задач" style="position: relative; background-color: #121413; background-image: linear-gradient(#1D201E 1px, transparent 1px), linear-gradient(90deg, #1D201E 1px, transparent 1px); background-size: 28px 28px; border-radius: 32px; padding: 22px; color: #E8ECE9; overflow: hidden">
+          <div style="display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 8px">
+            <div style="display: flex; flex-direction: column; gap: 2px">
+              <span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 40px; letter-spacing: .01em; line-height: 1">DAG · 11 ЗАДАЧ</span>
+              <span style="font-size: 13px; color: #A3ABA6">лайм — критический путь, пунктир — задача подаётся во время прогона</span>
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px">
+              <span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 40px; line-height: 1">{{lb}} Ч</span>
+              <span style="font-size: 13px; color: #A3ABA6">нижняя граница makespan</span>
+            </div>
+          </div>
+          <div style="overflow-x: auto">
+            <div style="position: relative; width: 872px; height: 486px">
+              <svg aria-hidden="true" width="872" height="486" viewBox="0 0 872 486" style="position: absolute; inset: 0">
+                <g fill="none" stroke="#5E6561" stroke-width="1.4">
+                  <path class="draw" d="M160 250C190 250 166 370 196 370"/>
+                  <path class="draw" d="M332 140C362 140 338 210 368 210"/>
+                  <path class="draw" d="M332 370C362 370 338 410 368 410"/>
+                  <path class="draw" d="M504 80C534 80 510 154 540 154"/>
+                  <path class="draw" d="M504 210C534 210 510 260 540 260"/>
+                  <path class="draw" d="M676 154C706 154 682 110 712 110"/>
+                  <path class="draw" stroke-dasharray="4 5" d="M504 410C534 410 510 430 540 430"/>
+                </g>
+                <g fill="none" stroke="#DDF27A" stroke-width="2">
+                  <path class="draw" d="M160 250C190 250 166 140 196 140"/>
+                  <path class="draw" d="M332 140C362 140 338 80 368 80"/>
+                  <path class="draw" d="M504 80C534 80 510 54 540 54"/>
+                  <path class="draw" d="M676 54C706 54 682 110 712 110"/>
+                </g>
+                <g fill="none" stroke="#3A403C" stroke-dasharray="2 5">
+                  <path d="M24 476H848"/><path d="M24 468V484"/><path d="M848 468V484"/>
+                </g>
+                <text x="436" y="470" text-anchor="middle" fill="#8A938D" font-family="JetBrains Mono" font-size="11">критический путь: prep_data → pretrain_vit → ft_det → distill → infer_bench</text>
+              </svg>
+              <sc-for list="{{nodes}}" as="n" hint-placeholder-count="11">
+                <button type="button" class="node" onClick="{{n.pick}}" aria-pressed="{{n.selected}}" aria-label="{{n.aria}}" style="{{n.style}}">
+                  <span style="display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%">
+                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #E8ECE9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{n.id}}</span>
+                    <span style="{{n.dot}}"></span>
+                  </span>
+                  <span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-size: 20px; letter-spacing: .02em; color: #FFFFFF">{{n.meta}}</span>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px">
+            <button type="button" aria-label="Приблизить" style="width: 40px; height: 40px; border-radius: 50%; border: 1px solid #3A403C; background: #1A1D1B; color: #E8ECE9; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+            <button type="button" aria-label="Отдалить" style="width: 40px; height: 40px; border-radius: 50%; border: 1px solid #3A403C; background: #1A1D1B; color: #E8ECE9; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+            <button type="button" style="height: 40px; padding: 0 16px; border-radius: 20px; border: 1px solid #3A403C; background: #1A1D1B; color: #E8ECE9; font: 500 13px Manrope, sans-serif; cursor: pointer">Разложить по слоям</button>
+            <button type="button" style="height: 40px; padding: 0 16px; border-radius: 20px; border: 1px solid #3A403C; background: #1A1D1B; color: #E8ECE9; font: 500 13px Manrope, sans-serif; cursor: pointer">Связать: shift + перетащить</button>
+          </div>
+        </section>
+
+        <section aria-label="Проверка входа" aria-live="polite" style="{{check.boxStyle}}">
+          <span style="{{check.iconStyle}}">
+            <sc-if value="{{check.ok}}" hint-placeholder-val="{{ true }}">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#151716" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg>
+            </sc-if>
+            <sc-if value="{{check.bad}}" hint-placeholder-val="{{ false }}">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg>
+            </sc-if>
+          </span>
+          <span style="flex: 1 1 260px; display: flex; flex-direction: column; gap: 3px">
+            <span style="font-size: 15px; font-weight: 600">{{check.title}}</span>
+            <span style="font-size: 13px; color: #3A403C">{{check.detail}}</span>
+          </span>
+          <span style="display: flex; flex-wrap: wrap; gap: 8px">
+            <span style="height: 32px; padding: 0 12px; border-radius: 16px; background: #FFFFFF; display: inline-flex; align-items: center; font-size: 13px">11 задач</span>
+            <span style="height: 32px; padding: 0 12px; border-radius: 16px; background: #FFFFFF; display: inline-flex; align-items: center; font-size: 13px">11 связей</span>
+            <span style="height: 32px; padding: 0 12px; border-radius: 16px; background: #FFFFFF; display: inline-flex; align-items: center; font-size: 13px">{{work}} GPU·ч работы</span>
+          </span>
+        </section>
+      </div>
+
+      <aside aria-label="Свойства задачи" style="flex: 1 1 320px; max-width: 100%; background: #F2F4F2; border-radius: 32px; padding: 22px; display: flex; flex-direction: column; gap: 18px; box-sizing: border-box">
+        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px">
+          <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0">
+            <span style="font-size: 12px; color: #5E6561">Задача</span>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 500; overflow-wrap: anywhere">{{t.id}}</span>
+          </div>
+          <span style="{{t.kindBadge}}">{{t.kind}}</span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <span style="font-size: 13px; color: #3A403C">Тип</span>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px">
+            <sc-for list="{{kinds}}" as="k" hint-placeholder-count="5">
+              <button type="button" class="chip" onClick="{{k.pick}}" aria-pressed="{{k.on}}" style="{{k.style}}">{{k.label}}</button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 12px">
+          <div style="flex: 1 1 0; background: #FFFFFF; border-radius: 22px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+            <span style="font-size: 13px; color: #3A403C">Длительность</span>
+            <div style="display: flex; align-items: center; justify-content: space-between">
+              <button type="button" aria-label="Короче" onClick="{{shorter}}" style="width: 36px; height: 36px; border-radius: 50%; border: 0; background: #EEF1EE; cursor: pointer; font: 600 18px Manrope, sans-serif; color: #151716">−</button>
+              <span style="font-size: 30px; font-weight: 400">{{t.duration}}<span style="font-size: 14px; color: #5E6561"> ч</span></span>
+              <button type="button" aria-label="Дольше" onClick="{{longer}}" style="width: 36px; height: 36px; border-radius: 50%; border: 0; background: #EEF1EE; cursor: pointer; font: 600 18px Manrope, sans-serif; color: #151716">+</button>
+            </div>
+          </div>
+          <div style="flex: 1 1 0; background: #FFFFFF; border-radius: 22px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+            <span style="font-size: 13px; color: #3A403C">Ретраи</span>
+            <div style="display: flex; align-items: center; justify-content: space-between">
+              <button type="button" aria-label="Меньше ретраев" onClick="{{fewerRetries}}" style="width: 36px; height: 36px; border-radius: 50%; border: 0; background: #EEF1EE; cursor: pointer; font: 600 18px Manrope, sans-serif; color: #151716">−</button>
+              <span style="font-size: 30px; font-weight: 400">{{t.retries}}</span>
+              <button type="button" aria-label="Больше ретраев" onClick="{{moreRetries}}" style="width: 36px; height: 36px; border-radius: 50%; border: 0; background: #EEF1EE; cursor: pointer; font: 600 18px Manrope, sans-serif; color: #151716">+</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <div style="display: flex; justify-content: space-between; font-size: 13px"><span style="color: #3A403C">GPU</span><span style="color: #5E6561">{{t.fits}}</span></div>
+          <div style="display: flex; gap: 6px">
+            <sc-for list="{{gpuPills}}" as="g" hint-placeholder-count="4">
+              <button type="button" onClick="{{g.pick}}" aria-label="{{g.aria}}" aria-pressed="{{g.on}}" style="{{g.style}}">{{g.n}}</button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <div style="display: flex; justify-content: space-between; font-size: 13px"><span style="color: #3A403C">Приоритет</span><span style="color: #5E6561">priority {{t.priority}}</span></div>
+          <div role="radiogroup" aria-label="Класс приоритета" style="display: flex; background: #FFFFFF; border-radius: 22px; padding: 4px; gap: 4px">
+            <sc-for list="{{classes}}" as="c" hint-placeholder-count="4">
+              <button type="button" role="radio" aria-checked="{{c.on}}" onClick="{{c.pick}}" style="{{c.style}}">{{c.label}}</button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="background: #FFFFFF; border-radius: 22px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+          <label for="ckpt" style="display: flex; justify-content: space-between; font-size: 13px"><span style="color: #3A403C">Чекпоинт</span><span style="font-weight: 600">{{t.ckptLabel}}</span></label>
+          <input id="ckpt" type="range" min="0" max="4" step="1" value="{{t.ckpt}}" onChange="{{setCkpt}}" style="width: 100%">
+          <span style="font-size: 12px; color: #5E6561">При отказе узла теряется работа после последнего чекпоинта</span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px">
+          <button type="button" role="switch" aria-checked="{{t.preemptOn}}" onClick="{{togglePreempt}}" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 20px; border: 0; background: #FFFFFF; cursor: pointer; font: 500 14px Manrope, sans-serif; color: #151716; text-align: left">
+            <span style="display: flex; flex-direction: column; gap: 2px"><span>Можно вытеснить</span><span style="font-size: 12px; color: #5E6561; font-weight: 400">ради срочной задачи класса выше</span></span>
+            <span style="{{t.switchTrack}}"><span style="{{t.switchKnob}}"></span></span>
+          </button>
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: 20px; background: #FFFFFF; font-size: 14px">
+            <span>Дедлайн</span><span style="font-weight: 600">{{t.deadlineLabel}}</span>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <span style="font-size: 13px; color: #3A403C">Зависит от</span>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px">
+            <sc-for list="{{t.deps}}" as="d" hint-placeholder-count="2">
+              <span style="height: 32px; padding: 0 12px; border-radius: 16px; background: #FFFFFF; display: inline-flex; align-items: center; font-family: 'JetBrains Mono', monospace; font-size: 12px">{{d}}</span>
+            </sc-for>
+            <sc-if value="{{t.noDeps}}" hint-placeholder-val="{{ false }}">
+              <span style="font-size: 13px; color: #5E6561">ни от чего: стартует сразу</span>
+            </sc-if>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1080}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const t = (id, kind, duration, gpu, priority, deps, x, y, extra) => ({ id, kind, duration, gpu, priority, deps, x, y, ckpt: 0, retries: 2, preemptible: false, deadline: null, release: 0, ...extra });
+    this.state = {
+      selected: 'pretrain_vit',
+      tasks: {
+        prep_data: t('prep_data', 'data', 2, 1, 1, [], 24, 220),
+        pretrain_vit: t('pretrain_vit', 'train', 8, 4, 2, ['prep_data'], 196, 110, { ckpt: 2 }),
+        train_asr: t('train_asr', 'train', 6, 2, 1, ['prep_data'], 196, 340),
+        ft_det: t('ft_det', 'train', 4, 2, 2, ['pretrain_vit'], 368, 50),
+        ft_seg: t('ft_seg', 'train', 5, 2, 1, ['pretrain_vit'], 368, 180),
+        eval_asr: t('eval_asr', 'eval', 2, 1, 1, ['train_asr'], 368, 380),
+        distill: t('distill', 'other', 4, 2, 1, ['ft_det'], 540, 24),
+        eval_det: t('eval_det', 'eval', 2, 1, 2, ['ft_det'], 540, 124),
+        eval_seg: t('eval_seg', 'eval', 2, 1, 1, ['ft_seg'], 540, 230),
+        urgent_eval: t('urgent_eval', 'eval', 3, 2, 10, ['eval_asr'], 540, 400, { deadline: 14, release: 9, submitted: true }),
+        infer_bench: t('infer_bench', 'infer', 3, 1, 1, ['distill', 'eval_det'], 712, 80)
+      }
+    };
+  }
+  update(fields) {
+    const id = this.state.selected;
+    this.setState({ tasks: { ...this.state.tasks, [id]: { ...this.state.tasks[id], ...fields } } });
+  }
+  renderVals() {
+    const KIND = { data: '#A9C7F5', train: '#C9B6F2', eval: '#9BDDB4', infer: '#F6C38F', other: '#D7DBD8' };
+    const tasks = this.state.tasks;
+    const order = ['prep_data', 'pretrain_vit', 'train_asr', 'ft_det', 'ft_seg', 'eval_asr', 'distill', 'eval_det', 'eval_seg', 'urgent_eval', 'infer_bench'];
+    const eft = {};
+    order.forEach((k) => {
+      const t = tasks[k];
+      const start = Math.max(t.release, ...t.deps.map((d) => eft[d]), 0);
+      eft[k] = start + t.duration;
+    });
+    let work = 0;
+    order.forEach((k) => { work += tasks[k].duration * tasks[k].gpu; });
+    const lb = Math.max(Math.max(...order.map((k) => eft[k])), Math.ceil(work / 10));
+    const late = order.filter((k) => tasks[k].deadline !== null && eft[k] > tasks[k].deadline);
+    const sel = tasks[this.state.selected];
+    const cls = (p) => (p >= 8 ? 'critical' : p >= 5 ? 'high' : p >= 2 ? 'normal' : 'low');
+    const nodes = order.map((k) => {
+      const t = tasks[k];
+      const on = k === this.state.selected;
+      const border = on ? '#5CC8E6' : late.includes(k) ? '#F08A4B' : '#3A403C';
+      return {
+        id: k,
+        meta: t.duration + ' Ч · ' + t.gpu + ' GPU',
+        selected: on ? 'true' : 'false',
+        aria: k + ', ' + t.duration + ' ч, ' + t.gpu + ' GPU',
+        pick: () => this.setState({ selected: k }),
+        dot: 'width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; background: ' + KIND[t.kind] + ';',
+        style: 'position: absolute; left: ' + t.x + 'px; top: ' + t.y + 'px; width: 136px; height: 60px; box-sizing: border-box; padding: 8px 12px; border-radius: 16px; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; cursor: pointer; text-align: left; background: ' + (on ? '#1D2a2F' : '#181B19') + '; border: 1.5px ' + (t.submitted ? 'dashed ' : 'solid ') + border + '; box-shadow: ' + (on ? '0 0 0 6px rgba(92,200,230,.14)' : 'none') + ';'
+      };
+    });
+    const kinds = ['data', 'train', 'eval', 'infer', 'other'].map((k) => ({
+      label: k,
+      on: sel.kind === k ? 'true' : 'false',
+      pick: () => this.update({ kind: k }),
+      style: 'height: 36px; padding: 0 14px; border-radius: 18px; border: 0; cursor: pointer; font: 500 13px Manrope, sans-serif; color: #151716; background: ' + (sel.kind === k ? KIND[k] : '#FFFFFF') + ';'
+    }));
+    const gpuPills = [1, 2, 3, 4].map((n) => ({
+      n,
+      on: sel.gpu === n ? 'true' : 'false',
+      aria: n + ' GPU',
+      pick: () => this.update({ gpu: n }),
+      style: 'flex: 1 1 0; height: 52px; border-radius: 18px; cursor: pointer; font: 600 15px Manrope, sans-serif; transition: background-color .25s, color .25s; ' + (n <= sel.gpu ? 'background: #151716; color: #FFFFFF; border: 0;' : 'background: transparent; color: #5E6561; border: 1.5px dashed #B7BEB9;')
+    }));
+    const classes = [['low', 1], ['normal', 2], ['high', 6], ['critical', 10]].map(([label, value]) => ({
+      label,
+      on: cls(sel.priority) === label ? 'true' : 'false',
+      pick: () => this.update({ priority: value }),
+      style: 'flex: 1 1 0; height: 40px; border-radius: 18px; border: 0; cursor: pointer; font: 500 13px Manrope, sans-serif; transition: background-color .25s; ' + (cls(sel.priority) === label ? 'background: #151716; color: #FFFFFF;' : 'background: transparent; color: #3A403C;')
+    }));
+    const preemptOn = sel.preemptible;
+    return {
+      palette: ['data', 'train', 'eval', 'infer', 'other'].map((k) => ({ label: k, swatch: 'width: 24px; height: 24px; border-radius: 50%; background: ' + KIND[k] + ';' })),
+      nodes,
+      lb,
+      work,
+      kinds,
+      gpuPills,
+      classes,
+      check: late.length
+        ? {
+            ok: false,
+            bad: true,
+            title: 'E030 · дедлайн недостижим: ' + late.join(', '),
+            detail: 'Даже при бесконечных ресурсах ' + late[0] + ' закончится в ' + eft[late[0]] + ' ч, а дедлайн — ' + tasks[late[0]].deadline + ' ч. Сократите задачу или её зависимости.',
+            boxStyle: 'display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 24px; background: #FBE3D3; transition: background-color .3s;',
+            iconStyle: 'width: 40px; height: 40px; border-radius: 50%; background: #E2553F; display: flex; align-items: center; justify-content: center; flex: 0 0 auto;'
+          }
+        : {
+            ok: true,
+            bad: false,
+            title: 'Вход корректен',
+            detail: 'Циклов нет, всем задачам хватает узлов, дедлайны достижимы. Проверка идёт при каждом изменении.',
+            boxStyle: 'display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 24px; background: #F2F4F2; transition: background-color .3s;',
+            iconStyle: 'width: 40px; height: 40px; border-radius: 50%; background: #DDF27A; display: flex; align-items: center; justify-content: center; flex: 0 0 auto;'
+          },
+      t: {
+        ...sel,
+        kindBadge: 'height: 32px; padding: 0 12px; border-radius: 16px; display: inline-flex; align-items: center; font-size: 13px; font-weight: 600; background: ' + KIND[sel.kind] + ';',
+        fits: sel.gpu > 2 ? 'node-A, node-B' : 'любой узел',
+        ckptLabel: sel.ckpt ? 'каждые ' + sel.ckpt + ' ч' : 'нет',
+        deadlineLabel: sel.deadline === null ? 'нет' : sel.deadline + ' ч · подача в ' + sel.release + ' ч',
+        preemptOn: preemptOn ? 'true' : 'false',
+        switchTrack: 'width: 46px; height: 28px; border-radius: 14px; flex: 0 0 auto; position: relative; transition: background-color .25s; background: ' + (preemptOn ? '#151716' : '#D5DAD6') + ';',
+        switchKnob: 'position: absolute; top: 3px; left: ' + (preemptOn ? 21 : 3) + 'px; width: 22px; height: 22px; border-radius: 50%; background: ' + (preemptOn ? '#DDF27A' : '#FFFFFF') + '; transition: left .25s cubic-bezier(.2,.8,.2,1);',
+        noDeps: sel.deps.length === 0
+      },
+      shorter: () => this.update({ duration: Math.max(1, sel.duration - 1) }),
+      longer: () => this.update({ duration: sel.duration + 1 }),
+      fewerRetries: () => this.update({ retries: Math.max(0, sel.retries - 1) }),
+      moreRetries: () => this.update({ retries: Math.min(20, sel.retries + 1) }),
+      setCkpt: (e) => this.update({ ckpt: Number(e.target.value) }),
+      togglePreempt: () => this.update({ preemptible: !sel.preemptible })
+    };
+  }
+}
+</script>
+</body>
+</html>

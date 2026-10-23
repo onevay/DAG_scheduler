@@ -10,5 +10,6 @@ jobs:
       - run: uv sync --all-extras
       - run: make lint types
       - run: make test
+      - run: make perf
       - name: schemas are up to date
-        run: uv run python -m expsched.contract.io_models | diff - schemas/problem.schema.json
+        run: make schema && git diff --exit-code schemas/

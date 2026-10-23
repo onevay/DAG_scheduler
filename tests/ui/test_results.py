@@ -111,3 +111,39 @@ def test_comparison_has_a_row_per_policy():
 def test_events_are_one_json_per_line():
     text = results.events_jsonl([{"seq": 0, "type": "READY"}, {"seq": 1, "type": "START"}])
     assert [json.loads(line)["seq"] for line in text.splitlines()] == [0, 1]
+
+
+def test_last_reservation_of_each_task_is_shown():
+    events = [
+        {"type": "RESERVE", "t": 0, "task": "big", "worker": "n0", "t_res": 4},
+        {"type": "START", "t": 1, "task": "short"},
+        {"type": "RESERVE", "t": 2, "task": "big", "worker": "n1", "t_res": 3},
+    ]
+    assert results.reservations(events) == [{"task": "big", "worker": "n1", "t_res": 3, "since": 2}]
+
+
+def test_replans_are_shown_one_per_row():
+    replan = {
+        "t": 5,
+        "events": [{"type": "worker_down", "worker": "node-A"}, {"type": "submit_task", "task": "u"}],
+        "changes": [{"task": "ft_det", "old_start": 10, "new_start": 11, "delta": 1}],
+        "new_tasks": {"pretrain_vit": 5},
+        "dropped": ["b"],
+    }
+    assert results.replan_rows([replan]) == [
+        {
+            "t": 5,
+            "events": "worker_down node-A, submit_task u",
+            "shifted": "ft_det +1",
+            "new": "pretrain_vit → 5",
+            "dropped": "b",
+        }
+    ]
+
+
+def test_preempted_attempt_keeps_its_outcome():
+    path = SCENARIOS / "preemption.json"
+    result = run(load(path.read_bytes())).result
+    bars = results.gantt_bars(result, json.loads(path.read_text(encoding="utf-8")))
+    first = next(b for b in bars if b["task"] == "background")
+    assert (first["outcome"], first["lost_from"], first["end"]) == ("PRE", 2, 3)

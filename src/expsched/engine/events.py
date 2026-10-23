@@ -63,5 +63,10 @@ class EventQueue:
             batch.append(heapq.heappop(self._heap)[3])
         return time, batch
 
+    def drop_external(self) -> None:
+        """Убирает внешние события (отказы, возвраты, подачу задач): прогноз «если ничего не случится»."""
+        self._heap = [entry for entry in self._heap if not isinstance(entry[3], Event)]
+        heapq.heapify(self._heap)
+
     def __len__(self) -> int:
         return len(self._heap)

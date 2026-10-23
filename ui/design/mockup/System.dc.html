@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>expsched — дизайн-система</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&amp;family=Barlow+Condensed:wght@500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E3E7E4}
+a{color:#151716}a:hover{color:#3A403C}
+.lift{transition:transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .35s cubic-bezier(.2,.8,.2,1)}
+.lift:hover{transform:translateY(-3px);box-shadow:0 22px 44px -28px rgba(21,23,22,.45)}
+.pulse{animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(221,242,122,.9)}50%{box-shadow:0 0 0 7px rgba(221,242,122,0)}}
+.rise{animation:rise 1.4s cubic-bezier(.2,.8,.2,1) infinite alternate}
+@keyframes rise{from{opacity:.2;transform:translateY(10px)}to{opacity:1;transform:none}}
+.draw{stroke-dasharray:120;animation:draw 2.4s cubic-bezier(.2,.8,.2,1) infinite}
+@keyframes draw{from{stroke-dashoffset:120}to{stroke-dashoffset:0}}
+.navlink{transition:background-color .25s,color .25s}
+.navlink:hover{background:#2A2E2C !important;color:#FFFFFF !important}
+button:focus-visible,a:focus-visible{outline:2px solid #151716;outline-offset:3px}
+@media (max-width:720px){.rail{flex-direction:row !important;width:100% !important;min-height:0 !important;padding:10px 12px !important;overflow-x:auto}.rail-gap{display:none !important}}
+@media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-wrap: wrap; background: #E3E7E4; font-family: Manrope, system-ui, sans-serif; color: #151716; padding: 14px; gap: 14px; box-sizing: border-box">
+
+  <nav class="rail" aria-label="Разделы" style="flex: 0 0 76px; width: 76px; min-height: calc(100vh - 28px); background: #151716; border-radius: 28px; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px 0; box-sizing: border-box">
+    <a href="Main.dc.html" aria-label="expsched" style="width: 48px; height: 48px; border-radius: 50%; border: 1.5px solid #3A403C; display: flex; align-items: center; justify-content: center; color: #DDF27A; margin-bottom: 18px">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.3 6.3l2.5 2.5M15.2 15.2l2.5 2.5M6.3 17.7l2.5-2.5M15.2 8.8l2.5-2.5"/></svg>
+    </a>
+    <a class="navlink" href="Main.dc.html" aria-label="Обзор" title="Обзор" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z"/></svg>
+    </a>
+    <a class="navlink" href="Builder.dc.html" aria-label="Сборка" title="Сборка" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M7.5 8l3.3 7.8M16.5 8l-3.3 7.8"/></svg>
+    </a>
+    <a class="navlink" href="Cluster.dc.html" aria-label="Кластер" title="Кластер" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="6" rx="2"/><rect x="4" y="14" width="16" height="6" rx="2"/><path d="M8 7h.01M8 17h.01"/></svg>
+    </a>
+    <a class="navlink" href="Run.dc.html" aria-label="Прогон" title="Прогон" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 6h9M8 12h11M4 18h7"/></svg>
+    </a>
+    <a class="navlink" href="Compare.dc.html" aria-label="Сравнение" title="Сравнение" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>
+    </a>
+    <a class="navlink" href="Explain.dc.html" aria-label="Объяснения" title="Объяснения" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/></svg>
+    </a>
+    <a class="navlink" href="Containers.dc.html" aria-label="Контейнеры" title="Контейнеры" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg>
+    </a>
+    <div class="rail-gap" style="flex: 1 1 auto"></div>
+    <a class="navlink" href="System.dc.html" aria-label="Дизайн-система" title="Дизайн-система" aria-current="page" style="width: 48px; height: 48px; border-radius: 16px; background: #DDF27A; color: #151716; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>
+    </a>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 18px; padding: 14px 10px 24px; box-sizing: border-box">
+    <header style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px">
+      <h1 style="margin: 0; font-size: 52px; font-weight: 500; letter-spacing: -0.035em; line-height: 1">Общий язык интерфейса</h1>
+      <span style="font-size: 14px; color: #5E6561; max-width: 420px">Светлая мягкая основа для работы, тёмный «чертёж» для структуры: графа, событий, объяснений.</span>
+    </header>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 16px">
+      <section aria-label="Цвета" style="flex: 2 1 560px; background: #F2F4F2; border-radius: 32px; padding: 24px; display: flex; flex-direction: column; gap: 16px">
+        <h2 style="margin: 0; font-size: 22px; font-weight: 600">Цвета</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px">
+          <div style="display: flex; flex-direction: column; gap: 8px"><span style="height: 64px; border-radius: 20px; background: #E3E7E4; border: 1px solid #D5DAD6"></span><span style="font-size: 13px; font-weight: 600">Фон</span><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #5E6561">#E3E7E4</span></div>
+          <div style="display: flex; flex-direction: column; gap: 8px"><span style="height: 64px; border-radius: 20px; background: #F2F4F2"></span><span style="font-size: 13px; font-weight: 600">Карточка</span><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #5E6561">#F2F4F2</span></div>
+          <div style="display: flex; flex-direction: column; gap: 8px"><span style="height: 64px; border-radius: 20px; background: #FFFFFF"></span><span style="font-size: 13px; font-weight: 600">Вложенная</span><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #5E6561">#FFFFFF</span></div>
+          <div style="display: flex; flex-direction: column; gap: 8px"><span style="height: 64px; border-radius: 20px; background: #151716"></span><span style="font-size: 13px; font-weight: 600">Чернила, главное действие</span><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #5E6561">#151716</span></div>
+          <div style="display: flex; flex-direction: column; gap: 8px"><span style="height: 64px; border-radius: 20px; background: #DDF27A"></span><span style="font-size: 13px; font-weight: 600">Акцент: выбрано, лучшее</span><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #5E6561">#DDF27A</span></div>
+          <div style="display: flex; flex-direction: column; gap: 8px"><span style="height: 64px; border-radius: 20px; background: #121413"></span><span style="font-size: 13px; font-weight: 600">Чертёж</span><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #5E6561">#121413</span></div>
+          <div style="display: flex; flex-direction: column; gap: 8px"><span style="height: 64px; border-radius: 20px; background: #5CC8E6"></span><span style="font-size: 13px; font-weight: 600">Фокус на чертеже</span><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #5E6561">#5CC8E6</span></div>
+          <div style="display: flex; flex-direction: column; gap: 8px"><span style="height: 64px; border-radius: 20px; background: #5E6561"></span><span style="font-size: 13px; font-weight: 600">Вторичный текст</span><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #5E6561">#5E6561 · 5.4:1</span></div>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px">
+          <span style="height: 32px; padding: 0 12px; border-radius: 16px; background: #3FA66B; color: #FFFFFF; display: inline-flex; align-items: center; font-size: 12px; font-weight: 600">успех #3FA66B</span>
+          <span style="height: 32px; padding: 0 12px; border-radius: 16px; background: #F08A4B; color: #151716; display: inline-flex; align-items: center; font-size: 12px; font-weight: 600">предупреждение #F08A4B</span>
+          <span style="height: 32px; padding: 0 12px; border-radius: 16px; background: #E2553F; color: #FFFFFF; display: inline-flex; align-items: center; font-size: 12px; font-weight: 600">ошибка #E2553F</span>
+          <span style="height: 32px; padding: 0 12px; border-radius: 16px; background: #F2CF5B; color: #151716; display: inline-flex; align-items: center; font-size: 12px; font-weight: 600">срочная задача #F2CF5B</span>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center">
+          <span style="font-size: 13px; color: #3A403C; margin-right: 6px">Типы задач</span>
+          <span style="height: 32px; padding: 0 14px; border-radius: 16px; background: #A9C7F5; display: inline-flex; align-items: center; font-size: 13px">data</span>
+          <span style="height: 32px; padding: 0 14px; border-radius: 16px; background: #C9B6F2; display: inline-flex; align-items: center; font-size: 13px">train</span>
+          <span style="height: 32px; padding: 0 14px; border-radius: 16px; background: #9BDDB4; display: inline-flex; align-items: center; font-size: 13px">eval</span>
+          <span style="height: 32px; padding: 0 14px; border-radius: 16px; background: #F6C38F; display: inline-flex; align-items: center; font-size: 13px">infer</span>
+          <span style="height: 32px; padding: 0 14px; border-radius: 16px; background: #D7DBD8; display: inline-flex; align-items: center; font-size: 13px">other</span>
+        </div>
+      </section>
+
+      <section aria-label="Шрифты" style="flex: 1 1 380px; background: #FFFFFF; border-radius: 32px; padding: 24px; display: flex; flex-direction: column; gap: 18px">
+        <h2 style="margin: 0; font-size: 22px; font-weight: 600">Шрифты</h2>
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <span style="font-size: 56px; font-weight: 300; letter-spacing: -0.04em; line-height: 1">22 ч</span>
+          <span style="font-size: 12px; color: #5E6561">Manrope 300 · 56–72 · крупные числа метрик</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <span style="font-size: 32px; font-weight: 500; letter-spacing: -0.03em; line-height: 1.1">Заголовок экрана</span>
+          <span style="font-size: 12px; color: #5E6561">Manrope 500 · 44–64 экран, 22–28 раздел</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <span style="font-size: 15px; line-height: 1.55">Основной текст и подписи к элементам управления.</span>
+          <span style="font-size: 12px; color: #5E6561">Manrope 400–600 · 13–16</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px; background: #121413; color: #FFFFFF; border-radius: 18px; padding: 14px">
+          <span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 44px; line-height: 1">DAG · 21 Ч</span>
+          <span style="font-size: 12px; color: #A3ABA6">Barlow Condensed 600–700 · только на чертеже: размеры, итоги</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 14px">pretrain_vit · node-B · WAIT_DEPS</span>
+          <span style="font-size: 12px; color: #5E6561">JetBrains Mono · id задач, узлов, коды, время</span>
+        </div>
+      </section>
+    </div>
+
+    <section aria-label="Компоненты" style="background: #F2F4F2; border-radius: 32px; padding: 24px; display: flex; flex-direction: column; gap: 20px">
+      <h2 style="margin: 0; font-size: 22px; font-weight: 600">Компоненты</h2>
+      <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center">
+        <button type="button" class="lift" style="height: 52px; padding: 0 26px; border-radius: 26px; border: 0; background: #151716; color: #FFFFFF; font: 500 15px Manrope, sans-serif; cursor: pointer">Главное действие</button>
+        <button type="button" class="lift" style="height: 52px; padding: 0 22px; border-radius: 26px; border: 1.5px solid #151716; background: transparent; color: #151716; font: 500 15px Manrope, sans-serif; cursor: pointer">Второстепенное</button>
+        <button type="button" class="lift" style="height: 52px; padding: 0 22px; border-radius: 26px; border: 0; background: #DDF27A; color: #151716; font: 600 15px Manrope, sans-serif; cursor: pointer">Акцентное</button>
+        <button type="button" aria-label="Иконка" class="lift" style="width: 52px; height: 52px; border-radius: 50%; border: 0; background: #FFFFFF; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#151716" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg></button>
+        <button type="button" disabled="disabled" style="height: 52px; padding: 0 22px; border-radius: 26px; border: 0; background: #D5DAD6; color: #5E6561; font: 500 15px Manrope, sans-serif">Недоступно</button>
+        <div role="radiogroup" aria-label="Сегменты" style="display: flex; background: #FFFFFF; border-radius: 24px; padding: 4px; gap: 4px">
+          <button type="button" role="radio" aria-checked="false" style="height: 40px; padding: 0 16px; border-radius: 20px; border: 0; background: transparent; font: 500 13px Manrope, sans-serif; color: #3A403C">low</button>
+          <button type="button" role="radio" aria-checked="true" style="height: 40px; padding: 0 16px; border-radius: 20px; border: 0; background: #151716; color: #FFFFFF; font: 500 13px Manrope, sans-serif">normal</button>
+          <button type="button" role="radio" aria-checked="false" style="height: 40px; padding: 0 16px; border-radius: 20px; border: 0; background: transparent; font: 500 13px Manrope, sans-serif; color: #3A403C">high</button>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 16px">
+        <div class="lift" style="flex: 1 1 260px; background: #FFFFFF; border-radius: 28px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+          <span style="font-size: 13px; color: #3A403C">Метрика с шагами</span>
+          <span style="font-size: 52px; font-weight: 300; letter-spacing: -0.04em; line-height: .9">48<span style="font-size: 16px; color: #5E6561"> %</span></span>
+          <div aria-hidden="true" style="display: flex; gap: 5px">
+            <span style="flex: 1 1 0; height: 44px; border-radius: 12px; background: #151716"></span><span style="flex: 1 1 0; height: 44px; border-radius: 12px; background: #151716"></span><span style="flex: 1 1 0; height: 44px; border-radius: 12px; background: #151716"></span><span style="flex: 1 1 0; height: 44px; border-radius: 12px; background: #151716"></span><span style="flex: 1 1 0; height: 44px; border-radius: 12px; background: #151716"></span>
+            <span style="flex: 1 1 0; height: 44px; border-radius: 12px; border: 1.5px dashed #B7BEB9; box-sizing: border-box"></span><span style="flex: 1 1 0; height: 44px; border-radius: 12px; border: 1.5px dashed #B7BEB9; box-sizing: border-box"></span><span style="flex: 1 1 0; height: 44px; border-radius: 12px; border: 1.5px dashed #B7BEB9; box-sizing: border-box"></span><span style="flex: 1 1 0; height: 44px; border-radius: 12px; border: 1.5px dashed #B7BEB9; box-sizing: border-box"></span><span style="flex: 1 1 0; height: 44px; border-radius: 12px; border: 1.5px dashed #B7BEB9; box-sizing: border-box"></span>
+          </div>
+          <span style="font-size: 12px; color: #5E6561">10 шагов: заполненный — доля, пунктир — свободно</span>
+        </div>
+
+        <div class="lift" style="flex: 2 1 420px; background: #FFFFFF; border-radius: 28px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+          <span style="font-size: 13px; color: #3A403C">Полоса задачи на Ганте</span>
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <div style="display: flex; align-items: center; gap: 12px"><span style="width: 100px; font-size: 12px; color: #5E6561">выполнена</span><span style="flex: 1 1 auto; height: 36px; border-radius: 12px; background: #C9B6F2; display: flex; align-items: center; padding-left: 12px; font-size: 12px; font-weight: 600">ft_det</span></div>
+            <div style="display: flex; align-items: center; gap: 12px"><span style="width: 100px; font-size: 12px; color: #5E6561">идёт сейчас</span><span style="flex: 1 1 auto; height: 36px; border-radius: 12px; background: #9BDDB4; border: 1.5px solid #151716; box-sizing: border-box; display: flex; align-items: center; padding-left: 12px; font-size: 12px; font-weight: 600">eval_asr</span></div>
+            <div style="display: flex; align-items: center; gap: 12px"><span style="width: 100px; font-size: 12px; color: #5E6561">в будущем</span><span style="flex: 1 1 auto; height: 36px; border-radius: 12px; border: 1.5px dashed #F6C38F; box-sizing: border-box; display: flex; align-items: center; padding-left: 12px; font-size: 12px; color: #5E6561">infer_bench</span></div>
+            <div style="display: flex; align-items: center; gap: 12px"><span style="width: 100px; font-size: 12px; color: #5E6561">прервана</span><span style="flex: 1 1 auto; height: 36px; border-radius: 12px; background: #C9B6F2; display: flex; align-items: center; padding-left: 12px; font-size: 12px; font-weight: 600; position: relative; overflow: hidden">pretrain_vit<span style="position: absolute; right: 0; top: 0; bottom: 0; width: 33%; background: repeating-linear-gradient(135deg, #B9CC5A 0 4px, #EEF7C2 4px 8px)"></span></span></div>
+            <div style="display: flex; align-items: center; gap: 12px"><span style="width: 100px; font-size: 12px; color: #5E6561">подана в прогоне</span><span style="flex: 1 1 auto; height: 36px; border-radius: 12px; background: #9BDDB4; outline: 2px solid #F2CF5B; outline-offset: 1px; display: flex; align-items: center; padding-left: 12px; font-size: 12px; font-weight: 600">urgent_eval</span></div>
+            <div style="display: flex; align-items: center; gap: 12px"><span style="width: 100px; font-size: 12px; color: #5E6561">узел лежит</span><span style="flex: 1 1 auto; height: 36px; border-radius: 12px; background: repeating-linear-gradient(135deg, #DDE1DE 0 6px, #F2F4F2 6px 12px)"></span></div>
+          </div>
+        </div>
+
+        <div class="lift" style="flex: 1 1 260px; background: #FFFFFF; border-radius: 28px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+          <span style="font-size: 13px; color: #3A403C">Статусы</span>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px">
+            <span style="height: 30px; padding: 0 12px; border-radius: 15px; background: #DDF27A; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600"><span style="width: 7px; height: 7px; border-radius: 50%; background: #3FA66B"></span>SUCCEEDED</span>
+            <span style="height: 30px; padding: 0 12px; border-radius: 15px; background: #F2E3A6; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600"><span style="width: 7px; height: 7px; border-radius: 50%; background: #B08A1E"></span>READY</span>
+            <span style="height: 30px; padding: 0 12px; border-radius: 15px; background: #151716; color: #FFFFFF; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600"><span class="pulse" style="width: 7px; height: 7px; border-radius: 50%; background: #DDF27A"></span>RUNNING</span>
+            <span style="height: 30px; padding: 0 12px; border-radius: 15px; background: #F6C9B8; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600"><span style="width: 7px; height: 7px; border-radius: 50%; background: #E2553F"></span>FAILED</span>
+            <span style="height: 30px; padding: 0 12px; border-radius: 15px; background: #E3E7E4; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600"><span style="width: 7px; height: 7px; border-radius: 50%; border: 1.5px dashed #5E6561; box-sizing: border-box"></span>BLOCKED</span>
+            <span style="height: 30px; padding: 0 12px; border-radius: 15px; background: #FBE3D3; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600"><span style="width: 7px; height: 7px; border-radius: 50%; background: #F08A4B"></span>INFEASIBLE</span>
+          </div>
+          <span style="font-size: 12px; color: #5E6561">Статус всегда с цветом и словом: цвет не единственный носитель смысла</span>
+        </div>
+      </div>
+    </section>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 16px">
+      <section aria-label="Форма и ритм" style="flex: 1 1 380px; background: #FFFFFF; border-radius: 32px; padding: 24px; display: flex; flex-direction: column; gap: 14px">
+        <h2 style="margin: 0; font-size: 22px; font-weight: 600">Форма и ритм</h2>
+        <div style="display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end">
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 6px"><span style="width: 96px; height: 72px; border-radius: 32px; background: #F2F4F2"></span><span style="font-size: 12px; color: #5E6561">32 · секции</span></div>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 6px"><span style="width: 80px; height: 64px; border-radius: 24px; background: #F2F4F2"></span><span style="font-size: 12px; color: #5E6561">24 · вложенные</span></div>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 6px"><span style="width: 64px; height: 52px; border-radius: 16px; background: #F2F4F2"></span><span style="font-size: 12px; color: #5E6561">16 · плитки</span></div>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 6px"><span style="width: 96px; height: 44px; border-radius: 22px; background: #F2F4F2"></span><span style="font-size: 12px; color: #5E6561">½ высоты · кнопки</span></div>
+        </div>
+        <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #3A403C">Отступы — шаг 4: 8 внутри групп, 12–16 между карточками, 22–26 внутри секций. Цель нажатия не меньше 44 px. На ширине телефона колонка разделов становится строкой, карточки встают в один столбец, широкие диаграммы прокручиваются внутри своей рамки.</p>
+      </section>
+
+      <section aria-label="Движение" style="flex: 1 1 380px; background: #151716; color: #E8ECE9; border-radius: 32px; padding: 24px; display: flex; flex-direction: column; gap: 14px">
+        <h2 style="margin: 0; font-size: 22px; font-weight: 600">Движение</h2>
+        <div style="display: flex; flex-wrap: wrap; gap: 14px; align-items: center">
+          <span class="rise" style="width: 96px; height: 64px; border-radius: 20px; background: #F2F4F2"></span>
+          <span class="pulse" style="width: 18px; height: 18px; border-radius: 50%; background: #DDF27A"></span>
+          <svg width="140" height="64" viewBox="0 0 140 64" aria-hidden="true"><path class="draw" d="M8 48C40 48 30 16 64 16S96 48 132 48" fill="none" stroke="#DDF27A" stroke-width="2"/></svg>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.5">
+          <span><span style="font-family: 'JetBrains Mono', monospace; color: #DDF27A">появление</span> — 0.7 с, подъём на 10 px с затуханием, каскад 80 мс между карточками</span>
+          <span><span style="font-family: 'JetBrains Mono', monospace; color: #DDF27A">наведение</span> — 0.35 с, карточка поднимается на 3 px, тень мягче</span>
+          <span><span style="font-family: 'JetBrains Mono', monospace; color: #DDF27A">данные</span> — 0.7 с на высоту и ширину полос, без пружины</span>
+          <span><span style="font-family: 'JetBrains Mono', monospace; color: #DDF27A">живое</span> — пульс точки только у того, что идёт прямо сейчас</span>
+          <span style="color: #A3ABA6">Кривая одна: cubic-bezier(.2,.8,.2,1). При «уменьшить движение» в системе всё мгновенно.</span>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

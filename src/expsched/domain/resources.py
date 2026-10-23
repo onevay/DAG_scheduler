@@ -30,6 +30,12 @@ class Resources:
     def __setattr__(self, name: str, value: Any) -> None:
         raise AttributeError("Resources is immutable")
 
+    def __copy__(self) -> Resources:
+        return self  # неизменяемый объект можно разделять
+
+    def __deepcopy__(self, memo: dict[int, Any]) -> Resources:
+        return self
+
     def get(self, key: str) -> int:
         for k, v in self._items:
             if k == key:

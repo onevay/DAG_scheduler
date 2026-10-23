@@ -86,7 +86,7 @@ def test_reservation_counts_everything_released_at_the_same_moment(make_task, ma
 
 
 def test_registry_builds_backfill_with_aging():
-    policy = make_policy(PolicyIn())  # имя по умолчанию
+    policy = make_policy(PolicyIn(preemption="never"))  # имя по умолчанию
     assert isinstance(policy, BackfillPolicy) and policy.aging == 360
 
 

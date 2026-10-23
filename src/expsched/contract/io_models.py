@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import sys
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -17,6 +16,7 @@ ResMap = dict[
     Annotated[int, Field(ge=0)],
 ]
 Id = Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")]
+PolicyName = Literal["fifo", "fifo_skip", "priority", "priority_backfill", "cpsat"]
 
 
 class Strict(BaseModel):
@@ -59,12 +59,15 @@ class EventIn(Strict):
 
 
 class PolicyIn(Strict):
-    name: Literal["fifo", "fifo_skip", "priority", "priority_backfill", "cpsat"] = "priority_backfill"
+    name: PolicyName = "priority_backfill"
     objective: Literal["lexicographic", "weighted"] = "lexicographic"
     preemption: Literal["never", "deadline_only", "priority"] = "deadline_only"
     max_preemptions_per_task: Annotated[int, Field(ge=0)] = 1
     min_runtime_before_preempt: Annotated[int, Field(ge=0)] = 30
     aging: Annotated[int, Field(ge=1)] | None = 360
+    # Прогноз перепланирования стоит как весь остаток прогона на каждом внешнем событии: на больших входах
+    # он не строится. 0 — не строить никогда.
+    max_forecast_tasks: Annotated[int, Field(ge=0)] = 1000
     validation_mode: Literal["strict", "lenient"] = "lenient"
 
 
@@ -126,8 +129,3 @@ def load(raw: bytes, max_bytes: int = MAX_BODY_BYTES) -> ProblemIn:
 
 def dump_schema() -> str:
     return json.dumps(ProblemIn.model_json_schema(), ensure_ascii=False, indent=2, sort_keys=True)
-
-
-if __name__ == "__main__":
-    # Байты вместо print: на Windows print дал бы CRLF, и сравнение схемы в CI не совпало бы.
-    sys.stdout.buffer.write((dump_schema() + "\n").encode("utf-8"))

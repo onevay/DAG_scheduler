@@ -7,12 +7,12 @@ make setup     # зависимости со всеми extras и pre-commit х�
 make lint      # ruff check, ruff format --check, lint-imports
 make types     # mypy --strict
 make test      # pytest без docker и slow
+make perf      # замеры по времени (маркер slow); на нагруженной машине могут не уложиться в границы
 make test-all  # все тесты
-make schema    # пересобрать schemas/problem.schema.json
+make schema    # пересобрать JSON Schema входа, результата и записи журнала в schemas/
 ```
 
-CI выполняет `make lint types test` и проверяет, что `schemas/problem.schema.json` совпадает со сгенерированной
-схемой. Перед отправкой изменений должны проходить все три цели.
+CI выполняет `make lint types test` и проверяет, что `schemas/` совпадает со сгенерированными схемами. Перед отправкой изменений должны проходить все три цели.
 
 ## Тесты
 
@@ -21,7 +21,8 @@ CI выполняет `make lint types test` и проверяет, что `sche
 - `tests/unit/test_scenarios.py` — прогоны `scenarios/*.json` с числами, посчитанными вручную. Если число
   разошлось, сначала нужно понять, что изменилось в поведении, а не обновлять ожидание.
 - `tests/ui/` — логика интерфейса без Streamlit и клиент против настоящего API.
-- Маркеры: `slow` — долгие тесты, `docker` — тесты, которым нужен Docker.
+- Маркеры: `slow` — долгие тесты и замеры по времени, `docker` — тесты, которым нужен Docker. В быстром
+  `make test` нет проверок по настенным часам: такие тесты помечаются `slow`.
 
 ## Соглашения
 

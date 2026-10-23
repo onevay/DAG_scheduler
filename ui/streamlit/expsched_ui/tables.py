@@ -29,6 +29,15 @@ TASK_COLUMNS = (
 SUBMIT_COLUMNS = ("time", *TASK_COLUMNS)
 WORKER_EVENT_COLUMNS = ("time", "worker", "event")
 WORKER_EVENTS = {"down": "worker_down", "up": "worker_up"}  # значение в таблице -> тип события во входе
+# Параметры политики, которые задаются в интерфейсе; имя политики — отдельно, ключом "policy".
+POLICY_SETTINGS = (
+    "aging",
+    "validation_mode",
+    "preemption",
+    "max_preemptions_per_task",
+    "min_runtime_before_preempt",
+    "max_forecast_tasks",
+)
 
 EMPTY_PROBLEM: dict[str, Any] = {
     "cluster": {"workers": [{"id": "node-1", "resources": {"gpu": 4}}]},
@@ -94,11 +103,7 @@ def build_problem(
         "cluster": {"workers": [_worker(r) for r in workers if _text(r.get("id"))]},
         "tasks": [_task(r) for r in tasks if _text(r.get("id"))],
         "events": node_events + task_events,
-        "policy": {
-            "name": settings["policy"],
-            "aging": settings["aging"],
-            "validation_mode": settings["validation_mode"],
-        },
+        "policy": {"name": settings["policy"], **{k: settings[k] for k in POLICY_SETTINGS}},
     }
 
 

@@ -1,0 +1,113 @@
+/* Токены интерфейса expsched. Значения совпадают с макетом (mockup/System.dc.html) и с tokens.json. */
+
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
+:root {
+  /* Поверхности: светлая основа для работы */
+  --color-bg: #e3e7e4;
+  --color-surface: #f2f4f2; /* секции и карточки */
+  --color-surface-raised: #ffffff; /* вложенные блоки, выбранная строка */
+  --color-surface-control: #f7f8f6; /* неактивные вкладки и кнопки-иконки */
+  --color-line: #d5dad6;
+  --color-line-dashed: #b7beb9; /* пустые слоты, свободное место */
+
+  /* Текст */
+  --color-ink: #151716; /* основной текст и главное действие */
+  --color-ink-2: #3a403c; /* подписи */
+  --color-muted: #5e6561; /* вторичный текст, 5.4:1 на surface */
+  --color-faint: #8a938d; /* только декор и крупный текст */
+
+  /* Акцент: выбрано, лучшее значение, «живое» */
+  --color-accent: #ddf27a;
+  --color-accent-soft: #f4fbd2;
+  --color-accent-strong: #9db33b;
+
+  /* Чертёж: тёмные панели для графа, событий, объяснений */
+  --color-blueprint: #121413;
+  --color-blueprint-grid: #1d201e;
+  --color-blueprint-panel: #181b19;
+  --color-blueprint-panel-2: #1a1d1b;
+  --color-blueprint-line: #3a403c;
+  --color-blueprint-text: #e8ece9;
+  --color-blueprint-muted: #a3aba6;
+  --color-blueprint-focus: #5cc8e6;
+  --color-blueprint-selected: #1d2a2f;
+
+  /* Смысловые */
+  --color-success: #3fa66b;
+  --color-warning: #f08a4b;
+  --color-error: #e2553f;
+  --color-error-soft: #fbe3d3;
+  --color-urgent: #f2cf5b; /* задача, поданная во время прогона */
+
+  /* Статусы задач: фон чипа */
+  --status-succeeded: #ddf27a;
+  --status-ready: #f2e3a6;
+  --status-running: #151716;
+  --status-failed: #f6c9b8;
+  --status-blocked: #e3e7e4;
+  --status-infeasible: #fbe3d3;
+
+  /* Типы задач */
+  --kind-data: #a9c7f5;
+  --kind-train: #c9b6f2;
+  --kind-eval: #9bddb4;
+  --kind-infer: #f6c38f;
+  --kind-other: #d7dbd8;
+
+  /* Простой и потери */
+  --idle-no-ready: #f2de8a;
+  --hatch-down: repeating-linear-gradient(135deg, #dde1de 0 6px, #f2f4f2 6px 12px);
+  --hatch-lost: repeating-linear-gradient(135deg, #b9cc5a 0 4px, #eef7c2 4px 8px);
+  --grid-blueprint: linear-gradient(var(--color-blueprint-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-blueprint-grid) 1px, transparent 1px);
+  --grid-blueprint-size: 28px 28px;
+
+  /* Шрифты */
+  --font-sans: Manrope, system-ui, sans-serif; /* всё, кроме двух случаев ниже */
+  --font-tech: "Barlow Condensed", sans-serif; /* только на чертеже: размеры и итоги */
+  --font-mono: "JetBrains Mono", ui-monospace, monospace; /* id задач и узлов, коды, время */
+
+  /* Шкала текста: размер / начертание */
+  --text-metric: 300 72px/0.9 var(--font-sans); /* крупные числа метрик, 56–72 */
+  --text-display: 500 64px/1.04 var(--font-sans); /* заголовок «Обзора» */
+  --text-h1: 500 52px/1 var(--font-sans); /* заголовок экрана, 44–52 */
+  --text-h2: 500 28px/1.2 var(--font-sans); /* заголовок секции, 22–28 */
+  --text-body: 400 15px/1.55 var(--font-sans);
+  --text-label: 500 14px/1.3 var(--font-sans);
+  --text-small: 400 13px/1.4 var(--font-sans);
+  --text-caption: 400 12px/1.4 var(--font-sans);
+  --text-tech: 700 40px/1 var(--font-tech);
+  --tracking-tight: -0.035em; /* заголовки и метрики */
+
+  /* Форма */
+  --radius-section: 32px;
+  --radius-card: 28px;
+  --radius-nested: 24px;
+  --radius-tile: 16px;
+  --radius-pill: 9999px; /* кнопки и чипы: половина высоты */
+  --control-height: 52px; /* главные кнопки */
+  --control-height-sm: 40px; /* сегменты, чипы-фильтры */
+  --touch-min: 44px;
+
+  /* Отступы: шаг 4 */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 22px; /* внутри секций */
+  --space-6: 26px;
+
+  /* Глубина */
+  --shadow-hover: 0 22px 44px -28px rgba(21, 23, 22, 0.45);
+  --shadow-selected: 0 10px 24px -18px rgba(21, 23, 22, 0.5);
+  --focus-ring: 2px solid var(--color-ink);
+
+  /* Движение */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --duration-fast: 0.25s; /* цвет, фон */
+  --duration-hover: 0.35s; /* подъём карточки */
+  --duration-enter: 0.7s; /* появление */
+  --duration-data: 0.7s; /* высота и ширина полос */
+  --stagger: 80ms; /* каскад между карточками */
+}

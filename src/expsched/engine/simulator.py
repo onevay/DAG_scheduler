@@ -11,10 +11,16 @@
 по порядку. Вытеснение прерывает попытку так же, как отказ узла (работа до чекпоинта сохраняется), но идёт
 в счётчик вытеснений, а не в max_retries. RESERVE — обещание начать задачу на узле не позже t_res: ресурсы
 резерв не занимает, политика пересчитывает его каждую эпоху, а запись пишется, когда резерв меняется.
+
+С `forecast=True` на каждой эпохе с внешними событиями (подача задачи, отказ или возврат узла) пишется REPLAN:
+как изменились прогнозные старты задач по сравнению с прогнозом, где этих событий не было. Прогноз — прогон
+копии симулятора до конца той же политикой без будущих внешних событий; он стоит как весь остаток прогона.
 """
 
 from __future__ import annotations
 
+import copy
+from collections.abc import Iterable
 from dataclasses import replace
 from typing import Any
 
@@ -43,8 +49,9 @@ class Simulator:
     получают диагностику STUCK.
     """
 
-    def __init__(self, problem: Problem, policy: Policy) -> None:
+    def __init__(self, problem: Problem, policy: Policy, forecast: bool = False) -> None:
         self.policy = policy
+        self.replans = forecast
         self.state = SimState.from_problem(problem)
         self.journal = Journal()
         self.queue = EventQueue()
@@ -66,9 +73,14 @@ class Simulator:
         if not self.queue:
             return None
         self.t, batch = self.queue.pop_batch()
+        external = [p for p in batch if isinstance(p, Event)]
+        before = self.forecast(pending=batch) if self.replans and external else None
+        epoch = len(self.journal)
         for payload in batch:
             self._handle(payload)
         self._decide()
+        if before is not None:
+            self._replan(before, external, epoch)
         first, self._reported = self._reported, len(self.journal)
         return list(self.journal.records[first:])
 
@@ -77,6 +89,51 @@ class Simulator:
             pass
         self._finalize()
         return list(self.journal.records)
+
+    def forecast(self, pending: Iterable[Payload] = ()) -> dict[str, int]:
+        """Прогнозные старты задач: копия прогоняется до конца без внешних событий, состояние не меняется.
+
+        `pending` — события текущего момента, уже извлечённые из очереди, но ещё не обработанные; внешние
+        из них отбрасываются. В ответе — первый старт каждой задачи, стартующей в прогнозе.
+        """
+        sim = copy.deepcopy(self, {id(self.journal): Journal()})  # журнал прогнозу не нужен
+        sim.replans = False
+        sim.queue.drop_external()
+        for payload in pending:
+            if not isinstance(payload, Event):
+                sim.queue.push(self.t, payload)
+        while sim.step() is not None:
+            pass
+        starts: dict[str, int] = {}
+        for r in sim.journal.records:
+            if r["type"] == "START":
+                starts.setdefault(r["task"], r["t"])
+        return starts
+
+    def _replan(self, before: dict[str, int], external: list[Event], epoch: int) -> None:
+        """Запись REPLAN: чьи прогнозные старты сдвинулись из-за внешних событий эпохи.
+
+        new_tasks — задачи, которых не было в прежнем прогнозе (поданные и прерванные отказом), dropped —
+        задачи, которые были в прогнозе, но теперь не стартуют.
+        """
+        after = self.forecast()
+        for r in self.journal.records[epoch:]:
+            if r["type"] == "START":
+                after[r["task"]] = r["t"]  # стартовавшие в эту эпоху уже не в прогнозе, а в факте
+        changes = [
+            {"task": k, "old_start": before[k], "new_start": after[k], "delta": after[k] - before[k]}
+            for k in sorted(before.keys() & after.keys())
+            if before[k] != after[k]
+        ]
+        self.journal.append(
+            "REPLAN",
+            self.t,
+            trigger=external[0].type.value,
+            events=[_describe(e) for e in external],
+            changes=changes,
+            new_tasks={k: after[k] for k in sorted(after.keys() - before.keys())},
+            dropped=sorted(before.keys() - after.keys()),
+        )
 
     # ---- события ----
 
@@ -355,3 +412,9 @@ class Simulator:
                 self.journal.append("DIAGNOSTIC", self.t, task=key, **diagnostic.to_dict())
             else:
                 self.journal.append("DIAGNOSTIC", self.t, code="STUCK", task=key)
+
+
+def _describe(event: Event) -> dict[str, Any]:
+    if event.task is not None:
+        return {"type": event.type.value, "task": event.task.id}
+    return {"type": event.type.value, "worker": event.worker}

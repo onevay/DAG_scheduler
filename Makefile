@@ -1,7 +1,7 @@
 # Работает в Linux и в Git Bash под Windows: все команды запускаются через uv.
 RUN := uv run
 
-.PHONY: setup lint types test test-all schema api ui
+.PHONY: setup lint types test perf test-all schema api ui
 
 setup:
 	uv sync --all-extras
@@ -18,11 +18,15 @@ types:
 test:
 	$(RUN) pytest -m "not docker and not slow"
 
+# Замеры по времени: на нагруженной машине могут не уложиться в границы, поэтому отдельно от test.
+perf:
+	$(RUN) pytest -m slow
+
 test-all:
 	$(RUN) pytest
 
 schema:
-	$(RUN) python -m expsched.contract.io_models > schemas/problem.schema.json
+	$(RUN) python -m expsched.contract.schemas schemas
 
 api:
 	$(RUN) uvicorn expsched.api.app:app --reload --port 8000

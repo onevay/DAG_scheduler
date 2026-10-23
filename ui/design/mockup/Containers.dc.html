@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>expsched — эмуляция и контейнеры</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&amp;family=Barlow+Condensed:wght@500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E3E7E4}
+a{color:#151716}a:hover{color:#3A403C}
+.lift{transition:transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .35s cubic-bezier(.2,.8,.2,1),background-color .3s,border-color .3s}
+.lift:hover{transform:translateY(-3px);box-shadow:0 22px 44px -28px rgba(21,23,22,.45)}
+.ring{transition:stroke-dashoffset .9s cubic-bezier(.2,.8,.2,1)}
+.rise{animation:rise .7s cubic-bezier(.2,.8,.2,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.live{animation:live 1.6s ease-in-out infinite}
+@keyframes live{0%,100%{opacity:1}50%{opacity:.3}}
+.line{animation:line .4s cubic-bezier(.2,.8,.2,1) both}
+@keyframes line{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.navlink{transition:background-color .25s,color .25s}
+.navlink:hover{background:#2A2E2C !important;color:#FFFFFF !important}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid #151716;outline-offset:3px}
+input[type=range]{accent-color:#151716}
+@media (max-width:720px){.rail{flex-direction:row !important;width:100% !important;min-height:0 !important;padding:10px 12px !important;overflow-x:auto}.rail-gap{display:none !important}}
+@media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-wrap: wrap; background: #E3E7E4; font-family: Manrope, system-ui, sans-serif; color: #151716; padding: 14px; gap: 14px; box-sizing: border-box">
+
+  <nav class="rail" aria-label="Разделы" style="flex: 0 0 76px; width: 76px; min-height: calc(100vh - 28px); background: #151716; border-radius: 28px; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px 0; box-sizing: border-box">
+    <a href="Main.dc.html" aria-label="expsched" style="width: 48px; height: 48px; border-radius: 50%; border: 1.5px solid #3A403C; display: flex; align-items: center; justify-content: center; color: #DDF27A; margin-bottom: 18px">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.3 6.3l2.5 2.5M15.2 15.2l2.5 2.5M6.3 17.7l2.5-2.5M15.2 8.8l2.5-2.5"/></svg>
+    </a>
+    <a class="navlink" href="Main.dc.html" aria-label="Обзор" title="Обзор" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z"/></svg>
+    </a>
+    <a class="navlink" href="Builder.dc.html" aria-label="Сборка" title="Сборка" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M7.5 8l3.3 7.8M16.5 8l-3.3 7.8"/></svg>
+    </a>
+    <a class="navlink" href="Cluster.dc.html" aria-label="Кластер" title="Кластер" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="6" rx="2"/><rect x="4" y="14" width="16" height="6" rx="2"/><path d="M8 7h.01M8 17h.01"/></svg>
+    </a>
+    <a class="navlink" href="Run.dc.html" aria-label="Прогон" title="Прогон" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 6h9M8 12h11M4 18h7"/></svg>
+    </a>
+    <a class="navlink" href="Compare.dc.html" aria-label="Сравнение" title="Сравнение" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>
+    </a>
+    <a class="navlink" href="Explain.dc.html" aria-label="Объяснения" title="Объяснения" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/></svg>
+    </a>
+    <a class="navlink" href="Containers.dc.html" aria-label="Контейнеры" title="Контейнеры" aria-current="page" style="width: 48px; height: 48px; border-radius: 16px; background: #DDF27A; color: #151716; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg>
+    </a>
+    <div class="rail-gap" style="flex: 1 1 auto"></div>
+    <a class="navlink" href="System.dc.html" aria-label="Дизайн-система" title="Дизайн-система" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>
+    </a>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 18px; padding: 14px 10px 24px; box-sizing: border-box">
+
+    <header class="rise" style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px">
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <span style="align-self: flex-start; height: 30px; padding: 0 12px; border-radius: 15px; background: #151716; color: #DDF27A; display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600"><span class="live" style="width: 7px; height: 7px; border-radius: 50%; background: #DDF27A"></span>следующий этап · макет</span>
+        <h1 style="margin: 0; font-size: 52px; font-weight: 500; letter-spacing: -0.035em; line-height: 1">Контейнеры</h1>
+      </div>
+      <div role="tablist" aria-label="Режим прогона" style="display: flex; flex-wrap: wrap; background: #F7F8F6; border-radius: 26px; padding: 5px; gap: 4px">
+        <sc-for list="{{modes}}" as="m" hint-placeholder-count="4">
+          <button type="button" role="tab" aria-selected="{{m.on}}" onClick="{{m.pick}}" style="{{m.style}}">{{m.label}}</button>
+        </sc-for>
+      </div>
+    </header>
+
+    <p style="margin: 0; max-width: 900px; font-size: 15px; line-height: 1.55; color: #3A403C">{{modeText}}</p>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start">
+      <div style="flex: 999 1 600px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 14px; background: #F2F4F2; border-radius: 26px; padding: 14px 18px">
+          <label for="scale" style="font-size: 14px; font-weight: 600">Масштаб времени</label>
+          <input id="scale" type="range" min="1" max="5" step="1" value="{{scaleIdx}}" onChange="{{setScale}}" style="flex: 1 1 200px">
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; background: #FFFFFF; border-radius: 14px; padding: 6px 12px">1 ч модели = {{scaleLabel}}</span>
+          <span style="font-size: 13px; color: #5E6561">момент модели: 9 ч</span>
+        </div>
+
+        <div role="tablist" aria-label="Состояние контейнера" style="display: flex; flex-wrap: wrap; gap: 6px">
+          <sc-for list="{{filters}}" as="f" hint-placeholder-count="4">
+            <button type="button" role="tab" aria-selected="{{f.on}}" onClick="{{f.pick}}" style="{{f.style}}">{{f.label}} · {{f.count}}</button>
+          </sc-for>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px">
+          <sc-for list="{{containers}}" as="c" hint-placeholder-count="6">
+            <button type="button" class="lift" onClick="{{c.pick}}" aria-pressed="{{c.on}}" style="{{c.card}}">
+              <span style="display: flex; justify-content: space-between; align-items: center; width: 100%">
+                <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #5E6561">{{c.node}} · #{{c.attempt}}</span>
+                <span style="{{c.chip}}"><span style="{{c.chipDot}}"></span>{{c.state}}</span>
+              </span>
+              <span style="display: flex; align-items: center; gap: 14px; width: 100%">
+                <svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true" style="flex: 0 0 auto">
+                  <circle cx="32" cy="32" r="26" fill="none" stroke="#E3E7E4" stroke-width="7"/>
+                  <circle class="ring" cx="32" cy="32" r="26" fill="none" stroke="{{c.ringColor}}" stroke-width="7" stroke-linecap="round" stroke-dasharray="163.4" stroke-dashoffset="{{c.offset}}" transform="rotate(-90 32 32)"/>
+                  <text x="32" y="37" text-anchor="middle" font-family="Manrope" font-size="14" font-weight="600" fill="#151716">{{c.pct}}%</text>
+                </svg>
+                <span style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0">
+                  <span style="font-size: 17px; font-weight: 600; overflow-wrap: anywhere; text-align: left">{{c.task}}</span>
+                  <span style="font-size: 12px; color: #5E6561; text-align: left">{{c.progress}}</span>
+                </span>
+              </span>
+              <span style="display: flex; justify-content: space-between; width: 100%; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #5E6561">
+                <span>[образ задачи]</span><span>fence {{c.fence}}</span>
+              </span>
+            </button>
+          </sc-for>
+        </div>
+
+        <section aria-label="План и факт" style="background: #F2F4F2; border-radius: 32px; padding: 22px; display: flex; flex-direction: column; gap: 14px">
+          <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px">
+            <h2 style="margin: 0; font-size: 24px; font-weight: 500; letter-spacing: -0.02em">План рядом с фактом</h2>
+            <span style="font-size: 13px; color: #5E6561">пунктир заполнится временем реальных контейнеров</span>
+          </div>
+          <sc-for list="{{pf}}" as="r" hint-placeholder-count="3">
+            <div style="display: flex; flex-direction: column; gap: 6px">
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #3A403C">{{r.task}}</span>
+              <div style="position: relative; height: 18px; background: #FFFFFF; border-radius: 9px"><span style="{{r.plan}}"></span></div>
+              <div style="position: relative; height: 18px; border-radius: 9px; border: 1.5px dashed #B7BEB9; box-sizing: border-box"><span style="{{r.fact}}"></span></div>
+            </div>
+          </sc-for>
+        </section>
+      </div>
+
+      <aside aria-label="Контейнер" style="flex: 1 1 320px; max-width: 100%; background: #151716; color: #E8ECE9; border-radius: 32px; padding: 22px; display: flex; flex-direction: column; gap: 16px; box-sizing: border-box">
+        <span style="font-size: 12px; color: #A3ABA6">Выбранный контейнер</span>
+        <span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 40px; line-height: 1; overflow-wrap: anywhere">{{sel.title}}</span>
+        <div style="display: flex; gap: 10px">
+          <div style="flex: 1 1 0; border-top: 1px solid #3A403C; padding-top: 10px"><span style="display: block; font-size: 12px; color: #A3ABA6">Узел</span><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-size: 26px">{{sel.node}}</span></div>
+          <div style="flex: 1 1 0; border-top: 1px solid #3A403C; padding-top: 10px"><span style="display: block; font-size: 12px; color: #A3ABA6">Чекпоинт</span><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-size: 26px">{{sel.ckpt}}</span></div>
+          <div style="flex: 1 1 0; border-top: 1px solid #3A403C; padding-top: 10px"><span style="display: block; font-size: 12px; color: #A3ABA6">Fence</span><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-size: 26px">{{sel.fence}}</span></div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px; background: #0D0F0E; border-radius: 18px; padding: 14px; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.5; min-height: 150px">
+          <sc-for list="{{sel.log}}" as="l" hint-placeholder-count="4">
+            <span class="line" style="{{l.style}}">{{l.text}}</span>
+          </sc-for>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px">
+          <button type="button" style="flex: 1 1 120px; height: 46px; border-radius: 23px; border: 1px solid #3A403C; background: transparent; color: #E8ECE9; font: 500 14px Manrope, sans-serif; cursor: pointer">Сохранить чекпоинт</button>
+          <button type="button" style="flex: 1 1 120px; height: 46px; border-radius: 23px; border: 0; background: #F08A4B; color: #151716; font: 600 14px Manrope, sans-serif; cursor: pointer">Уронить узел</button>
+        </div>
+        <p style="margin: 0; font-size: 12px; line-height: 1.5; color: #A3ABA6">Fence — номер попытки, который контейнер предъявляет при каждой записи. После отказа узла старая попытка получает отказ в записи и не может испортить результат новой.</p>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { mode: 'emulate', filter: 'all', picked: 'pretrain_vit#2', scale: 3 };
+  }
+  renderVals() {
+    const MODES = {
+      simulate: ['Симуляция', 'Сейчас: время модели идёт мгновенно, задачи не запускаются. Всё, что видно на других экранах, — этот режим.'],
+      emulate: ['Эмуляция', 'Каждая попытка задачи — настоящий контейнер на узле. Планировщик тот же; время модели идёт в заданном масштабе, а отказы узлов убивают контейнеры по-настоящему.'],
+      shadow: ['Shadow', 'Контейнеры работают как обычно, а симуляция идёт рядом: видно, где факт разошёлся с планом и почему.'],
+      replay: ['Replay', 'Повтор сохранённого журнала: тот же прогон шаг за шагом, без запуска контейнеров.']
+    };
+    const STATE = {
+      running: ['идёт', '#DDF27A', '#3FA66B'],
+      done: ['завершён · 0', '#E3E7E4', '#5E6561'],
+      killed: ['убит отказом', '#F6C9B8', '#E2553F'],
+      pending: ['ждёт', '#F2E3A6', '#B08A1E']
+    };
+    const list = [
+      { id: 'prep_data#1', task: 'prep_data', node: 'node-C', attempt: 1, state: 'done', done: 2, total: 2, ckpt: '—', fence: 1 },
+      { id: 'pretrain_vit#1', task: 'pretrain_vit', node: 'node-A', attempt: 1, state: 'killed', done: 2, total: 8, ckpt: '2 из 8', fence: 1 },
+      { id: 'pretrain_vit#2', task: 'pretrain_vit', node: 'node-B', attempt: 2, state: 'running', done: 6, total: 8, ckpt: '6 из 8', fence: 2 },
+      { id: 'train_asr#1', task: 'train_asr', node: 'node-C', attempt: 1, state: 'done', done: 6, total: 6, ckpt: '—', fence: 1 },
+      { id: 'eval_asr#1', task: 'eval_asr', node: 'node-C', attempt: 1, state: 'running', done: 1, total: 2, ckpt: '—', fence: 1 },
+      { id: 'urgent_eval#1', task: 'urgent_eval', node: '—', attempt: 1, state: 'pending', done: 0, total: 3, ckpt: '—', fence: 0 }
+    ];
+    const filter = this.state.filter;
+    const shown = list.filter((c) => filter === 'all' || c.state === filter);
+    const containers = shown.map((c) => {
+      const on = c.id === this.state.picked;
+      const pct = Math.round(c.done / c.total * 100);
+      const [label, bg, dot] = STATE[c.state];
+      return {
+        ...c,
+        on: on ? 'true' : 'false',
+        pick: () => this.setState({ picked: c.id }),
+        pct,
+        offset: (163.4 * (1 - pct / 100)).toFixed(1),
+        ringColor: c.state === 'killed' ? '#F08A4B' : c.state === 'done' ? '#151716' : '#9DB33B',
+        state: label,
+        progress: c.done + ' из ' + c.total + ' ч работы',
+        chip: 'height: 26px; padding: 0 10px; border-radius: 13px; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; background: ' + bg + ';',
+        chipDot: 'width: 7px; height: 7px; border-radius: 50%; background: ' + dot + ';',
+        card: 'display: flex; flex-direction: column; align-items: flex-start; gap: 14px; padding: 16px; border-radius: 26px; cursor: pointer; font-family: Manrope, sans-serif; color: #151716; text-align: left; background: ' + (on ? '#FFFFFF' : '#F2F4F2') + '; border: 1.5px solid ' + (on ? '#151716' : 'transparent') + ';'
+      };
+    });
+    const counts = { all: list.length };
+    list.forEach((c) => { counts[c.state] = (counts[c.state] || 0) + 1; });
+    const filters = [['all', 'все'], ['running', 'идут'], ['killed', 'убиты'], ['pending', 'ждут'], ['done', 'завершены']].map(([id, label]) => ({
+      label,
+      count: counts[id] || 0,
+      on: filter === id ? 'true' : 'false',
+      pick: () => this.setState({ filter: id }),
+      style: 'height: 40px; padding: 0 16px; border-radius: 20px; border: 0; cursor: pointer; font: 500 14px Manrope, sans-serif; transition: background-color .25s, color .25s; ' + (filter === id ? 'background: #151716; color: #FFFFFF;' : 'background: #F7F8F6; color: #151716;')
+    }));
+    const sel = list.find((c) => c.id === this.state.picked) || list[2];
+    const LOG = {
+      'pretrain_vit#1': [['2 ч', 'start на node-A с позиции 0', '#E8ECE9'], ['4 ч', 'checkpoint: сохранено 2 ч', '#DDF27A'], ['5 ч', 'node-A down: контейнер убит', '#F08A4B'], ['5 ч', 'потерян 1 ч работы', '#F08A4B']],
+      'pretrain_vit#2': [['5 ч', 'start на node-B с позиции 2', '#E8ECE9'], ['6 ч', 'checkpoint: 4 из 8', '#DDF27A'], ['8 ч', 'checkpoint: 6 из 8', '#DDF27A'], ['9 ч', 'работает, fence 2', '#A3ABA6']],
+      'urgent_eval#1': [['9 ч', 'подана: priority 10, дедлайн 14', '#E8ECE9'], ['9 ч', 'ждёт eval_asr', '#F2DE8A']]
+    };
+    const log = (LOG[sel.id] || [['—', 'контейнер ' + sel.task + ' на ' + sel.node, '#E8ECE9'], ['—', sel.done + ' из ' + sel.total + ' ч работы', '#A3ABA6']]).map(([t, text, color]) => ({ text: t + '  ' + text, style: 'color: ' + color + ';' }));
+    const SCALES = ['100 мс', '500 мс', '1 с', '5 с', '1 мин'];
+    const pct = (x) => (x / 22 * 100).toFixed(2) + '%';
+    const pf = [['pretrain_vit', 2, 11], ['ft_det', 11, 15], ['urgent_eval', 10, 13]].map(([task, s, e]) => ({
+      task,
+      plan: 'position: absolute; top: 3px; bottom: 3px; left: ' + pct(s) + '; width: ' + pct(e - s) + '; border-radius: 6px; background: #C9B6F2;',
+      fact: 'position: absolute; top: 2px; bottom: 2px; left: ' + pct(s) + '; width: ' + pct(e - s) + '; border-radius: 6px; background: transparent;'
+    }));
+    return {
+      modes: Object.keys(MODES).map((id) => ({
+        label: MODES[id][0],
+        on: this.state.mode === id ? 'true' : 'false',
+        pick: () => this.setState({ mode: id }),
+        style: 'height: 42px; padding: 0 18px; border-radius: 21px; border: 0; cursor: pointer; font: 500 14px Manrope, sans-serif; transition: background-color .25s, color .25s; ' + (this.state.mode === id ? 'background: #151716; color: #FFFFFF;' : 'background: transparent; color: #151716;')
+      })),
+      modeText: MODES[this.state.mode][1],
+      scaleIdx: this.state.scale,
+      scaleLabel: SCALES[this.state.scale - 1],
+      setScale: (e) => this.setState({ scale: Number(e.target.value) }),
+      filters,
+      containers,
+      pf,
+      sel: { title: sel.id.toUpperCase(), node: sel.node, ckpt: sel.ckpt, fence: sel.fence || '—', log }
+    };
+  }
+}
+</script>
+</body>
+</html>

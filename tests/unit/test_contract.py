@@ -4,12 +4,13 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from expsched.contract.io_models import dump_schema, load, to_domain
+from expsched.contract.io_models import load, to_domain
 from expsched.contract.limits import InputTooLarge
+from expsched.contract.schemas import SCHEMAS
 from expsched.domain.models import EvType
 from expsched.domain.resources import Resources
 
-SCHEMA_FILE = Path(__file__).resolve().parents[2] / "schemas" / "problem.schema.json"
+SCHEMA_DIR = Path(__file__).resolve().parents[2] / "schemas"
 
 
 def problem(**over):
@@ -88,6 +89,7 @@ def test_self_dependency_and_duplicates_pass_schema():
     assert load(raw).tasks[0].dependencies == ["a", "a"]
 
 
-def test_committed_schema_is_up_to_date():
-    # То же, что проверяет CI: `make schema` не должен менять файл.
-    assert SCHEMA_FILE.read_text(encoding="utf-8") == dump_schema() + "\n"
+@pytest.mark.parametrize("name", sorted(SCHEMAS))
+def test_committed_schemas_are_up_to_date(name):
+    # То же, что проверяет CI: `make schema` не должен менять файлы.
+    assert (SCHEMA_DIR / name).read_bytes().decode("utf-8") == SCHEMAS[name]() + "\n"

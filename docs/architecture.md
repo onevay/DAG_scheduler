@@ -15,7 +15,7 @@ src/expsched/
 └── api/          REST API (FastAPI)
 ui/streamlit/     интерфейс, клиент REST API
 scenarios/        примеры входа, на них же — тесты с ожидаемыми числами
-schemas/          JSON Schema входа, генерируется из contract/
+schemas/          JSON Schema входа, результата и записи журнала, генерируются из contract/
 ```
 
 ## Слои
@@ -56,6 +56,7 @@ policies`: проверка расписания не должна раздел�
 |---|---|
 | новая политика | `policies/<name>.py`, регистрация в `policies/registry.py`, тесты в `tests/unit/test_<name>.py` |
 | новое поле входа | `contract/io_models.py`, доменная модель в `domain/models.py`, затем `make schema` |
+| новое поле результата или записи журнала | модель в `contract/output_models.py`, затем `make schema`; без неё тесты контракта упадут |
 | новый код диагностики | `validation/diagnostics.py` и проверка в соответствующем модуле `validation/` |
 | новая запись журнала | `engine/simulator.py`; если её читают `verify` или `metrics` — разбор в `verify/attempts.py` |
 | новая метрика | `metrics/metrics.py` |
