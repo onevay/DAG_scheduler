@@ -73,6 +73,83 @@
       "title": "AttemptOut",
       "type": "object"
     },
+    "ChainLink": {
+      "additionalProperties": false,
+      "description": "Звено критической цепочки: попытка и то, что сделало её старт возможным.",
+      "properties": {
+        "attempt": {
+          "minimum": 1,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "By"
+        },
+        "cause": {
+          "enum": [
+            "origin",
+            "dep",
+            "fail",
+            "pre",
+            "res",
+            "rel",
+            "up",
+            "wait"
+          ],
+          "title": "Cause",
+          "type": "string"
+        },
+        "end": {
+          "minimum": 0,
+          "title": "End",
+          "type": "integer"
+        },
+        "lost": {
+          "minimum": 0,
+          "title": "Lost",
+          "type": "integer"
+        },
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "integer"
+        },
+        "task": {
+          "title": "Task",
+          "type": "string"
+        },
+        "work": {
+          "minimum": 0,
+          "title": "Work",
+          "type": "integer"
+        },
+        "worker": {
+          "title": "Worker",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task",
+        "attempt",
+        "worker",
+        "start",
+        "end",
+        "work",
+        "lost",
+        "cause"
+      ],
+      "title": "ChainLink",
+      "type": "object"
+    },
     "DeadlineMisses": {
       "additionalProperties": false,
       "properties": {
@@ -100,6 +177,46 @@
         "low"
       ],
       "title": "DeadlineMisses",
+      "type": "object"
+    },
+    "Decomposition": {
+      "additionalProperties": false,
+      "description": "makespan = dep + res + lost + release + wait.",
+      "properties": {
+        "dep": {
+          "minimum": 0,
+          "title": "Dep",
+          "type": "integer"
+        },
+        "lost": {
+          "minimum": 0,
+          "title": "Lost",
+          "type": "integer"
+        },
+        "release": {
+          "minimum": 0,
+          "title": "Release",
+          "type": "integer"
+        },
+        "res": {
+          "minimum": 0,
+          "title": "Res",
+          "type": "integer"
+        },
+        "wait": {
+          "minimum": 0,
+          "title": "Wait",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "dep",
+        "res",
+        "lost",
+        "release",
+        "wait"
+      ],
+      "title": "Decomposition",
       "type": "object"
     },
     "DiagnosticOut": {
@@ -135,6 +252,27 @@
         "hint"
       ],
       "title": "DiagnosticOut",
+      "type": "object"
+    },
+    "ExplainOut": {
+      "additionalProperties": false,
+      "properties": {
+        "chain": {
+          "items": {
+            "$ref": "#/$defs/ChainLink"
+          },
+          "title": "Chain",
+          "type": "array"
+        },
+        "decomposition": {
+          "$ref": "#/$defs/Decomposition"
+        }
+      },
+      "required": [
+        "chain",
+        "decomposition"
+      ],
+      "title": "ExplainOut",
       "type": "object"
     },
     "MetricsOut": {
@@ -489,6 +627,16 @@
       "title": "Diagnostics",
       "type": "array"
     },
+    "explain": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ExplainOut"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "input_hash": {
       "pattern": "^sha256:[0-9a-f]{64}$",
       "title": "Input Hash",
@@ -579,6 +727,7 @@
     "attempts",
     "tasks",
     "metrics",
+    "explain",
     "diagnostics",
     "violations",
     "replans"

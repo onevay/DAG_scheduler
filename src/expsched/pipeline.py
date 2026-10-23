@@ -12,6 +12,7 @@ from expsched.contract.io_models import PolicyIn, ProblemIn, to_domain
 from expsched.domain.models import Task
 from expsched.domain.states import TaskStatus
 from expsched.engine.simulator import Simulator
+from expsched.explain.chain import critical_chain, decompose
 from expsched.explain.waits import wait_intervals
 from expsched.metrics.metrics import metrics
 from expsched.policies.registry import make_policy
@@ -58,6 +59,7 @@ def run(problem: ProblemIn, policy: PolicyIn | None = None) -> RunResult:
             "attempts": [],
             "tasks": {},
             "metrics": None,
+            "explain": None,
             "replans": [],
             "diagnostics": found,
             "violations": [],
@@ -78,11 +80,17 @@ def run(problem: ProblemIn, policy: PolicyIn | None = None) -> RunResult:
         "attempts": [asdict(a) for a in attempts_from_log(log)],
         "tasks": _task_summaries(validated.all_tasks() | sim.state.tasks, status, log),
         "metrics": metrics(plan.problem, log, lower_bound),
+        "explain": _explain(sim.state.tasks, log),
         "replans": [r for r in log if r["type"] == "REPLAN"] if forecast else None,
         "diagnostics": found,
         "violations": verify(plan.problem, log, config.max_preemptions_per_task),
     }
     return RunResult(result, log)
+
+
+def _explain(tasks: Mapping[str, Task], log: list[dict[str, Any]]) -> dict[str, Any]:
+    chain = critical_chain(tasks, log)
+    return {"chain": chain, "decomposition": decompose(chain)}
 
 
 def _task_summaries(

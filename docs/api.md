@@ -111,6 +111,7 @@ EXPSCHED_CORS_ORIGINS=http://localhost:5173 make api
 | `attempts` | попытки: `task`, `attempt`, `worker`, `start`, `end`, `resume_from`, `outcome` (`DONE`, `INT`, `PRE`), `saved` |
 | `tasks` | по id: `status`, `start` (первой попытки), `finish`, `deadline`, `tardiness`, `waits` |
 | `metrics` | [метрики](scheduling.md#метрики); `null` при INFEASIBLE |
+| `explain` | критическая цепочка и разложение makespan ([что значат поля](scheduling.md#почему-makespan-такой)); `null` при INFEASIBLE |
 | `replans` | записи `REPLAN` журнала: как внешние события сдвинули план ([формат](scheduling.md#перепланирование)); `null`, если задач больше `max_forecast_tasks` |
 | `diagnostics` | ошибки и предупреждения входа |
 | `violations` | нарушения, найденные проверкой расписания; пустой список — расписание допустимо |
