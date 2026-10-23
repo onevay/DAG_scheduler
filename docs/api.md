@@ -94,6 +94,21 @@ EXPSCHED_CORS_ORIGINS=http://localhost:5173 make api
 
 `next_seq` — откуда читать следующую страницу, `null` — журнал прочитан.
 
+## `GET /v1/runs/{run_id}/explain?task=&worker=&t=`
+
+Почему прогон такой: [критическая цепочка](scheduling.md#почему-makespan-такой), попытки, ожидания задач и
+[простой узлов](scheduling.md#почему-простаивают-gpu). Каждый фильтр сужает все списки сразу: `task` — эта
+задача, `worker` — этот узел, `t` — то, что идёт в этот момент.
+
+```json
+{"chain": [...], "decomposition": {"dep": 21, "res": 0, "lost": 1, "release": 0, "wait": 0},
+ "attempts": [...], "waits": [{"task": "urgent_eval", "code": "WAIT_DEPS", "from": 9, "to": 10, "detail": {}}],
+ "idle": [{"worker": "node-C", "from": 13, "to": 15, "code": "IDLE_NO_READY", "gpu": 2, "detail": {}}]}
+```
+
+Ожидание — свойство задачи, простой — узла: с `worker` ожиданий в ответе нет, с `task` нет простоя. Неизвестные
+задача или узел и прогон без симуляции (INFEASIBLE) — 404.
+
 Ошибки самого входа (цикл, неизвестная зависимость) не делают запрос ошибочным: прогон возвращает 200
 со статусом PARTIAL или INFEASIBLE и диагностиками в `result.diagnostics`.
 
@@ -111,7 +126,7 @@ EXPSCHED_CORS_ORIGINS=http://localhost:5173 make api
 | `attempts` | попытки: `task`, `attempt`, `worker`, `start`, `end`, `resume_from`, `outcome` (`DONE`, `INT`, `PRE`), `saved` |
 | `tasks` | по id: `status`, `start` (первой попытки), `finish`, `deadline`, `tardiness`, `waits` |
 | `metrics` | [метрики](scheduling.md#метрики); `null` при INFEASIBLE |
-| `explain` | критическая цепочка и разложение makespan ([что значат поля](scheduling.md#почему-makespan-такой)); `null` при INFEASIBLE |
+| `explain` | критическая цепочка, разложение makespan ([поля](scheduling.md#почему-makespan-такой)) и простой узлов (`idle`, [коды](scheduling.md#почему-простаивают-gpu)); `null` при INFEASIBLE |
 | `replans` | записи `REPLAN` журнала: как внешние события сдвинули план ([формат](scheduling.md#перепланирование)); `null`, если задач больше `max_forecast_tasks` |
 | `diagnostics` | ошибки и предупреждения входа |
 | `violations` | нарушения, найденные проверкой расписания; пустой список — расписание допустимо |

@@ -266,13 +266,102 @@
         },
         "decomposition": {
           "$ref": "#/$defs/Decomposition"
+        },
+        "idle": {
+          "$ref": "#/$defs/IdleOut"
         }
       },
       "required": [
         "chain",
-        "decomposition"
+        "decomposition",
+        "idle"
       ],
       "title": "ExplainOut",
+      "type": "object"
+    },
+    "IdleInterval": {
+      "additionalProperties": false,
+      "description": "На узле свободны `gpu` GPU с `from` до `to` по причине `code`.",
+      "properties": {
+        "code": {
+          "enum": [
+            "IDLE_DOWN",
+            "IDLE_NO_READY",
+            "IDLE_FRAGMENTATION",
+            "IDLE_RESERVED",
+            "IDLE_POLICY"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "detail": {
+          "additionalProperties": true,
+          "title": "Detail",
+          "type": "object"
+        },
+        "from": {
+          "minimum": 0,
+          "title": "From",
+          "type": "integer"
+        },
+        "gpu": {
+          "minimum": 1,
+          "title": "Gpu",
+          "type": "integer"
+        },
+        "to": {
+          "minimum": 0,
+          "title": "To",
+          "type": "integer"
+        },
+        "worker": {
+          "title": "Worker",
+          "type": "string"
+        }
+      },
+      "required": [
+        "worker",
+        "from",
+        "to",
+        "code",
+        "gpu",
+        "detail"
+      ],
+      "title": "IdleInterval",
+      "type": "object"
+    },
+    "IdleOut": {
+      "additionalProperties": false,
+      "properties": {
+        "by_code": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "propertyNames": {
+            "enum": [
+              "IDLE_DOWN",
+              "IDLE_NO_READY",
+              "IDLE_FRAGMENTATION",
+              "IDLE_RESERVED",
+              "IDLE_POLICY"
+            ]
+          },
+          "title": "By Code",
+          "type": "object"
+        },
+        "intervals": {
+          "items": {
+            "$ref": "#/$defs/IdleInterval"
+          },
+          "title": "Intervals",
+          "type": "array"
+        }
+      },
+      "required": [
+        "by_code",
+        "intervals"
+      ],
+      "title": "IdleOut",
       "type": "object"
     },
     "MetricsOut": {

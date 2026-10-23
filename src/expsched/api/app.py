@@ -28,6 +28,7 @@ from expsched.api.models import (
     ErrorCode,
     ErrorOut,
     EventsPage,
+    ExplainView,
     PoliciesOut,
     RunOut,
     RunRequest,
@@ -35,6 +36,7 @@ from expsched.api.models import (
 )
 from expsched.api.runner import ProcessRunner, RunTimeout
 from expsched.api.store import RUN_ID_PATTERN, RunStore, run_id_of
+from expsched.api.views import explain_view
 from expsched.contract.io_models import PolicyIn, ProblemIn
 from expsched.contract.limits import MAX_BODY_BYTES, InputTooLarge
 from expsched.pipeline import input_hash
@@ -127,6 +129,28 @@ def get_events(
     events, total = _store(request).events(run_id, from_seq, limit)
     next_seq = from_seq + len(events)
     return {"events": events, "total": total, "next_seq": next_seq if next_seq < total else None}
+
+
+@router.get("/runs/{run_id}/explain", response_model=ExplainView, responses=ERRORS)
+def get_explain(
+    request: Request,
+    run_id: RunId,
+    task: str | None = None,
+    worker: str | None = None,
+    t: Annotated[int | None, Query(ge=0)] = None,
+) -> Any:
+    """Почему прогон такой: цепочка, попытки, ожидания и простой, суженные до задачи, узла и момента."""
+    store = _store(request)
+    if store.find(run_id) is None:
+        return _no_run(run_id)
+    result = store.result(run_id)
+    if result["explain"] is None:
+        return error_response(404, "NOT_FOUND", f"run {run_id} was not simulated: the input has errors")
+    if task is not None and task not in result["tasks"]:
+        return error_response(404, "NOT_FOUND", f"run {run_id} has no task {task!r}")
+    if worker is not None and worker not in {w["id"] for w in store.problem(run_id)["cluster"]["workers"]}:
+        return error_response(404, "NOT_FOUND", f"run {run_id} has no worker {worker!r}")
+    return explain_view(result, task, worker, t)
 
 
 def create_app(

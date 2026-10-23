@@ -218,9 +218,29 @@ class Decomposition(Strict):
     wait: Time
 
 
+IdleCode = Literal["IDLE_DOWN", "IDLE_NO_READY", "IDLE_FRAGMENTATION", "IDLE_RESERVED", "IDLE_POLICY"]
+
+
+class IdleInterval(Strict):
+    """На узле свободны `gpu` GPU с `from` до `to` по причине `code`."""
+
+    worker: str
+    from_: Time = Field(alias="from")
+    to: Time
+    code: IdleCode
+    gpu: Annotated[int, Field(ge=1)]
+    detail: Detail  # для IDLE_RESERVED: head, t_res
+
+
+class IdleOut(Strict):
+    by_code: dict[IdleCode, int]  # GPU · время простоя по причинам
+    intervals: list[IdleInterval]
+
+
 class ExplainOut(Strict):
     chain: list[ChainLink]  # от начала прогона к последнему окончанию
     decomposition: Decomposition
+    idle: IdleOut
 
 
 class DiagnosticOut(Strict):

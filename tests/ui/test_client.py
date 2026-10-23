@@ -16,7 +16,8 @@ DEMO = json.loads(
 
 @pytest.fixture(scope="module")
 def client(tmp_path_factory):
-    return ApiClient(http=TestClient(create_app(store=RunStore(tmp_path_factory.mktemp("runs")))))
+    with TestClient(create_app(store=RunStore(tmp_path_factory.mktemp("runs")))) as http:
+        yield ApiClient(http=http)
 
 
 def test_policies_and_validation_through_the_api(client):
