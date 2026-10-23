@@ -5,7 +5,16 @@ from __future__ import annotations
 from typing import Literal
 
 from expsched.contract.io_models import PolicyIn, PolicyName, ProblemIn, Strict
-from expsched.contract.output_models import DiagnosticOut, EventRecord, ResultOut
+from expsched.contract.output_models import (
+    AttemptOut,
+    ChainLink,
+    Decomposition,
+    DiagnosticOut,
+    EventRecord,
+    IdleInterval,
+    ResultOut,
+    WaitInterval,
+)
 
 ErrorCode = Literal[
     "INPUT_TOO_LARGE",  # тело больше лимита
@@ -43,6 +52,20 @@ class EventsPage(Strict):
     events: list[EventRecord]
     total: int  # записей в журнале всего
     next_seq: int | None  # с какого номера читать следующую страницу; None — журнал прочитан
+
+
+class WaitView(WaitInterval):
+    task: str
+
+
+class ExplainView(Strict):
+    """Объяснение прогона, суженное фильтрами запроса."""
+
+    chain: list[ChainLink]
+    decomposition: Decomposition
+    attempts: list[AttemptOut]
+    waits: list[WaitView]
+    idle: list[IdleInterval]
 
 
 class ErrorInfo(Strict):

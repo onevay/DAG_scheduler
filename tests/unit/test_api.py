@@ -16,7 +16,8 @@ DEMO = json.loads(
 @pytest.fixture(scope="module")
 def client(tmp_path_factory):
     """Одно хранилище на модуль: временные каталоги на Windows создаются медленно."""
-    return TestClient(create_app(store=RunStore(tmp_path_factory.mktemp("runs"))))
+    with TestClient(create_app(store=RunStore(tmp_path_factory.mktemp("runs")))) as client:
+        yield client  # выход из контекста закрывает рабочие процессы
 
 
 class InlineRunner:

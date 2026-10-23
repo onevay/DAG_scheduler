@@ -194,6 +194,55 @@ class MetricsOut(Strict):
     mean_wait: float
 
 
+class ChainLink(Strict):
+    """Звено критической цепочки: попытка и то, что сделало её старт возможным."""
+
+    task: str
+    attempt: Annotated[int, Field(ge=1)]
+    worker: str
+    start: Time
+    end: Time
+    work: Time  # полезная работа: вся попытка или сохранённое до чекпоинта
+    lost: Time  # работа прерванной попытки после последнего чекпоинта
+    cause: Literal["origin", "dep", "fail", "pre", "res", "rel", "up", "wait"]
+    by: str | None = None  # задача, после которой стал возможен старт
+
+
+class Decomposition(Strict):
+    """makespan = dep + res + lost + release + wait."""
+
+    dep: Time
+    res: Time
+    lost: Time
+    release: Time
+    wait: Time
+
+
+IdleCode = Literal["IDLE_DOWN", "IDLE_NO_READY", "IDLE_FRAGMENTATION", "IDLE_RESERVED", "IDLE_POLICY"]
+
+
+class IdleInterval(Strict):
+    """На узле свободны `gpu` GPU с `from` до `to` по причине `code`."""
+
+    worker: str
+    from_: Time = Field(alias="from")
+    to: Time
+    code: IdleCode
+    gpu: Annotated[int, Field(ge=1)]
+    detail: Detail  # для IDLE_RESERVED: head, t_res
+
+
+class IdleOut(Strict):
+    by_code: dict[IdleCode, int]  # GPU · время простоя по причинам
+    intervals: list[IdleInterval]
+
+
+class ExplainOut(Strict):
+    chain: list[ChainLink]  # от начала прогона к последнему окончанию
+    decomposition: Decomposition
+    idle: IdleOut
+
+
 class DiagnosticOut(Strict):
     code: Annotated[str, Field(pattern=r"^[EW]\d{3}$")]
     level: Literal["error", "warning"]
@@ -210,6 +259,7 @@ class ResultOut(Strict):
     attempts: list[AttemptOut]
     tasks: dict[str, TaskOut]
     metrics: MetricsOut | None
+    explain: ExplainOut | None  # None — симуляции не было
     diagnostics: list[DiagnosticOut]  # ошибки и предупреждения входа
     violations: list[str]  # нарушения, найденные проверкой расписания
     replans: list[ReplanRecord] | None  # None — прогноз не строился (вход больше max_forecast_tasks)

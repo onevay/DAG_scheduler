@@ -9,9 +9,11 @@ from typing import Any
 from expsched.analysis import analyze
 from expsched.contract.hashing import canonical_hash
 from expsched.contract.io_models import PolicyIn, ProblemIn, to_domain
-from expsched.domain.models import Task
+from expsched.domain.models import Problem, Task
 from expsched.domain.states import TaskStatus
 from expsched.engine.simulator import Simulator
+from expsched.explain.chain import critical_chain, decompose
+from expsched.explain.idle import idle_by_code, idle_intervals
 from expsched.explain.waits import wait_intervals
 from expsched.metrics.metrics import metrics
 from expsched.policies.registry import make_policy
@@ -58,6 +60,7 @@ def run(problem: ProblemIn, policy: PolicyIn | None = None) -> RunResult:
             "attempts": [],
             "tasks": {},
             "metrics": None,
+            "explain": None,
             "replans": [],
             "diagnostics": found,
             "violations": [],
@@ -71,18 +74,32 @@ def run(problem: ProblemIn, policy: PolicyIn | None = None) -> RunResult:
     status = {**plan.excluded, **sim.state.status}
     planned = {k: t for k, t in sim.state.tasks.items() if status[k] is not TaskStatus.INFEASIBLE}
     lower_bound = analyze(replace(plan.problem, tasks=planned)).lb if planned else None
+    scores = metrics(plan.problem, log, lower_bound)
     result = {
         **base,
         "status": "OK" if set(status.values()) <= {TaskStatus.SUCCEEDED} else "PARTIAL",
         "result_hash": sim.journal.result_hash(),
         "attempts": [asdict(a) for a in attempts_from_log(log)],
         "tasks": _task_summaries(validated.all_tasks() | sim.state.tasks, status, log),
-        "metrics": metrics(plan.problem, log, lower_bound),
+        "metrics": scores,
+        "explain": _explain(plan.problem, sim.state.tasks, log, scores["makespan"]),
         "replans": [r for r in log if r["type"] == "REPLAN"] if forecast else None,
         "diagnostics": found,
         "violations": verify(plan.problem, log, config.max_preemptions_per_task),
     }
     return RunResult(result, log)
+
+
+def _explain(
+    problem: Problem, tasks: Mapping[str, Task], log: list[dict[str, Any]], makespan: int
+) -> dict[str, Any]:
+    chain = critical_chain(tasks, log)
+    idle = idle_intervals(problem, log, makespan)
+    return {
+        "chain": chain,
+        "decomposition": decompose(chain),
+        "idle": {"by_code": idle_by_code(idle), "intervals": idle},
+    }
 
 
 def _task_summaries(
