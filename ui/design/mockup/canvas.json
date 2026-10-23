@@ -1,0 +1,35 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-10-23T09:00:00Z"},
+  "title": "expsched — интерфейс планировщика",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 1440, "h": 1180, "title": "Обзор", "expand": "fill", "is_interactive": true, "radius": 24},
+    "Builder.dc.html": {"x": 1520, "y": 0, "w": 1440, "h": 1080, "title": "Сборка эксперимента", "expand": "fill", "is_interactive": true, "radius": 24},
+    "Run.dc.html": {"x": 3040, "y": 0, "w": 1440, "h": 1240, "title": "Прогон и расписание", "expand": "fill", "is_interactive": true, "radius": 24},
+    "Cluster.dc.html": {"x": 0, "y": 1660, "w": 1440, "h": 1120, "title": "Кластер и события", "expand": "fill", "is_interactive": true, "radius": 24},
+    "Compare.dc.html": {"x": 1520, "y": 1660, "w": 1440, "h": 1120, "title": "Сравнение политик и what-if", "expand": "fill", "is_interactive": true, "radius": 24},
+    "Explain.dc.html": {"x": 3040, "y": 1660, "w": 1440, "h": 1120, "title": "Почему так: объяснения", "expand": "fill", "is_interactive": true, "radius": 24},
+    "Containers.dc.html": {"x": 0, "y": 3200, "w": 1440, "h": 1100, "title": "Эмуляция и контейнеры (следующий этап)", "expand": "fill", "is_interactive": true, "radius": 24},
+    "System.dc.html": {"x": 1520, "y": 3200, "w": 1440, "h": 1100, "title": "Дизайн-система", "expand": "fill", "radius": 24}
+  },
+  "order": [
+    "Main.dc.html",
+    "Builder.dc.html",
+    "Run.dc.html",
+    "Cluster.dc.html",
+    "Compare.dc.html",
+    "Explain.dc.html",
+    "Containers.dc.html",
+    "System.dc.html"
+  ],
+  "notes": {
+    "row1": {"x": 0, "y": -300, "text": "Основной путь: обзор → сборка → прогон", "kind": "title1", "maxW": 4480},
+    "row2": {"x": 0, "y": 1360, "text": "Кластер, сравнение, объяснения", "kind": "title1", "maxW": 4480},
+    "row3": {"x": 0, "y": 2900, "text": "Дальше: контейнеры · общий язык интерфейса", "kind": "title1", "maxW": 2960},
+    "nav": {"x": 3040, "y": 3200, "w": 420, "maxH": 640, "fill": "teal", "size": "m", "text": "Навигация\n\nЛевая тёмная колонка — разделы: Обзор, Сборка, Кластер, Прогон, Сравнение, Объяснения, Контейнеры. Внизу — дизайн-система и настройки.\n\nВерхняя строка — контекст: сценарий, политика, последний прогон, главное действие справа (чёрная кнопка).\n\nВсе экраны — страницы: на ширине телефона колонка разделов становится строкой сверху, карточки встают в один столбец."},
+    "flow": {"x": 3520, "y": 3200, "w": 420, "maxH": 640, "fill": "orange", "size": "m", "text": "Сквозной сценарий\n\n1. Обзор: «Новый сценарий» или пример.\n2. Сборка: задачи на холсте, связи, свойства справа, проверка снизу.\n3. Кластер: узлы, GPU, события отказа.\n4. «Запустить» → Прогон: Гант с прокруткой времени.\n5. «Сравнить» → политики и what-if.\n6. «Почему?» → цепочка и простои.\n7. Контейнеры — тот же Гант, но план рядом с фактом."}
+  },
+  "designSystems": []
+}

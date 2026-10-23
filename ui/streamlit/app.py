@@ -11,7 +11,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 from expsched_ui import dag, results, tables
-from expsched_ui.client import ApiClient, ApiUnavailable
+from expsched_ui.client import ApiClient, ApiUnavailable, error_message
 
 SCENARIOS = Path(__file__).resolve().parents[2] / "scenarios"
 OFFLINE_POLICIES = {
@@ -191,12 +191,12 @@ with st.sidebar:
 def run_policy(name: str) -> dict[str, Any] | None:
     """Прогон текущего входа политикой `name`; ошибки показываются и дают None."""
     status, body = client.run(current_problem, {**current_problem["policy"], "name": name})
-    if status == 200:
+    if status == 201:
         return dict(body)
-    if status == 422:
+    if "diagnostics" in body:
         st.session_state.diagnostics = body["diagnostics"]
     else:
-        st.error(body.get("error", f"Ошибка API: {status}"))
+        st.error(error_message(status, body))
     return None
 
 
@@ -204,12 +204,13 @@ check, start, compare = st.columns([1, 1, 3])
 try:
     if check.button("Проверить"):
         status, body = client.validate(current_problem, mode)
-        if status == 413:
-            st.error(f"Вход слишком большой: {body['error']}")
-        else:
+        if "diagnostics" in body:
             st.session_state.diagnostics = body["diagnostics"]
+        else:
+            st.error(error_message(status, body))
     if start.button("Запустить", type="primary") and (outcome := run_policy(policy)):
-        st.session_state.run = {**outcome, "problem": current_problem}
+        events = client.events(outcome["run_id"])  # журнал нужен только для диаграммы, не для сравнения
+        st.session_state.run = {**outcome, "events": events, "problem": current_problem}
         st.session_state.diagnostics = outcome["result"]["diagnostics"]
     if compare.button("Сравнить политики"):
         found = {name: run_policy(name) for name in options["policies"]}

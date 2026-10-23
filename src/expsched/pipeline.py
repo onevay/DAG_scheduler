@@ -28,6 +28,11 @@ class RunResult:
     events: list[dict[str, Any]]  # журнал прогона
 
 
+def input_hash(problem: ProblemIn, policy: PolicyIn) -> str:
+    """Хеш входа вместе с действующей политикой: одинаковый у прогонов, которые дадут одинаковый результат."""
+    return canonical_hash({"problem": problem.model_dump(mode="json"), "policy": policy.model_dump()})
+
+
 def run(problem: ProblemIn, policy: PolicyIn | None = None) -> RunResult:
     """Прогон входа политикой `policy` (по умолчанию — из входа).
 
@@ -39,9 +44,7 @@ def run(problem: ProblemIn, policy: PolicyIn | None = None) -> RunResult:
     config = policy or problem.policy
     base = {
         "schema_version": SCHEMA_VERSION,
-        "input_hash": canonical_hash(
-            {"problem": problem.model_dump(mode="json"), "policy": config.model_dump()}
-        ),
+        "input_hash": input_hash(problem, config),
         "policy": config.name,
     }
     validated, diagnostics = validate_problem(to_domain(problem), config.validation_mode)

@@ -67,16 +67,29 @@ def test_empty_graph(make_task):
     assert len(g) == 0 and g.topological_order() == [] and g.cyclic_components() == []
 
 
+def long_graph(shape: str, n: int = 100_000) -> dict[str, Task]:
+    """Цепочка или кольцо из n задач: глубина рекурсии n, если бы обход был рекурсивным."""
+    deps = (lambda i: (f"t{i - 1}",) if i else ()) if shape == "chain" else (lambda i: (f"t{(i - 1) % n}",))
+    return {f"t{i}": Task(f"t{i}", 1, deps=deps(i)) for i in range(n)}
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("shape", ["chain", "ring"])
+def test_large_graphs_are_processed_in_seconds(shape):
+    tasks = long_graph(shape)
+    start = time.perf_counter()
+    g = TaskGraph(tasks)
+    g.cyclic_components()
+    g.topological_order()
+    assert time.perf_counter() - start < 10  # ловим квадратичную асимптотику, а не мерим скорость
+
+
 @pytest.mark.parametrize("shape", ["chain", "ring"])
 def test_large_graphs_are_handled_without_recursion(shape):
     n = 100_000
-    deps = (lambda i: (f"t{i - 1}",) if i else ()) if shape == "chain" else (lambda i: (f"t{(i - 1) % n}",))
-    tasks = {f"t{i}": Task(f"t{i}", 1, deps=deps(i)) for i in range(n)}
-    start = time.perf_counter()
-    g = TaskGraph(tasks)
+    g = TaskGraph(long_graph(shape, n))
     components = g.cyclic_components()
     order = g.topological_order()
-    assert time.perf_counter() - start < 10  # запас на медленный CI: ловим квадратичную асимптотику
     if shape == "chain":
         assert components == [] and len(order) == n
     else:

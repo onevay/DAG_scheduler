@@ -1,0 +1,99 @@
+/* Движение интерфейса: одна кривая, короткие подъёмы, пульс только у того, что идёт сейчас. Нужен tokens.css. */
+
+/* Появление: подъём на 10 px с затуханием; для каскада задать animation-delay кратно var(--stagger) */
+.motion-rise {
+  animation: motion-rise var(--duration-enter) var(--ease) both;
+}
+
+/* Наведение на карточку или кнопку */
+.motion-lift {
+  transition:
+    transform var(--duration-hover) var(--ease),
+    box-shadow var(--duration-hover) var(--ease),
+    background-color var(--duration-fast);
+}
+.motion-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-hover);
+}
+
+/* Значение данных: высота и ширина полос, столбцов, колец */
+.motion-data {
+  transition:
+    height var(--duration-data) var(--ease),
+    width var(--duration-data) var(--ease),
+    stroke-dashoffset var(--duration-data) var(--ease),
+    background-color var(--duration-fast);
+}
+
+/* «Живое»: точка у выполняющейся задачи или контейнера */
+.motion-pulse {
+  animation: motion-pulse 2.4s ease-in-out infinite;
+}
+
+/* Прорисовка линии: рёбра графа; задать stroke-dasharray не меньше длины пути */
+.motion-draw {
+  stroke-dasharray: 400;
+  stroke-dashoffset: 400;
+  animation: motion-draw 1.2s 0.2s var(--ease) forwards;
+}
+
+/* Строка ленты журнала */
+.motion-feed {
+  animation: motion-feed 0.45s var(--ease) both;
+}
+
+@keyframes motion-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes motion-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(221, 242, 122, 0.9);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(221, 242, 122, 0);
+  }
+}
+
+@keyframes motion-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes motion-feed {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .motion-draw {
+    stroke-dashoffset: 0;
+  }
+}

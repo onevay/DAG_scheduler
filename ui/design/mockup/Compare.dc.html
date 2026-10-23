@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>expsched — сравнение политик</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&amp;family=Barlow+Condensed:wght@500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E3E7E4}
+a{color:#151716}a:hover{color:#3A403C}
+.lift{transition:transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .35s cubic-bezier(.2,.8,.2,1),background-color .3s}
+.lift:hover{transform:translateY(-3px);box-shadow:0 22px 44px -28px rgba(21,23,22,.45)}
+.grow{transition:height .7s cubic-bezier(.2,.8,.2,1),background-color .3s}
+.petal{transition:all .7s cubic-bezier(.2,.8,.2,1)}
+.rise{animation:rise .7s cubic-bezier(.2,.8,.2,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.spin{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.navlink{transition:background-color .25s,color .25s}
+.navlink:hover{background:#2A2E2C !important;color:#FFFFFF !important}
+button:focus-visible,a:focus-visible{outline:2px solid #151716;outline-offset:3px}
+@media (max-width:720px){.rail{flex-direction:row !important;width:100% !important;min-height:0 !important;padding:10px 12px !important;overflow-x:auto}.rail-gap{display:none !important}}
+@media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-wrap: wrap; background: #E3E7E4; font-family: Manrope, system-ui, sans-serif; color: #151716; padding: 14px; gap: 14px; box-sizing: border-box">
+
+  <nav class="rail" aria-label="Разделы" style="flex: 0 0 76px; width: 76px; min-height: calc(100vh - 28px); background: #151716; border-radius: 28px; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px 0; box-sizing: border-box">
+    <a href="Main.dc.html" aria-label="expsched" style="width: 48px; height: 48px; border-radius: 50%; border: 1.5px solid #3A403C; display: flex; align-items: center; justify-content: center; color: #DDF27A; margin-bottom: 18px">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.3 6.3l2.5 2.5M15.2 15.2l2.5 2.5M6.3 17.7l2.5-2.5M15.2 8.8l2.5-2.5"/></svg>
+    </a>
+    <a class="navlink" href="Main.dc.html" aria-label="Обзор" title="Обзор" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z"/></svg>
+    </a>
+    <a class="navlink" href="Builder.dc.html" aria-label="Сборка" title="Сборка" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M7.5 8l3.3 7.8M16.5 8l-3.3 7.8"/></svg>
+    </a>
+    <a class="navlink" href="Cluster.dc.html" aria-label="Кластер" title="Кластер" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="6" rx="2"/><rect x="4" y="14" width="16" height="6" rx="2"/><path d="M8 7h.01M8 17h.01"/></svg>
+    </a>
+    <a class="navlink" href="Run.dc.html" aria-label="Прогон" title="Прогон" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 6h9M8 12h11M4 18h7"/></svg>
+    </a>
+    <a class="navlink" href="Compare.dc.html" aria-label="Сравнение" title="Сравнение" aria-current="page" style="width: 48px; height: 48px; border-radius: 16px; background: #DDF27A; color: #151716; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>
+    </a>
+    <a class="navlink" href="Explain.dc.html" aria-label="Объяснения" title="Объяснения" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/></svg>
+    </a>
+    <a class="navlink" href="Containers.dc.html" aria-label="Контейнеры" title="Контейнеры" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg>
+    </a>
+    <div class="rail-gap" style="flex: 1 1 auto"></div>
+    <a class="navlink" href="System.dc.html" aria-label="Дизайн-система" title="Дизайн-система" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>
+    </a>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 18px; padding: 14px 10px 24px; box-sizing: border-box">
+
+    <header class="rise" style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px">
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <span style="font-size: 13px; color: #5E6561">Один вход — четыре политики, детерминированно</span>
+        <h1 style="margin: 0; font-size: 52px; font-weight: 500; letter-spacing: -0.035em; line-height: 1">Сравнение политик</h1>
+      </div>
+      <div role="tablist" aria-label="Сценарий" style="display: flex; background: #F7F8F6; border-radius: 26px; padding: 5px; gap: 4px">
+        <sc-for list="{{scenarios}}" as="s" hint-placeholder-count="2">
+          <button type="button" role="tab" aria-selected="{{s.on}}" onClick="{{s.pick}}" style="{{s.style}}">{{s.label}}</button>
+        </sc-for>
+      </div>
+    </header>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: stretch">
+      <section aria-label="Метрика по политикам" style="flex: 999 1 560px; min-width: 0; background: #F2F4F2; border-radius: 32px; padding: 24px; display: flex; flex-direction: column; gap: 20px">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px">
+          <div style="display: flex; align-items: center; gap: 14px">
+            <span style="width: 44px; height: 44px; border-radius: 50%; background: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#151716" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg></span>
+            <h2 style="margin: 0; font-size: 28px; font-weight: 500; letter-spacing: -0.02em">{{metric.title}}</h2>
+          </div>
+          <div role="radiogroup" aria-label="Метрика" style="display: flex; flex-wrap: wrap; gap: 6px">
+            <sc-for list="{{metrics}}" as="m" hint-placeholder-count="4">
+              <button type="button" role="radio" aria-checked="{{m.on}}" onClick="{{m.pick}}" style="{{m.style}}">{{m.label}}</button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 18px; align-items: flex-end; justify-content: space-around; height: 300px; border-bottom: 1px solid #D5DAD6; padding: 0 8px">
+          <sc-for list="{{bars}}" as="b" hint-placeholder-count="4">
+            <button type="button" onClick="{{b.pick}}" aria-label="{{b.aria}}" aria-pressed="{{b.on}}" style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 10px; height: 100%; background: transparent; border: 0; cursor: pointer; padding: 0; font-family: Manrope, sans-serif; color: #151716">
+              <span style="{{b.pill}}">{{b.value}}</span>
+              <span class="grow" style="{{b.style}}"><span style="{{b.cap}}"></span></span>
+            </button>
+          </sc-for>
+        </div>
+        <div style="display: flex; gap: 18px; justify-content: space-around; padding: 0 8px; margin-top: -8px">
+          <sc-for list="{{bars}}" as="b" hint-placeholder-count="4">
+            <span style="width: 120px; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #3A403C">{{b.name}}</span>
+          </sc-for>
+        </div>
+        <p style="margin: 0; font-size: 14px; color: #3A403C; background: #FFFFFF; border-radius: 18px; padding: 12px 16px">{{insight}}</p>
+      </section>
+
+      <section aria-label="Профиль политики" style="flex: 1 1 320px; background: #FFFFFF; border-radius: 32px; padding: 24px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; justify-content: space-between; align-items: center">
+          <h2 style="margin: 0; font-size: 22px; font-weight: 500">Профиль</h2>
+          <span style="height: 34px; padding: 0 14px; border-radius: 17px; background: #151716; color: #FFFFFF; display: inline-flex; align-items: center; font-family: 'JetBrains Mono', monospace; font-size: 12px">{{profile.name}}</span>
+        </div>
+        <svg role="img" aria-label="{{profile.aria}}" viewBox="0 0 300 300" style="width: 100%; max-width: 320px; align-self: center">
+          <defs>
+            <radialGradient id="pg" cx="50%" cy="85%" r="90%"><stop offset="0%" stop-color="#F6B49A"/><stop offset="55%" stop-color="#F2DE8A"/><stop offset="100%" stop-color="#B9E6A0"/></radialGradient>
+          </defs>
+          <circle cx="150" cy="150" r="118" fill="none" stroke="#EEF1EE" stroke-dasharray="3 6"/>
+          <circle cx="150" cy="150" r="70" fill="none" stroke="#EEF1EE" stroke-dasharray="3 6"/>
+          <ellipse class="petal" cx="150" cy="{{profile.p0.cy}}" rx="44" ry="{{profile.p0.ry}}" fill="url(#pg)" opacity=".92"/>
+          <ellipse class="petal" cx="{{profile.p1.cx}}" cy="150" rx="{{profile.p1.ry}}" ry="44" fill="url(#pg)" opacity=".92"/>
+          <ellipse class="petal" cx="150" cy="{{profile.p2.cy}}" rx="44" ry="{{profile.p2.ry}}" fill="url(#pg)" opacity=".92"/>
+          <ellipse class="petal" cx="{{profile.p3.cx}}" cy="150" rx="{{profile.p3.ry}}" ry="44" fill="url(#pg)" opacity=".92"/>
+          <circle cx="150" cy="150" r="22" fill="#151716"/>
+          <path d="M143 150l5 5 10-10" fill="none" stroke="#DDF27A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <text x="150" y="20" text-anchor="middle" font-family="Manrope" font-size="13" font-weight="600" fill="#151716">{{profile.p0.label}}</text>
+          <text x="292" y="154" text-anchor="end" font-family="Manrope" font-size="13" font-weight="600" fill="#151716">{{profile.p1.label}}</text>
+          <text x="150" y="292" text-anchor="middle" font-family="Manrope" font-size="13" font-weight="600" fill="#151716">{{profile.p2.label}}</text>
+          <text x="8" y="154" font-family="Manrope" font-size="13" font-weight="600" fill="#151716">{{profile.p3.label}}</text>
+        </svg>
+        <p style="margin: 0; font-size: 13px; color: #5E6561">Чем длиннее лепесток, тем лучше: короче расписание, выше загрузка, меньше ожидания и потерь. 100% — лучшая из четырёх.</p>
+      </section>
+    </div>
+
+    <section aria-label="Что если" style="background: #151716; color: #E8ECE9; border-radius: 32px; padding: 24px; display: flex; flex-direction: column; gap: 16px">
+      <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px">
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 44px; line-height: 1">ЧТО ЕСЛИ…</span>
+          <span style="font-size: 13px; color: #A3ABA6">Одно изменение входа — один прогон. Сценарий failure, политика priority, makespan 22 ч</span>
+        </div>
+        <span style="height: 34px; padding: 0 14px; border-radius: 17px; border: 1px solid #3A403C; display: inline-flex; align-items: center; font-size: 12px; color: #A3ABA6">разница — только от изменения, без шума</span>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 12px">
+        <sc-for list="{{whatifs}}" as="w" hint-placeholder-count="4">
+          <div class="lift" style="flex: 1 1 240px; background: #1D201E; border: 1px solid #2A2E2C; border-radius: 24px; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+            <span style="font-size: 15px; font-weight: 500; min-height: 40px">{{w.title}}</span>
+            <sc-if value="{{w.done}}" hint-placeholder-val="{{ false }}">
+              <span style="display: flex; align-items: baseline; gap: 8px">
+                <span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 40px; line-height: 1">{{w.result}}</span>
+                <span style="{{w.deltaStyle}}">{{w.delta}}</span>
+              </span>
+            </sc-if>
+            <sc-if value="{{w.busy}}" hint-placeholder-val="{{ false }}">
+              <span style="display: flex; align-items: center; gap: 10px; height: 40px; font-size: 13px; color: #A3ABA6">
+                <svg class="spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#DDF27A" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 3a9 9 0 1 1-9 9"/></svg>
+                прогон…
+              </span>
+            </sc-if>
+            <sc-if value="{{w.idle}}" hint-placeholder-val="{{ true }}">
+              <button type="button" onClick="{{w.run}}" style="height: 40px; border-radius: 20px; border: 0; background: #DDF27A; color: #151716; font: 600 13px Manrope, sans-serif; cursor: pointer">Посчитать</button>
+            </sc-if>
+            <span style="font-size: 12px; color: #8A938D">{{w.note}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1120}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { scenario: 'backfill', metric: 'makespan', policy: 'priority_backfill', whatif: {} };
+    this.timers = [];
+  }
+  componentWillUnmount() {
+    this.timers.forEach((t) => clearTimeout(t));
+  }
+  runWhatIf(id) {
+    this.setState({ whatif: { ...this.state.whatif, [id]: 'busy' } });
+    this.timers.push(setTimeout(() => this.setState({ whatif: { ...this.state.whatif, [id]: 'done' } }), 1100));
+  }
+  renderVals() {
+    const DATA = {
+      backfill: {
+        lb: 9,
+        rows: [
+          { name: 'fifo', makespan: 11, util: 0.6136, wait: 1.25, lost: 0 },
+          { name: 'fifo_skip', makespan: 11, util: 0.6136, wait: 1.25, lost: 0 },
+          { name: 'priority', makespan: 11, util: 0.6136, wait: 2.25, lost: 0 },
+          { name: 'priority_backfill', makespan: 15, util: 0.45, wait: 2.5, lost: 0 }
+        ],
+        insight: 'priority_backfill длиннее на 4 ч, зато big стартует в 4, а не в 9: резерв не даёт длинной задаче занять место крупной.'
+      },
+      urgent_failure: {
+        lb: 21,
+        rows: [
+          { name: 'fifo', makespan: 22, util: 0.4833, wait: 0.091, lost: 4 },
+          { name: 'fifo_skip', makespan: 22, util: 0.4833, wait: 0.091, lost: 4 },
+          { name: 'priority', makespan: 22, util: 0.4833, wait: 0.091, lost: 4 },
+          { name: 'priority_backfill', makespan: 22, util: 0.4833, wait: 0.091, lost: 4 }
+        ],
+        insight: 'На этом входе политики не различаются: узкое место — зависимости и потерянный при отказе час, а не очередь.'
+      }
+    };
+    const METRICS = {
+      makespan: { label: 'Makespan', title: 'Длина расписания, ч', get: (r) => r.makespan, fmt: (v) => v + ' ч', better: 'low' },
+      util: { label: 'Загрузка', title: 'Загрузка GPU', get: (r) => r.util, fmt: (v) => Math.round(v * 100) + '%', better: 'high' },
+      wait: { label: 'Ожидание', title: 'Среднее ожидание, ч', get: (r) => r.wait, fmt: (v) => v + ' ч', better: 'low' },
+      lost: { label: 'Потери', title: 'Потерянная работа, GPU·ч', get: (r) => r.lost, fmt: (v) => v + ' GPU·ч', better: 'low' }
+    };
+    const data = DATA[this.state.scenario];
+    const metric = METRICS[this.state.metric];
+    const values = data.rows.map(metric.get);
+    const max = Math.max(...values, 1e-9);
+    const best = metric.better === 'low' ? Math.min(...values) : Math.max(...values);
+    const bars = data.rows.map((r) => {
+      const v = metric.get(r);
+      const on = r.name === this.state.policy;
+      const h = Math.max(14, Math.round(v / max * 230));
+      return {
+        name: r.name,
+        value: metric.fmt(v),
+        on: on ? 'true' : 'false',
+        aria: r.name + ': ' + metric.fmt(v),
+        pick: () => this.setState({ policy: r.name }),
+        pill: 'padding: 4px 10px; border-radius: 12px; font-size: 13px; font-weight: 600; ' + (on ? 'background: #151716; color: #FFFFFF;' : 'background: #FFFFFF; color: #151716;'),
+        style: 'position: relative; display: block; width: 72px; height: ' + h + 'px; border-radius: 36px; background: ' + (v === best ? '#DDF27A' : on ? '#151716' : '#C9CFCB') + '; box-shadow: ' + (on ? '0 0 0 3px #151716' : 'none') + ';',
+        cap: 'position: absolute; top: 10px; left: 50%; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: ' + (v === best ? '#151716' : '#FFFFFF') + ';'
+      };
+    });
+    const sel = data.rows.find((r) => r.name === this.state.policy) || data.rows[0];
+    const score = (key) => {
+      const m = METRICS[key];
+      const vs = data.rows.map(m.get);
+      const v = m.get(sel);
+      if (m.better === 'low') { const lo = Math.min(...vs); return v === 0 ? 1 : lo / v; }
+      return v / Math.max(...vs);
+    };
+    const petal = (s) => 34 + Math.round(s * 66);
+    const s0 = score('makespan'), s1 = score('util'), s2 = score('wait'), s3 = score('lost');
+    const whatIfs = [
+      { id: 'ckpt', title: 'Чекпоинт pretrain_vit каждый час', result: '21 ч', delta: '−1 ч', good: true, note: 'потеряется 0 вместо 1 часа работы' },
+      { id: 'nofail', title: 'Без отказа node-A', result: '21 ч', delta: '−1 ч', good: true, note: 'совпадает с нижней границей' },
+      { id: 'node', title: 'Ещё один узел на 4 GPU', result: '[ПОСЛЕ ПРОГОНА]', delta: '', good: true, note: 'нужен прогон what-if в API' },
+      { id: 'preempt', title: 'ft_seg можно вытеснять', result: '[ПОСЛЕ ПРОГОНА]', delta: '', good: true, note: 'нужен прогон what-if в API' }
+    ];
+    return {
+      scenarios: [['backfill', 'backfill'], ['urgent_failure', 'urgent_failure']].map(([id, label]) => ({
+        label,
+        on: this.state.scenario === id ? 'true' : 'false',
+        pick: () => this.setState({ scenario: id }),
+        style: 'height: 42px; padding: 0 18px; border-radius: 21px; border: 0; cursor: pointer; font: 500 14px Manrope, sans-serif; transition: background-color .25s, color .25s; ' + (this.state.scenario === id ? 'background: #151716; color: #FFFFFF;' : 'background: transparent; color: #151716;')
+      })),
+      metrics: Object.keys(METRICS).map((k) => ({
+        label: METRICS[k].label,
+        on: this.state.metric === k ? 'true' : 'false',
+        pick: () => this.setState({ metric: k }),
+        style: 'height: 40px; padding: 0 16px; border-radius: 20px; border: 0; cursor: pointer; font: 500 14px Manrope, sans-serif; transition: background-color .25s; ' + (this.state.metric === k ? 'background: #DDF27A; color: #151716;' : 'background: #FFFFFF; color: #151716;')
+      })),
+      metric,
+      bars,
+      insight: data.insight,
+      profile: {
+        name: sel.name,
+        aria: 'Профиль ' + sel.name + ': makespan ' + Math.round(s0 * 100) + '%, загрузка ' + Math.round(s1 * 100) + '%, ожидание ' + Math.round(s2 * 100) + '%, потери ' + Math.round(s3 * 100) + '%',
+        p0: { cy: 150 - petal(s0) / 2 - 8, ry: petal(s0) / 2 + 8, label: 'makespan ' + Math.round(s0 * 100) + '%' },
+        p1: { cx: 150 + petal(s1) / 2 + 8, ry: petal(s1) / 2 + 8, label: 'загрузка ' + Math.round(s1 * 100) + '%' },
+        p2: { cy: 150 + petal(s2) / 2 + 8, ry: petal(s2) / 2 + 8, label: 'ожидание ' + Math.round(s2 * 100) + '%' },
+        p3: { cx: 150 - petal(s3) / 2 - 8, ry: petal(s3) / 2 + 8, label: 'потери ' + Math.round(s3 * 100) + '%' }
+      },
+      whatifs: whatIfs.map((w) => {
+        const st = this.state.whatif[w.id] || 'idle';
+        return {
+          ...w,
+          done: st === 'done',
+          busy: st === 'busy',
+          idle: st === 'idle',
+          run: () => this.runWhatIf(w.id),
+          deltaStyle: 'padding: 3px 10px; border-radius: 12px; font-size: 13px; font-weight: 600; background: #DDF27A; color: #151716;'
+        };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

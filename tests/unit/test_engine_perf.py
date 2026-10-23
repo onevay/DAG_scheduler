@@ -7,6 +7,10 @@ from expsched.domain.resources import Resources
 from expsched.domain.states import TaskStatus
 from expsched.engine.simulator import Simulator
 
+# Замер по настенным часам зависит от нагрузки машины, поэтому эти тесты не входят в `make test`:
+# они запускаются `make perf` и отдельным шагом CI.
+pytestmark = pytest.mark.slow
+
 N = 10_000
 WORKERS = {f"n{i}": Worker(f"n{i}", Resources({"gpu": 4})) for i in range(4)}
 

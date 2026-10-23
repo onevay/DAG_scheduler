@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>expsched — кластер и события</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&amp;family=Barlow+Condensed:wght@500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E3E7E4}
+a{color:#151716}a:hover{color:#3A403C}
+.lift{transition:transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .35s cubic-bezier(.2,.8,.2,1),background-color .35s}
+.lift:hover{transform:translateY(-3px);box-shadow:0 22px 44px -28px rgba(21,23,22,.45)}
+.rise{animation:rise .7s cubic-bezier(.2,.8,.2,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.slot{transition:background-color .35s,border-color .35s}
+.marker{animation:pop .5s cubic-bezier(.2,.8,.2,1.4) both}
+@keyframes pop{from{opacity:0;transform:translate(-50%,-50%) scale(.4)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+.navlink{transition:background-color .25s,color .25s}
+.navlink:hover{background:#2A2E2C !important;color:#FFFFFF !important}
+button:focus-visible,a:focus-visible{outline:2px solid #151716;outline-offset:3px}
+@media (max-width:720px){.rail{flex-direction:row !important;width:100% !important;min-height:0 !important;padding:10px 12px !important;overflow-x:auto}.rail-gap{display:none !important}}
+@media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+</style>
+</helmet>
+<div style="min-height: 100vh; display: flex; flex-wrap: wrap; background: #E3E7E4; font-family: Manrope, system-ui, sans-serif; color: #151716; padding: 14px; gap: 14px; box-sizing: border-box">
+
+  <nav class="rail" aria-label="Разделы" style="flex: 0 0 76px; width: 76px; min-height: calc(100vh - 28px); background: #151716; border-radius: 28px; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px 0; box-sizing: border-box">
+    <a href="Main.dc.html" aria-label="expsched" style="width: 48px; height: 48px; border-radius: 50%; border: 1.5px solid #3A403C; display: flex; align-items: center; justify-content: center; color: #DDF27A; margin-bottom: 18px">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.3 6.3l2.5 2.5M15.2 15.2l2.5 2.5M6.3 17.7l2.5-2.5M15.2 8.8l2.5-2.5"/></svg>
+    </a>
+    <a class="navlink" href="Main.dc.html" aria-label="Обзор" title="Обзор" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z"/></svg>
+    </a>
+    <a class="navlink" href="Builder.dc.html" aria-label="Сборка" title="Сборка" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M7.5 8l3.3 7.8M16.5 8l-3.3 7.8"/></svg>
+    </a>
+    <a class="navlink" href="Cluster.dc.html" aria-label="Кластер" title="Кластер" aria-current="page" style="width: 48px; height: 48px; border-radius: 16px; background: #DDF27A; color: #151716; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="6" rx="2"/><rect x="4" y="14" width="16" height="6" rx="2"/><path d="M8 7h.01M8 17h.01"/></svg>
+    </a>
+    <a class="navlink" href="Run.dc.html" aria-label="Прогон" title="Прогон" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 6h9M8 12h11M4 18h7"/></svg>
+    </a>
+    <a class="navlink" href="Compare.dc.html" aria-label="Сравнение" title="Сравнение" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>
+    </a>
+    <a class="navlink" href="Explain.dc.html" aria-label="Объяснения" title="Объяснения" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/></svg>
+    </a>
+    <a class="navlink" href="Containers.dc.html" aria-label="Контейнеры" title="Контейнеры" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg>
+    </a>
+    <div class="rail-gap" style="flex: 1 1 auto"></div>
+    <a class="navlink" href="System.dc.html" aria-label="Дизайн-система" title="Дизайн-система" style="width: 48px; height: 48px; border-radius: 16px; color: #A3ABA6; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>
+    </a>
+  </nav>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 18px; padding: 14px 10px 24px; box-sizing: border-box">
+
+    <header class="rise" style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px">
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <span style="font-size: 13px; color: #5E6561">Сценарий urgent_failure</span>
+        <h1 style="margin: 0; font-size: 52px; font-weight: 500; letter-spacing: -0.035em; line-height: 1">Кластер <span style="color: #8A938D">· {{gpuTotal}} GPU</span></h1>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px">
+        <button type="button" class="lift" style="height: 52px; padding: 0 22px; border-radius: 26px; border: 1.5px solid #151716; background: transparent; font: 500 15px Manrope, sans-serif; color: #151716; cursor: pointer">Метки и ограничения</button>
+        <button type="button" class="lift" style="height: 52px; padding: 0 24px; border-radius: 26px; border: 0; background: #151716; color: #FFFFFF; font: 500 15px Manrope, sans-serif; cursor: pointer; display: inline-flex; align-items: center; gap: 10px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Добавить узел
+        </button>
+      </div>
+    </header>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 16px">
+      <sc-for list="{{workers}}" as="w" hint-placeholder-count="3">
+        <section class="lift" aria-label="{{w.id}}" style="{{w.cardStyle}}">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px">
+            <div style="display: flex; align-items: center; gap: 12px">
+              <span style="width: 44px; height: 44px; border-radius: 50%; background: #FFFFFF; display: flex; align-items: center; justify-content: center">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#151716" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><rect x="4" y="4" width="16" height="6" rx="2"/><rect x="4" y="14" width="16" height="6" rx="2"/><path d="M8 7h.01M8 17h.01"/></svg>
+              </span>
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 17px; font-weight: 500">{{w.id}}</span>
+            </div>
+            <span style="{{w.statusStyle}}"><span style="{{w.statusDot}}"></span>{{w.status}}</span>
+          </div>
+          <div style="display: flex; align-items: flex-end; gap: 10px">
+            <span style="font-size: 64px; font-weight: 300; letter-spacing: -0.04em; line-height: .9">{{w.gpu}}</span>
+            <span style="font-size: 15px; color: #3A403C; padding-bottom: 4px">GPU · {{w.fitsNote}}</span>
+          </div>
+          <div aria-hidden="true" style="display: flex; gap: 6px">
+            <sc-for list="{{w.slots}}" as="s" hint-placeholder-count="4">
+              <span class="slot" style="{{s.style}}"></span>
+            </sc-for>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px">
+            <span style="height: 28px; padding: 0 10px; border-radius: 14px; background: #FFFFFF; display: inline-flex; align-items: center; color: #3A403C">cpu, ram — не заданы</span>
+            <span style="height: 28px; padding: 0 10px; border-radius: 14px; border: 1.5px dashed #B7BEB9; display: inline-flex; align-items: center; color: #5E6561">+ метка</span>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px dashed #C5CBC7; padding-top: 12px">
+            <span style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #5E6561">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/></svg>
+              Контейнеры · после эмуляции
+            </span>
+            <button type="button" onClick="{{w.toggle}}" style="{{w.toggleStyle}}">{{w.toggleLabel}}</button>
+          </div>
+        </section>
+      </sc-for>
+      <button type="button" class="lift" style="flex: 1 1 200px; min-height: 300px; border-radius: 32px; border: 1.5px dashed #A3ABA6; background: transparent; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; font: 500 15px Manrope, sans-serif; color: #3A403C">
+        <span style="width: 56px; height: 56px; border-radius: 50%; background: #F7F8F6; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#151716" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
+        Новый узел
+      </button>
+    </div>
+
+    <section aria-label="События кластера" style="background-color: #121413; background-image: linear-gradient(#1D201E 1px, transparent 1px), linear-gradient(90deg, #1D201E 1px, transparent 1px); background-size: 28px 28px; color: #E8ECE9; border-radius: 32px; padding: 24px; display: flex; flex-direction: column; gap: 18px">
+      <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px">
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 44px; line-height: 1">СОБЫТИЯ · {{eventCount}}</span>
+          <span style="font-size: 13px; color: #A3ABA6">Отказы и возвраты узлов, подача задач во время прогона</span>
+        </div>
+        <div style="display: flex; gap: 22px">
+          <div style="display: flex; flex-direction: column; align-items: flex-end"><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 34px; line-height: 1">{{downHours}} Ч</span><span style="font-size: 12px; color: #A3ABA6">узлы недоступны</span></div>
+          <div style="display: flex; flex-direction: column; align-items: flex-end"><span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 34px; line-height: 1">{{downGpu}} GPU·Ч</span><span style="font-size: 12px; color: #A3ABA6">выпало из ёмкости</span></div>
+        </div>
+      </div>
+
+      <div style="overflow-x: auto">
+        <div style="min-width: 640px; display: flex; flex-direction: column; gap: 14px">
+          <sc-for list="{{timeline}}" as="row" hint-placeholder-count="4">
+            <div style="display: flex; align-items: center; gap: 14px">
+              <span style="width: 92px; flex: 0 0 auto; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #A3ABA6">{{row.name}}</span>
+              <div style="position: relative; flex: 1 1 auto; height: 28px">
+                <span style="position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed #3A403C"></span>
+                <sc-for list="{{row.spans}}" as="sp" hint-placeholder-count="1">
+                  <span style="{{sp.style}}"></span>
+                </sc-for>
+                <sc-for list="{{row.marks}}" as="m" hint-placeholder-count="2">
+                  <span class="marker" title="{{m.title}}" style="{{m.style}}"></span>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+          <div style="display: flex; align-items: center; gap: 14px">
+            <span style="width: 92px; flex: 0 0 auto"></span>
+            <div style="position: relative; flex: 1 1 auto; height: 16px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8A938D">
+              <sc-for list="{{ticks}}" as="tk" hint-placeholder-count="12"><span style="{{tk.style}}">{{tk.label}}</span></sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <sc-for list="{{eventRows}}" as="e" hint-placeholder-count="3">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; background: #1A1D1B; border: 1px solid #2A2E2C; border-radius: 18px; padding: 10px 14px">
+            <span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-size: 24px; width: 64px">{{e.t}} Ч</span>
+            <span style="{{e.badge}}">{{e.type}}</span>
+            <span style="flex: 1 1 200px; font-size: 14px">{{e.text}}</span>
+            <button type="button" onClick="{{e.remove}}" aria-label="{{e.removeLabel}}" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid #3A403C; background: transparent; color: #A3ABA6; cursor: pointer; display: flex; align-items: center; justify-content: center">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+          </div>
+        </sc-for>
+        <p style="margin: 4px 0 0; font-size: 13px; color: #A3ABA6">Нажмите «Уронить» на карточке узла — событие появится здесь и на шкале. Прогон пересчитается по кнопке «Запустить».</p>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1120}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      events: [
+        { id: 1, t: 5, type: 'worker_down', worker: 'node-A' },
+        { id: 2, t: 9, type: 'submit_task', task: 'urgent_eval' },
+        { id: 3, t: 15, type: 'worker_up', worker: 'node-A' }
+      ],
+      next: 4
+    };
+  }
+  renderVals() {
+    const H = 22;
+    const pct = (x) => (x / H * 100).toFixed(3) + '%';
+    const events = [...this.state.events].sort((a, b) => a.t - b.t || a.id - b.id);
+    const ws = [{ id: 'node-A', gpu: 4 }, { id: 'node-B', gpu: 4 }, { id: 'node-C', gpu: 2 }];
+    const outages = (w) => {
+      const out = [];
+      let from = null;
+      events.forEach((e) => {
+        if (e.worker !== w) return;
+        if (e.type === 'worker_down' && from === null) from = e.t;
+        if (e.type === 'worker_up' && from !== null) { out.push([from, e.t]); from = null; }
+      });
+      if (from !== null) out.push([from, H]);
+      return out;
+    };
+    let downHours = 0, downGpu = 0;
+    const workers = ws.map((w) => {
+      const spans = outages(w.id);
+      const hours = spans.reduce((s, [a, b]) => s + b - a, 0);
+      downHours += hours;
+      downGpu += hours * w.gpu;
+      const failing = spans.length > 0;
+      const slots = [];
+      for (let i = 0; i < 4; i++) {
+        slots.push({ style: 'flex: 1 1 0; height: 56px; border-radius: 16px; box-sizing: border-box; ' + (i >= w.gpu ? 'border: 1.5px dashed #C5CBC7; background: transparent; opacity: .5;' : failing ? 'background: repeating-linear-gradient(135deg, #151716 0 5px, #3A403C 5px 10px);' : 'background: #151716;') });
+      }
+      const add = () => this.setState({
+        events: [...this.state.events, { id: this.state.next, t: 3, type: 'worker_down', worker: w.id }, { id: this.state.next + 1, t: 8, type: 'worker_up', worker: w.id }],
+        next: this.state.next + 2
+      });
+      const clear = () => this.setState({ events: this.state.events.filter((e) => e.worker !== w.id) });
+      return {
+        ...w,
+        slots,
+        status: failing ? 'падает ' + spans.map(([a, b]) => a + '–' + b).join(', ') + ' ч' : 'всё время в строю',
+        statusStyle: 'height: 30px; padding: 0 12px; border-radius: 15px; display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; background: ' + (failing ? '#F6C9B8' : '#FFFFFF') + ';',
+        statusDot: 'width: 8px; height: 8px; border-radius: 50%; background: ' + (failing ? '#E2553F' : '#3FA66B') + ';',
+        fitsNote: w.gpu >= 4 ? 'берёт pretrain_vit' : 'задачи до 2 GPU',
+        cardStyle: 'flex: 1 1 260px; border-radius: 32px; padding: 22px; display: flex; flex-direction: column; gap: 16px; background: ' + (failing ? '#EEF0EE' : w.id === 'node-C' ? '#DDF27A' : '#F2F4F2') + ';',
+        toggle: failing ? clear : add,
+        toggleLabel: failing ? 'Убрать отказы' : 'Уронить 3–8 ч',
+        toggleStyle: 'height: 36px; padding: 0 14px; border-radius: 18px; border: 0; cursor: pointer; font: 600 12px Manrope, sans-serif; ' + (failing ? 'background: #FFFFFF; color: #151716;' : 'background: #151716; color: #FFFFFF;')
+      };
+    });
+    const BADGE = { worker_down: ['#F6C9B8', 'отказ'], worker_up: ['#CDEBD6', 'возврат'], submit_task: ['#F2E3A6', 'подача'] };
+    const markStyle = (t, color) => 'position: absolute; top: 50%; left: ' + pct(t) + '; width: 16px; height: 16px; border-radius: 50%; background: ' + color + '; border: 3px solid #121413; transform: translate(-50%, -50%);';
+    const timeline = ws.map((w) => ({
+      name: w.id,
+      spans: outages(w.id).map(([a, b]) => ({ style: 'position: absolute; top: 4px; bottom: 4px; left: ' + pct(a) + '; width: ' + pct(b - a) + '; border-radius: 10px; background: repeating-linear-gradient(135deg, #3A403C 0 5px, transparent 5px 10px); border: 1px solid #5E6561; box-sizing: border-box;' })),
+      marks: events.filter((e) => e.worker === w.id).map((e) => ({ title: BADGE[e.type][1] + ' в ' + e.t + ' ч', style: markStyle(e.t, e.type === 'worker_down' ? '#F08A4B' : '#9BDDB4') }))
+    }));
+    timeline.push({ name: 'подача задач', spans: [], marks: events.filter((e) => e.type === 'submit_task').map((e) => ({ title: e.task + ' в ' + e.t + ' ч', style: markStyle(e.t, '#5CC8E6') })) });
+    const ticks = [];
+    for (let h = 0; h <= H; h += 2) ticks.push({ label: h, style: 'position: absolute; left: ' + pct(h) + '; transform: translateX(-50%);' });
+    return {
+      gpuTotal: ws.reduce((s, w) => s + w.gpu, 0),
+      workers,
+      timeline,
+      ticks,
+      eventCount: events.length,
+      downHours,
+      downGpu,
+      eventRows: events.map((e) => ({
+        t: e.t,
+        type: BADGE[e.type][1],
+        text: e.type === 'submit_task' ? e.task + ' — срочная, priority 10, дедлайн 14 ч' : e.worker + (e.type === 'worker_down' ? ' — задачи прерываются, работа после чекпоинта теряется' : ' — возвращается пустым'),
+        badge: 'height: 28px; padding: 0 10px; border-radius: 14px; display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; color: #151716; background: ' + BADGE[e.type][0] + ';',
+        removeLabel: 'Удалить событие ' + BADGE[e.type][1] + ' в ' + e.t + ' ч',
+        remove: () => this.setState({ events: this.state.events.filter((x) => x.id !== e.id) })
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>

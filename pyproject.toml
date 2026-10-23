@@ -47,5 +47,5 @@ testpaths = ["tests"]
 pythonpath = ["ui/streamlit"]
 markers = [
     "docker: требует Docker",
-    "slow: долгие (ночной CI)",
+    "slow: долгие тесты и замеры по времени: `make perf`, отдельный шаг CI",
 ]
