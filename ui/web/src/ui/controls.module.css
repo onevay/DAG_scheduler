@@ -1,0 +1,207 @@
+.button {
+  height: var(--control-height);
+  padding: 0 24px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  font: var(--text-label);
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.primary {
+  background: var(--color-ink);
+  color: #ffffff;
+}
+
+.secondary {
+  background: transparent;
+  color: var(--color-ink);
+  box-shadow: inset 0 0 0 1.5px var(--color-ink);
+}
+
+.accent {
+  background: var(--color-accent);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.button:disabled,
+.iconButton:disabled {
+  background: var(--color-line);
+  color: var(--color-muted);
+  box-shadow: none;
+  transform: none;
+  cursor: default;
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  border: 0;
+  border-radius: 50%;
+  background: var(--color-surface-raised);
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.chip {
+  height: var(--control-height-sm);
+  min-width: var(--touch-min);
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-raised);
+  color: var(--color-ink);
+  font: var(--text-label);
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast),
+    transform var(--duration-fast) var(--ease);
+}
+
+.chip:hover {
+  transform: translateY(-1px);
+}
+
+.chip[aria-pressed="true"] {
+  background: var(--chip-on, var(--color-accent));
+}
+
+.segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-nested);
+  background: var(--color-surface-raised);
+}
+
+.segment {
+  height: var(--control-height-sm);
+  min-width: var(--touch-min);
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-ink-2);
+  font: var(--text-label);
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast),
+    color var(--duration-fast);
+}
+
+.segment[aria-checked="true"] {
+  background: var(--color-ink);
+  color: #ffffff;
+}
+
+.switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--touch-min);
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--color-surface-raised);
+  color: var(--color-ink);
+  font: var(--text-label);
+  text-align: left;
+  cursor: pointer;
+}
+
+.switchText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hint {
+  font: var(--text-caption);
+  color: var(--color-muted);
+}
+
+.track {
+  position: relative;
+  flex: 0 0 auto;
+  width: 46px;
+  height: 28px;
+  border-radius: 14px;
+  background: var(--color-line);
+  transition: background-color var(--duration-fast);
+}
+
+.knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #ffffff;
+  transition:
+    transform var(--duration-fast) var(--ease),
+    background-color var(--duration-fast);
+}
+
+.switch[aria-checked="true"] .track {
+  background: var(--color-ink);
+}
+
+.switch[aria-checked="true"] .knob {
+  background: var(--color-accent);
+  transform: translateX(18px);
+}
+
+.stepper {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 22px;
+  background: var(--color-surface-raised);
+}
+
+.stepperLabel {
+  font: var(--text-small);
+  color: var(--color-ink-2);
+}
+
+.stepperRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.stepperValue {
+  font: 400 30px/1 var(--font-sans);
+}
+
+.unit {
+  font: var(--text-label);
+  color: var(--color-muted);
+}
+
+.step {
+  width: var(--touch-min);
+  height: var(--touch-min);
+  border: 0;
+  border-radius: 50%;
+  background: #eef1ee;
+  color: var(--color-ink);
+  font: 600 18px/1 var(--font-sans);
+  cursor: pointer;
+}
+
+.step:disabled {
+  color: var(--color-faint);
+  cursor: default;
+}

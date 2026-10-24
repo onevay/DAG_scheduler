@@ -1,16 +1,33 @@
+import { Route, Routes, useLocation } from "react-router";
+
 import styles from "./App.module.css";
+import { ContainersPage } from "./pages/ContainersPage";
+import { SystemPage } from "./pages/SystemPage";
 import { Rail } from "./shell/Rail";
 import { sectionOf } from "./shell/sections";
+import { PageHeader } from "./ui/PageHeader";
 
-export function App({ pathname = window.location.pathname }: { pathname?: string }) {
-  const section = sectionOf(pathname);
+export function App() {
   return (
     <div className={styles.page}>
-      <Rail pathname={pathname} />
+      <Rail />
       <main className={styles.main}>
-        <h1 className={`${styles.title} motion-rise`}>{section?.label ?? "Страница не найдена"}</h1>
-        <p className={styles.note}>Экран появится на следующих шагах.</p>
+        <Routes>
+          <Route path="/system" element={<SystemPage />} />
+          <Route path="/containers" element={<ContainersPage />} />
+          <Route path="*" element={<Placeholder />} />
+        </Routes>
       </main>
     </div>
+  );
+}
+
+/** Раздел, экран которого ещё не сделан, или незнакомый путь. */
+function Placeholder() {
+  const section = sectionOf(useLocation().pathname);
+  return (
+    <PageHeader title={section?.label ?? "Страница не найдена"}>
+      {section ? "Экран появится на следующих шагах." : "Такого адреса нет — выберите раздел слева."}
+    </PageHeader>
   );
 }

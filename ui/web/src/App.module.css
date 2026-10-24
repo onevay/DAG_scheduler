@@ -19,14 +19,3 @@
   gap: 18px;
   padding: 14px 10px 24px;
 }
-
-.title {
-  margin: 0;
-  font: var(--text-h1);
-  letter-spacing: var(--tracking-tight);
-}
-
-.note {
-  margin: 0;
-  color: var(--color-muted);
-}

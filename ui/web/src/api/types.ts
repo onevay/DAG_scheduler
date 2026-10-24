@@ -27,3 +27,5 @@ export type ExplainView = S["ExplainView"];
 export type Intervention = S["WhatIfRequest"]["interventions"][number];
 export type WhatIf = S["WhatIfOut"];
 export type ErrorBody = S["ErrorOut"];
+export type TaskStatus = S["TaskStatus"];
+export type TaskKind = NonNullable<Task["kind"]>;
