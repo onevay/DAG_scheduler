@@ -1,7 +1,8 @@
-import { type ChangeEvent, useState } from "react";
+import { type ChangeEvent, useMemo, useState } from "react";
 
 import { api } from "../api/client";
 import { useScenarios } from "../api/hooks";
+import { Canvas } from "../builder/Canvas";
 import { diagnosticsByTask, EMPTY_DRAFT } from "../draft/draft";
 import { useDraft, useDraftValidation } from "../draft/DraftContext";
 import { downloadDraft, readDraft } from "../draft/files";
@@ -11,12 +12,28 @@ import { PageHeader } from "../ui/PageHeader";
 import styles from "./BuilderPage.module.css";
 
 export function BuilderPage() {
+  const { draft } = useDraft();
+  const validation = useDraftValidation();
+  const [selected, setSelected] = useState<string | null>(null);
+  const analysis = validation.data?.analysis;
+  // Рамка ошибки — только у задач с ошибками; предупреждения видны в итоге проверки
+  const invalid = useMemo(() => {
+    const groups = diagnosticsByTask(draft, validation.data?.diagnostics ?? []);
+    return new Set([...groups].filter(([, ds]) => ds.some((d) => d.level === "error")).map(([task]) => task));
+  }, [draft, validation.data]);
   return (
     <>
       <PageHeader title="Сборка">
         Задачи, зависимости и узлы эксперимента; проверка идёт по ходу ввода.
       </PageHeader>
       <DraftToolbar />
+      <Canvas
+        selected={selected}
+        onSelect={setSelected}
+        criticalPath={analysis?.critical_path ?? []}
+        invalid={invalid}
+        lowerBound={analysis?.lower_bound}
+      />
       <ValidationSummary />
     </>
   );

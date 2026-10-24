@@ -12,6 +12,9 @@ const PATHS = {
     "M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z",
   containers: "M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9",
   system: "M12 3l9 5-9 5-9-5zM3 13l9 5 9-5",
+  plus: "M12 5v14M5 12h14",
+  minus: "M5 12h14",
+  fit: "M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5",
 } as const;
 
 export type IconName = keyof typeof PATHS;
