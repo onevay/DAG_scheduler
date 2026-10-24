@@ -1,16 +1,24 @@
+import { QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
+import { createQueryClient } from "./api/hooks";
 import { App } from "./App";
+import { EMPTY_DRAFT } from "./draft/draft";
+import { DraftProvider } from "./draft/DraftContext";
 import { sectionOf } from "./shell/sections";
 
 function renderAt(path: string) {
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <App />
-    </MemoryRouter>,
+    <QueryClientProvider client={createQueryClient()}>
+      <DraftProvider initial={EMPTY_DRAFT}>
+        <MemoryRouter initialEntries={[path]}>
+          <App />
+        </MemoryRouter>
+      </DraftProvider>
+    </QueryClientProvider>,
   );
 }
 

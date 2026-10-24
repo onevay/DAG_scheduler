@@ -1,6 +1,7 @@
 import { Route, Routes, useLocation } from "react-router";
 
 import styles from "./App.module.css";
+import { BuilderPage } from "./pages/BuilderPage";
 import { ContainersPage } from "./pages/ContainersPage";
 import { SystemPage } from "./pages/SystemPage";
 import { Rail } from "./shell/Rail";
@@ -13,6 +14,7 @@ export function App() {
       <Rail />
       <main className={styles.main}>
         <Routes>
+          <Route path="/builder" element={<BuilderPage />} />
           <Route path="/system" element={<SystemPage />} />
           <Route path="/containers" element={<ContainersPage />} />
           <Route path="*" element={<Placeholder />} />

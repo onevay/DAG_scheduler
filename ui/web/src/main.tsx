@@ -9,6 +9,7 @@ import { BrowserRouter } from "react-router";
 
 import { createQueryClient } from "./api/hooks";
 import { App } from "./App";
+import { DraftProvider } from "./draft/DraftContext";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("index.html has no #root element");
@@ -16,9 +17,11 @@ if (!root) throw new Error("index.html has no #root element");
 createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={createQueryClient()}>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
+      <DraftProvider>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </DraftProvider>
     </QueryClientProvider>
   </StrictMode>,
 );
