@@ -1,15 +1,16 @@
 import { lazy, Suspense } from "react";
-import { Route, Routes, useLocation } from "react-router";
+import { Link, Navigate, Route, Routes } from "react-router";
 
+import { useRuns } from "./api/hooks";
 import styles from "./App.module.css";
 import { ClusterPage } from "./pages/ClusterPage";
 import { ComparePage } from "./pages/ComparePage";
 import { ContainersPage } from "./pages/ContainersPage";
 import { ExplainPage } from "./pages/ExplainPage";
+import { OverviewPage } from "./pages/OverviewPage";
 import { RunPage } from "./pages/RunPage";
 import { SystemPage } from "./pages/SystemPage";
 import { Rail } from "./shell/Rail";
-import { sectionOf } from "./shell/sections";
 import { PageHeader } from "./ui/PageHeader";
 
 // Сборка тянет React Flow — это больше трети всего кода; грузится отдельно, когда открывают раздел
@@ -21,6 +22,7 @@ export function App() {
       <Rail />
       <main className={styles.main}>
         <Routes>
+          <Route path="/" element={<OverviewPage />} />
           <Route
             path="/builder"
             element={
@@ -30,24 +32,34 @@ export function App() {
             }
           />
           <Route path="/cluster" element={<ClusterPage />} />
+          <Route path="/runs" element={<LatestRun to="runs" title="Прогон" />} />
           <Route path="/runs/:runId" element={<RunPage />} />
           <Route path="/compare" element={<ComparePage />} />
+          <Route path="/explain" element={<LatestRun to="explain" title="Объяснения" />} />
           <Route path="/explain/:runId" element={<ExplainPage />} />
           <Route path="/system" element={<SystemPage />} />
           <Route path="/containers" element={<ContainersPage />} />
-          <Route path="*" element={<Placeholder />} />
+          <Route
+            path="*"
+            element={
+              <PageHeader title="Страница не найдена">Такого адреса нет — выберите раздел слева.</PageHeader>
+            }
+          />
         </Routes>
       </main>
     </div>
   );
 }
 
-/** Раздел, экран которого ещё не сделан, или незнакомый путь. */
-function Placeholder() {
-  const section = sectionOf(useLocation().pathname);
+/** Разделы «Прогон» и «Объяснения» без id открывают самый свежий прогон. */
+function LatestRun({ to, title }: { to: "runs" | "explain"; title: string }) {
+  const runs = useRuns(1);
+  const latest = runs.data?.[0];
+  if (latest) return <Navigate to={`/${to}/${latest.run_id}`} replace />;
   return (
-    <PageHeader title={section?.label ?? "Страница не найдена"}>
-      {section ? "Экран появится на следующих шагах." : "Такого адреса нет — выберите раздел слева."}
+    <PageHeader title={title}>
+      {runs.isPending ? "Ищу последний прогон…" : "Прогонов пока нет — "}
+      {!runs.isPending && <Link to="/">начните с примера в обзоре</Link>}
     </PageHeader>
   );
 }
