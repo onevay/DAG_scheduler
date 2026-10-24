@@ -4,6 +4,7 @@ import { ApiError } from "../api/client";
 import { useRun, useRunProblem } from "../api/hooks";
 import type { Problem, Result } from "../api/types";
 import { taskRows } from "../run/results";
+import { Schedule } from "../run/Schedule";
 import { ButtonLink } from "../ui/controls";
 import { StatusChip } from "../ui/data";
 import { PageHeader } from "../ui/PageHeader";
@@ -28,10 +29,12 @@ export function RunPage() {
   if (!run.data || !problem.data) return <PageHeader title="Прогон">Загружаю прогон {runId}…</PageHeader>;
 
   const { result } = run.data;
+  const unit = UNITS[problem.data.time_unit ?? "hour"];
   return (
     <>
       <RunHeader runId={runId} result={result} problem={problem.data} />
-      <Metrics result={result} unit={UNITS[problem.data.time_unit ?? "hour"]} />
+      <Metrics result={result} unit={unit} />
+      <Schedule key={runId} runId={runId} result={result} problem={problem.data} unit={unit} />
       <TaskTable result={result} />
     </>
   );

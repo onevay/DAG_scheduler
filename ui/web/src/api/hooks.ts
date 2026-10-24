@@ -56,10 +56,11 @@ export const useRunEvents = (runId: string) =>
     ...IMMUTABLE,
   });
 
-export const useExplain = (runId: string, filter: ExplainFilter = {}) =>
+export const useExplain = (runId: string, filter: ExplainFilter = {}, enabled = true) =>
   useQuery({
     queryKey: keys.explain(runId, filter),
     queryFn: ({ signal }) => api.explain(runId, filter, signal),
+    enabled,
     ...IMMUTABLE,
   });
 
