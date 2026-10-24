@@ -22,7 +22,8 @@ def client(tmp_path_factory):
 
 def test_policies_and_validation_through_the_api(client):
     assert "priority" in client.policies()["policies"]
-    assert client.validate(DEMO, "lenient") == (200, {"valid": True, "diagnostics": []})
+    status, body = client.validate(DEMO, "lenient")
+    assert status == 200 and body["valid"] and body["diagnostics"] == []
 
 
 def test_run_through_the_api(client):

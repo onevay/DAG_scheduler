@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from collections.abc import AsyncIterator, Sequence
@@ -33,13 +34,18 @@ from expsched.api.models import (
     PoliciesOut,
     RunOut,
     RunRequest,
+    RunsOut,
+    ScenariosOut,
     ValidationOut,
+    WhatIfOut,
+    WhatIfRequest,
 )
 from expsched.api.runner import ProcessRunner, RunTimeout
 from expsched.api.store import RUN_ID_PATTERN, RunStore, run_id_of
-from expsched.api.views import explain_view
-from expsched.contract.io_models import PolicyIn, ProblemIn
+from expsched.api.views import explain_view, input_analysis
+from expsched.contract.io_models import PolicyIn, ProblemIn, load
 from expsched.contract.limits import MAX_BODY_BYTES, InputTooLarge
+from expsched.contract.whatif import apply, deltas
 from expsched.pipeline import input_hash
 from expsched.policies.registry import implemented_policies
 from expsched.validation import Code, has_errors, validate
@@ -55,6 +61,7 @@ REQUEST_BODIES: dict[str, type[BaseModel]] = {
     "/v1/validate": ProblemIn,
     "/v1/runs": RunRequest,
     "/v1/runs/{run_id}/events": EventRequest,
+    "/v1/whatif": WhatIfRequest,
 }
 
 log = logging.getLogger(__name__)
@@ -71,13 +78,48 @@ def policies() -> dict[str, Any]:
 async def check_problem(request: Request, mode: Literal["strict", "lenient"] = "lenient") -> Any:
     """Диагностики входа. 422 — вход не соответствует схеме, остальные ошибки входа приходят с кодом 200."""
     try:
-        _, diagnostics = validate(await _read_body(request), mode)
+        problem, diagnostics = validate(await _read_body(request), mode)
     except InputTooLarge as error:
         return error_response(413, "INPUT_TOO_LARGE", str(error))
     found = [d.to_dict() for d in diagnostics]
     if any(d.code in SCHEMA_CODES for d in diagnostics):
         return error_response(422, "SCHEMA_INVALID", "input does not match the schema", found)
-    return {"valid": not has_errors(diagnostics), "diagnostics": found}
+    analysis = input_analysis(problem, diagnostics) if problem is not None else None
+    return {"valid": not has_errors(diagnostics), "diagnostics": found, "analysis": analysis}
+
+
+@router.get("/scenarios", response_model=ScenariosOut)
+def scenarios(request: Request) -> Any:
+    """Примеры входа: имя и размер, чтобы выбрать, с чего начать."""
+    out = []
+    for name, problem in _scenarios(request).items():
+        submitted = [e for e in problem.events if e.task is not None]
+        out.append(
+            {
+                "name": name,
+                "tasks": len(problem.tasks) + len(submitted),
+                "workers": len(problem.cluster.workers),
+                "events": len(problem.events),
+                "policy": problem.policy.name,
+                "time_unit": problem.time_unit,
+            }
+        )
+    return {"scenarios": out}
+
+
+@router.get("/scenarios/{name}", response_model=ProblemIn, responses=ERRORS)
+def scenario(request: Request, name: Annotated[str, Path(pattern=r"^[a-z0-9_-]{1,64}$")]) -> Any:
+    """Вход примера; без собственного `name` получает имя файла."""
+    problem = _scenarios(request).get(name)
+    if problem is None:
+        return error_response(404, "NOT_FOUND", f"no scenario {name!r}")
+    return problem.model_copy(update={"name": problem.name or name}).model_dump(mode="json")
+
+
+@router.get("/runs", response_model=RunsOut)
+def runs(request: Request, limit: Annotated[int, Query(ge=1, le=500)] = 50) -> Any:
+    """Последние сохранённые прогоны, новые первыми."""
+    return {"runs": _store(request).recent(limit)}
 
 
 @router.post("/runs", status_code=201, response_model=RunOut, responses=ERRORS)
@@ -114,6 +156,48 @@ async def add_event(request: Request, run_id: RunId) -> Any:
     base = ProblemIn.model_validate(store.problem(run_id))
     problem = base.model_copy(update={"events": [*base.events, event]})
     return await _run_and_store(request, problem, problem.policy)
+
+
+@router.post("/whatif", response_model=WhatIfOut, responses=ERRORS)
+async def what_if(request: Request) -> Any:
+    """Исходный вход и его варианты с одним изменением каждый: метрики вариантов и разница с исходным.
+
+    Каждый вариант — обычный сохранённый прогон: по его `run_id` открываются расписание и объяснения.
+    """
+    try:
+        body = WhatIfRequest.model_validate_json(await _read_body(request))
+    except InputTooLarge as error:
+        return error_response(413, "INPUT_TOO_LARGE", str(error))
+    except ValidationError as error:
+        found = [d.to_dict() for d in schema_diagnostics(error)]
+        return error_response(422, "SCHEMA_INVALID", "request does not match the schema", found)
+    config = body.policy or body.problem.policy
+    try:
+        variants = [apply(body.problem, change) for change in body.interventions]
+    except ValueError as error:
+        return error_response(422, "INVALID_REQUEST", str(error))
+    try:
+        runs = await asyncio.gather(*(_stored_run(request, p, config) for p in [body.problem, *variants]))
+    except NotImplementedError as error:
+        return error_response(400, "POLICY_NOT_IMPLEMENTED", str(error))
+    except RunTimeout as error:
+        return error_response(504, "RUN_TIMEOUT", str(error))
+    (base_id, base), *others = runs
+    return {
+        "baseline": _summary(base_id, base),
+        "variants": [
+            {
+                "intervention": change.model_dump(mode="json"),
+                **_summary(run_id, result),
+                "delta": deltas(base["metrics"], result["metrics"]),
+            }
+            for change, (run_id, result) in zip(body.interventions, others, strict=True)
+        ],
+    }
+
+
+def _summary(run_id: str, result: dict[str, Any]) -> dict[str, Any]:
+    return {"run_id": run_id, "status": result["status"], "metrics": result["metrics"]}
 
 
 @router.get("/runs/{run_id}", response_model=RunOut, responses=ERRORS)
@@ -169,7 +253,10 @@ def get_explain(
 
 
 def create_app(
-    cors_origins: Sequence[str] = (), store: RunStore | None = None, runner: ProcessRunner | None = None
+    cors_origins: Sequence[str] = (),
+    store: RunStore | None = None,
+    runner: ProcessRunner | None = None,
+    scenarios_dir: FilePath | None = None,
 ) -> FastAPI:
     runner = runner or ProcessRunner(
         float(os.environ.get("EXPSCHED_RUN_TIMEOUT", "60")), int(os.environ.get("EXPSCHED_RUN_WORKERS", "2"))
@@ -182,6 +269,9 @@ def create_app(
 
     app = FastAPI(title="expsched", lifespan=lifespan)
     app.state.runner = runner
+    app.state.scenarios_dir = scenarios_dir or FilePath(
+        os.environ.get("EXPSCHED_SCENARIOS_DIR", FilePath(__file__).resolve().parents[3] / "scenarios")
+    )
     app.state.store = store or RunStore(
         FilePath(os.environ.get("EXPSCHED_RUNS_DIR", "runs")), int(os.environ.get("EXPSCHED_MAX_RUNS", "100"))
     )
@@ -216,19 +306,37 @@ def error_response(
 
 
 async def _run_and_store(request: Request, problem: ProblemIn, config: PolicyIn) -> Any:
+    """Ответ `{run_id, result}` или ошибка: политика не реализована, прогон не уложился в таймаут."""
+    try:
+        run_id, result = await _stored_run(request, problem, config)
+    except NotImplementedError as error:
+        return error_response(400, "POLICY_NOT_IMPLEMENTED", str(error))
+    except RunTimeout as error:
+        return error_response(504, "RUN_TIMEOUT", str(error))
+    return {"run_id": run_id, "result": result}
+
+
+async def _stored_run(request: Request, problem: ProblemIn, config: PolicyIn) -> tuple[str, dict[str, Any]]:
     """Сохранённый прогон входа с политикой или новый: в рабочем процессе, с таймаутом, затем в хранилище."""
     run_id = run_id_of(input_hash(problem, config))
     store = _store(request)
     if store.find(run_id) is None:
         runner: ProcessRunner = request.app.state.runner
-        try:
-            outcome = await runner.run(problem, config)
-        except NotImplementedError as error:
-            return error_response(400, "POLICY_NOT_IMPLEMENTED", str(error))
-        except RunTimeout as error:
-            return error_response(504, "RUN_TIMEOUT", str(error))
+        outcome = await runner.run(problem, config)
         store.save(run_id, problem.model_copy(update={"policy": config}).model_dump(mode="json"), outcome)
-    return {"run_id": run_id, "result": store.result(run_id)}
+    return run_id, store.result(run_id)
+
+
+def _scenarios(request: Request) -> dict[str, ProblemIn]:
+    """Примеры из каталога сценариев по имени файла; файлы, не прошедшие схему, пропускаются."""
+    out = {}
+    root: FilePath = request.app.state.scenarios_dir
+    for path in sorted(root.glob("*.json")) if root.is_dir() else []:
+        try:
+            out[path.stem] = load(path.read_bytes())
+        except ValueError:
+            log.warning("scenario %s does not match the schema", path.name)
+    return out
 
 
 def _store(request: Request) -> RunStore:

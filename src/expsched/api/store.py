@@ -1,9 +1,10 @@
-"""Хранилище прогонов: каталог `<root>/<run_id>/` с problem.json, result.json и events.jsonl.
+"""Хранилище прогонов: каталог `<root>/<run_id>/` с problem.json, result.json, events.jsonl и summary.json.
 
 `run_id` — начало `input_hash`: повторный запрос с тем же входом и политикой отдаёт сохранённый прогон.
 В problem.json вход лежит вместе с политикой, которой он был посчитан.
 Прогон пишется во временный каталог и переименовывается целиком: читатель не увидит наполовину записанный.
-Когда прогонов больше `max_runs`, удаляются самые старые.
+Когда прогонов больше `max_runs`, удаляются самые старые. summary.json — строка списка прогонов, чтобы список
+не читал result.json целиком.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ import json
 import os
 import shutil
 import tempfile
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -45,6 +47,15 @@ class RunStore:
     def problem(self, run_id: str) -> dict[str, Any]:
         return dict(json.loads((self.root / run_id / "problem.json").read_text(encoding="utf-8")))
 
+    def recent(self, limit: int) -> list[dict[str, Any]]:
+        """Сводки последних прогонов, новые первыми."""
+        summaries = []
+        for path in self.root.iterdir() if self.root.is_dir() else []:
+            if path.is_dir() and not path.name.startswith(".") and (path / "summary.json").is_file():
+                summaries.append(json.loads((path / "summary.json").read_text(encoding="utf-8")))
+        summaries.sort(key=lambda s: (s["created_at"], s["run_id"]), reverse=True)
+        return summaries[:limit]
+
     def events(self, run_id: str, from_seq: int, limit: int) -> tuple[list[dict[str, Any]], int]:
         """Записи журнала с номерами [from_seq, from_seq + limit) и общее число записей."""
         with (self.root / run_id / "events.jsonl").open(encoding="utf-8") as lines:
@@ -58,6 +69,8 @@ class RunStore:
         (staging / "result.json").write_text(json.dumps(outcome.result, ensure_ascii=False), encoding="utf-8")
         events = "".join(canonical_json(r) + "\n" for r in outcome.events)
         (staging / "events.jsonl").write_text(events, encoding="utf-8", newline="\n")
+        summary = _summary(run_id, problem, outcome.result)
+        (staging / "summary.json").write_text(json.dumps(summary, ensure_ascii=False), encoding="utf-8")
         try:
             os.rename(staging, self.root / run_id)
         except OSError:
@@ -71,3 +84,16 @@ class RunStore:
         for path in runs[: max(0, len(runs) - self.max_runs)]:
             if path.name != keep:
                 shutil.rmtree(path, ignore_errors=True)
+
+
+def _summary(run_id: str, problem: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:
+    metrics = result["metrics"] or {}
+    return {
+        "run_id": run_id,
+        "name": problem.get("name"),
+        "policy": result["policy"],
+        "status": result["status"],
+        "tasks": len(result["tasks"]),
+        "makespan": metrics.get("makespan"),
+        "created_at": datetime.now(UTC).isoformat(timespec="milliseconds"),
+    }

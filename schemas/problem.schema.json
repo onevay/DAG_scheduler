@@ -316,6 +316,20 @@
       "title": "Mode",
       "type": "string"
     },
+    "name": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Name"
+    },
     "policy": {
       "$ref": "#/$defs/PolicyIn",
       "default": {

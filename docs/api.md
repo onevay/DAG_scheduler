@@ -58,11 +58,31 @@ EXPSCHED_CORS_ORIGINS=http://localhost:5173 make api
 ```json
 {"valid": false,
  "diagnostics": [{"code": "E012", "level": "error", "detail": {"cycle": ["a", "b", "c", "a"], "component_size": 3},
-                  "hint": "Цикл: a → b → c → a. ..."}]}
+                  "hint": "Цикл: a → b → c → a. ..."}],
+ "analysis": {"lower_bound": 4, "critical_path": ["free", "report"]}}
 ```
+
+`analysis` — нижняя граница makespan и критический путь той части входа, которую можно планировать: задачи
+с ошибками и их потомки не учитываются, поданные событиями задачи входят с моментом подачи как release_time.
+`null`, если планировать нечего или режим strict нашёл ошибки.
 
 Код 200 — вход разобран; ошибки графа, ресурсов и дедлайнов приходят в `diagnostics`. Если вход не
 соответствует схеме (E001, E070), остальные проверки не выполняются и ответ — ошибка 422 `SCHEMA_INVALID`.
+
+## `GET /v1/scenarios`, `GET /v1/scenarios/{name}`
+
+Примеры входа из каталога `EXPSCHED_SCENARIOS_DIR` (по умолчанию `scenarios/` репозитория). Список — имя, число
+задач (вместе с подаваемыми), узлов и событий, политика, единица времени. Пример целиком — `problem.json`;
+без собственного `name` он получает имя файла. Имя — `[a-z0-9_-]`, неизвестное — 404.
+
+## `GET /v1/runs?limit=50`
+
+Последние сохранённые прогоны, новые первыми (`limit` до 500):
+
+```json
+{"runs": [{"run_id": "dc2f0ef68b28536c", "name": "urgent_failure", "policy": "priority", "status": "OK",
+           "tasks": 11, "makespan": 22, "created_at": "2026-10-24T10:15:02.120+00:00"}]}
+```
 
 ## `POST /v1/runs`
 
@@ -106,6 +126,39 @@ EXPSCHED_CORS_ORIGINS=http://localhost:5173 make api
 Ответ 201 — как у `POST /v1/runs`; что сдвинуло событие, видно в `result.replans`. Тот же вход с тем же
 событием отдаёт сохранённый прогон. Событие для неизвестного узла — диагностика E040 в результате (в режиме
 lenient событие отброшено); неизвестный `run_id` — 404, неверное событие — 422.
+
+## `POST /v1/whatif`
+
+Что если: исходный вход и до 16 его вариантов, в каждом — одно изменение. Все считаются той же политикой.
+
+```json
+{"problem": {"...": "problem.json"}, "policy": {"name": "priority"},
+ "interventions": [{"kind": "set_checkpoint", "task": "pretrain_vit", "checkpoint_interval": 1},
+                   {"kind": "remove_failures", "worker": "node-A"}]}
+```
+
+| `kind` | Поля | Что меняется |
+|---|---|---|
+| `add_worker` | `worker` — как в `cluster.workers` | в кластере на один узел больше |
+| `remove_failures` | `worker` | у узла нет отказов и возвратов |
+| `set_checkpoint` | `task`, `checkpoint_interval` (`null` — без чекпоинтов) | интервал чекпоинта |
+| `set_preemptible` | `task`, `preemptible` (по умолчанию `true`) | можно ли вытеснять задачу |
+| `set_priority` | `task`, `priority` | приоритет |
+| `set_deadline` | `task`, `deadline` (`null` — снять) | дедлайн |
+
+Задача может быть и во входе, и поданной событием. Ответ:
+
+```json
+{"baseline": {"run_id": "...", "status": "OK", "metrics": {"makespan": 22, "...": "..."}},
+ "variants": [{"intervention": {"kind": "set_checkpoint", "...": "..."}, "run_id": "...", "status": "OK",
+               "metrics": {"makespan": 21, "...": "..."},
+               "delta": {"makespan": -1, "lost_work_gpu": -4, "utilization_gpu": 0.0265, "...": "..."}}]}
+```
+
+`delta` — вариант минус исходный по `makespan`, сумме `deadline_misses`, `weighted_tardiness`,
+`utilization_gpu`, `lost_work_gpu`, `mean_wait`; `null`, если один из прогонов не симулировался. Каждый вариант —
+сохранённый прогон: по `run_id` открываются его расписание и объяснения. Ссылка на неизвестные задачу или узел,
+повтор id узла — 422 `INVALID_REQUEST`.
 
 ## `GET /v1/runs/{run_id}/explain?task=&worker=&t=`
 

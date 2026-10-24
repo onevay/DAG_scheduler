@@ -6,9 +6,8 @@ from expsched.pipeline import RunResult
 
 
 def outcome(n):
-    return RunResult(
-        {"input_hash": "sha256:" + "0" * 64, "n": n}, [{"seq": i, "t": i, "type": "READY"} for i in range(n)]
-    )
+    result = {"n": n, "policy": "fifo", "status": "OK", "tasks": {}, "metrics": {"makespan": n}}
+    return RunResult(result, [{"seq": i, "t": i, "type": "READY"} for i in range(n)])
 
 
 def test_saved_run_is_read_back(tmp_path):
@@ -42,3 +41,15 @@ def test_concurrent_saves_of_one_run_leave_one_copy(tmp_path):
         list(pool.map(lambda _: store.save("a" * 16, {}, outcome(3)), range(8)))
     assert store.result("a" * 16)["n"] == 3
     assert [p.name for p in tmp_path.iterdir()] == ["a" * 16]  # временных каталогов не осталось
+
+
+def test_recent_runs_come_from_summaries(tmp_path):
+    store = RunStore(tmp_path)
+    store.save("a" * 16, {"name": "first"}, outcome(4))
+    store.save("b" * 16, {}, outcome(7))
+    recent = store.recent(10)
+    assert [(r["run_id"], r["name"], r["makespan"]) for r in recent] == [
+        ("b" * 16, None, 7),
+        ("a" * 16, "first", 4),
+    ]
+    assert len(store.recent(1)) == 1 and RunStore(tmp_path / "none").recent(5) == []

@@ -77,6 +77,7 @@ class ClusterIn(Strict):
 
 class ProblemIn(Strict):
     schema_version: Literal["1.0"] = "1.0"
+    name: Annotated[str, Field(min_length=1, max_length=128)] | None = None  # как показывать вход в списках
     seed: int = 0
     time_unit: Literal["minute", "hour", "second"] = "minute"
     cluster: ClusterIn

@@ -50,7 +50,15 @@ def test_policies_lists_implemented_ones_and_defaults(client):
 
 def test_validate_accepts_the_demo(client):
     response = client.post("/v1/validate", json=DEMO)
-    assert response.status_code == 200 and response.json() == {"valid": True, "diagnostics": []}
+    assert response.status_code == 200
+    assert response.json() == {
+        "valid": True,
+        "diagnostics": [],
+        "analysis": {
+            "lower_bound": 21,
+            "critical_path": ["prep_data", "pretrain_vit", "ft_det", "distill", "infer_bench"],
+        },
+    }
 
 
 def test_validate_reports_graph_errors_with_200_in_both_modes(client):
@@ -150,7 +158,7 @@ def test_run_with_a_policy_that_is_not_implemented_is_400(client):
     ("method", "path", "status", "code"),
     [
         ("GET", "/v1/nowhere", 404, "NOT_FOUND"),
-        ("GET", "/v1/runs", 405, "METHOD_NOT_ALLOWED"),
+        ("GET", "/v1/validate", 405, "METHOD_NOT_ALLOWED"),
         ("POST", "/v1/validate?mode=loose", 422, "INVALID_REQUEST"),
     ],
 )

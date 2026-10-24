@@ -11,6 +11,26 @@ from expsched.domain.graph import TaskGraph
 from expsched.domain.models import Problem
 
 
+def critical_path(problem: Problem, analysis: Analysis) -> list[str]:
+    """Задачи критического пути от начала к концу; последняя кончается в lb_path.
+
+    Путь идёт назад от задачи с самым поздним ранним окончанием по зависимостям, окончание которых определило
+    её ранний старт; при равенстве берётся меньший id. Обрывается на задаче без таких зависимостей.
+    """
+    if not analysis.eft:
+        return []
+    current = min(analysis.eft, key=lambda k: (-analysis.eft[k], k))
+    path = [current]
+    while True:
+        deps = sorted(
+            d for d in set(problem.tasks[current].deps) if analysis.eft.get(d) == analysis.est[current]
+        )
+        if not deps:
+            return path[::-1]
+        current = deps[0]
+        path.append(current)
+
+
 def analyze(
     problem: Problem,
     remaining: Mapping[str, int] | None = None,
