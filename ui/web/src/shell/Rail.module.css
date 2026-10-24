@@ -1,0 +1,74 @@
+.rail {
+  flex: 0 0 76px;
+  min-height: calc(100vh - 28px);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 0;
+  border-radius: var(--radius-card);
+  background: var(--color-ink);
+}
+
+.logo {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 18px;
+  border: 1.5px solid var(--color-ink-2);
+  border-radius: 50%;
+  color: var(--color-accent);
+}
+
+.link {
+  flex: 0 0 auto; /* в строке на телефоне — прокрутка, а не сжатие кнопок */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-min);
+  height: var(--touch-min);
+  padding: 2px;
+  border-radius: var(--radius-tile);
+  color: var(--color-blueprint-muted);
+  transition:
+    background-color var(--duration-fast),
+    color var(--duration-fast);
+}
+
+.link:hover {
+  background: #2a2e2c;
+  color: #ffffff;
+}
+
+.link[aria-current="page"] {
+  background: var(--color-accent);
+  color: var(--color-ink);
+}
+
+.gap {
+  flex: 1 1 auto;
+}
+
+@media (max-width: 720px) {
+  .rail {
+    flex: 1 1 100%;
+    flex-direction: row;
+    min-width: 0; /* иначе строка растягивается по содержимому и сдвигает всю страницу */
+    min-height: 0;
+    padding: 10px 12px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .logo {
+    margin-bottom: 0;
+  }
+
+  .gap {
+    display: none;
+  }
+}

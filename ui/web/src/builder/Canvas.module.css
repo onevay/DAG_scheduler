@@ -1,0 +1,233 @@
+.palette {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.paletteHint {
+  margin-right: var(--space-1);
+  font: var(--text-small);
+  color: var(--color-muted);
+}
+
+.paletteItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--touch-min);
+  padding: 0 14px 0 10px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-control);
+  color: var(--color-ink);
+  font: var(--text-label);
+  cursor: grab;
+  transition: transform var(--duration-fast) var(--ease);
+}
+
+.paletteItem:hover {
+  transform: translateY(-1px);
+}
+
+.swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+}
+
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: 22px;
+  border-radius: var(--radius-section);
+  background-color: var(--color-blueprint);
+  background-image: var(--grid-blueprint);
+  background-size: var(--grid-blueprint-size);
+  color: var(--color-blueprint-text);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.right {
+  align-items: flex-end;
+}
+
+.tech {
+  font: var(--text-tech);
+  letter-spacing: 0.01em;
+}
+
+.caption {
+  font: var(--text-small);
+  color: var(--color-blueprint-muted);
+}
+
+.flow {
+  height: 486px;
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .flow {
+    height: 400px;
+  }
+}
+
+.flow :global(.react-flow) {
+  --xy-background-color: transparent;
+}
+
+.flow :global(.react-flow__edge-path) {
+  stroke: var(--color-muted);
+  stroke-width: 1.4;
+}
+
+.flow :global(.react-flow__edge.selected .react-flow__edge-path),
+.flow :global(.react-flow__edge:focus-visible .react-flow__edge-path) {
+  stroke: var(--color-blueprint-focus);
+  stroke-width: 2;
+}
+
+.flow .critical :global(.react-flow__edge-path) {
+  stroke: var(--color-accent);
+  stroke-width: 2;
+}
+
+.flow .submittedEdge :global(.react-flow__edge-path) {
+  stroke-dasharray: 4 5;
+}
+
+.flow :global(.react-flow__node:focus-visible) {
+  outline: 2px solid var(--color-blueprint-focus);
+  outline-offset: 3px;
+  border-radius: var(--radius-tile);
+}
+
+.flow :global(.react-flow__attribution) {
+  background: transparent;
+  color: var(--color-blueprint-muted);
+}
+
+.flow :global(.react-flow__attribution a) {
+  color: inherit;
+}
+
+.node {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 136px;
+  height: 60px;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 1.5px solid var(--color-blueprint-line);
+  border-radius: var(--radius-tile);
+  background: var(--color-blueprint-panel);
+  transition:
+    transform 0.3s var(--ease),
+    border-color var(--duration-fast),
+    box-shadow 0.3s;
+}
+
+.node:hover {
+  transform: translateY(-2px);
+}
+
+.node[data-submitted="true"] {
+  border-style: dashed;
+}
+
+.node[data-invalid="true"] {
+  border-color: var(--color-warning);
+}
+
+.node[data-selected="true"] {
+  border-color: var(--color-blueprint-focus);
+  background: var(--color-blueprint-selected);
+  box-shadow: 0 0 0 6px rgba(92, 200, 230, 0.14);
+}
+
+.nodeHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.nodeId {
+  overflow: hidden;
+  font: 400 11px/1.3 var(--font-mono);
+  color: var(--color-blueprint-text);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.kind {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.nodeMeta {
+  font: 600 20px/1 var(--font-tech);
+  letter-spacing: 0.02em;
+  color: #ffffff;
+}
+
+.handle {
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--color-blueprint-muted);
+  background: var(--color-blueprint);
+}
+
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.tool {
+  height: var(--touch-min);
+  padding: 0 16px;
+  border: 1px solid var(--color-blueprint-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-blueprint-panel-2);
+  color: var(--color-blueprint-text);
+  font: var(--text-label);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.tool:disabled {
+  color: var(--color-faint);
+  cursor: default;
+}
+
+.tool:focus-visible {
+  outline-color: var(--color-blueprint-focus);
+}
+
+.round {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-min);
+  padding: 0;
+}

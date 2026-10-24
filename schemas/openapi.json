@@ -1,0 +1,3640 @@
+{
+  "components": {
+    "schemas": {
+      "AddWorker": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "add_worker",
+            "title": "Kind",
+            "type": "string"
+          },
+          "worker": {
+            "$ref": "#/components/schemas/WorkerIn"
+          }
+        },
+        "required": [
+          "kind",
+          "worker"
+        ],
+        "title": "AddWorker",
+        "type": "object"
+      },
+      "AttemptOut": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt": {
+            "minimum": 1.0,
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "enum": [
+                  "DONE",
+                  "INT",
+                  "PRE"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "resume_from": {
+            "minimum": 0.0,
+            "title": "Resume From",
+            "type": "integer"
+          },
+          "saved": {
+            "minimum": 0.0,
+            "title": "Saved",
+            "type": "integer"
+          },
+          "start": {
+            "minimum": 0.0,
+            "title": "Start",
+            "type": "integer"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          },
+          "worker": {
+            "title": "Worker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task",
+          "attempt",
+          "worker",
+          "start",
+          "resume_from",
+          "end",
+          "outcome",
+          "saved"
+        ],
+        "title": "AttemptOut",
+        "type": "object"
+      },
+      "BlockedRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "by": {
+            "title": "By",
+            "type": "string"
+          },
+          "seq": {
+            "minimum": 0.0,
+            "title": "Seq",
+            "type": "integer"
+          },
+          "t": {
+            "minimum": 0.0,
+            "title": "T",
+            "type": "integer"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          },
+          "type": {
+            "const": "BLOCKED",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "seq",
+          "t",
+          "type",
+          "task",
+          "by"
+        ],
+        "title": "BlockedRecord",
+        "type": "object"
+      },
+      "ChainLink": {
+        "additionalProperties": false,
+        "description": "Звено критической цепочки: попытка и то, что сделало её старт возможным.",
+        "properties": {
+          "attempt": {
+            "minimum": 1.0,
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By"
+          },
+          "cause": {
+            "enum": [
+              "origin",
+              "dep",
+              "fail",
+              "pre",
+              "res",
+              "rel",
+              "up",
+              "wait"
+            ],
+            "title": "Cause",
+            "type": "string"
+          },
+          "end": {
+            "minimum": 0.0,
+            "title": "End",
+            "type": "integer"
+          },
+          "lost": {
+            "minimum": 0.0,
+            "title": "Lost",
+            "type": "integer"
+          },
+          "start": {
+            "minimum": 0.0,
+            "title": "Start",
+            "type": "integer"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          },
+          "work": {
+            "minimum": 0.0,
+            "title": "Work",
+            "type": "integer"
+          },
+          "worker": {
+            "title": "Worker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task",
+          "attempt",
+          "worker",
+          "start",
+          "end",
+          "work",
+          "lost",
+          "cause"
+        ],
+        "title": "ChainLink",
+        "type": "object"
+      },
+      "ClusterIn": {
+        "additionalProperties": false,
+        "properties": {
+          "workers": {
+            "items": {
+              "$ref": "#/components/schemas/WorkerIn"
+            },
+            "minItems": 1,
+            "title": "Workers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "workers"
+        ],
+        "title": "ClusterIn",
+        "type": "object"
+      },
+      "DeadlineMisses": {
+        "additionalProperties": false,
+        "properties": {
+          "critical": {
+            "title": "Critical",
+            "type": "integer"
+          },
+          "high": {
+            "title": "High",
+            "type": "integer"
+          },
+          "low": {
+            "title": "Low",
+            "type": "integer"
+          },
+          "normal": {
+            "title": "Normal",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "critical",
+          "high",
+          "normal",
+          "low"
+        ],
+        "title": "DeadlineMisses",
+        "type": "object"
+      },
+      "Decomposition": {
+        "additionalProperties": false,
+        "description": "makespan = dep + res + lost + release + wait.",
+        "properties": {
+          "dep": {
+            "minimum": 0.0,
+            "title": "Dep",
+            "type": "integer"
+          },
+          "lost": {
+            "minimum": 0.0,
+            "title": "Lost",
+            "type": "integer"
+          },
+          "release": {
+            "minimum": 0.0,
+            "title": "Release",
+            "type": "integer"
+          },
+          "res": {
+            "minimum": 0.0,
+            "title": "Res",
+            "type": "integer"
+          },
+          "wait": {
+            "minimum": 0.0,
+            "title": "Wait",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "dep",
+          "res",
+          "lost",
+          "release",
+          "wait"
+        ],
+        "title": "Decomposition",
+        "type": "object"
+      },
+      "DiagnosticOut": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "pattern": "^[EW]\\d{3}$",
+            "title": "Code",
+            "type": "string"
+          },
+          "detail": {
+            "additionalProperties": true,
+            "title": "Detail",
+            "type": "object"
+          },
+          "hint": {
+            "title": "Hint",
+            "type": "string"
+          },
+          "level": {
+            "enum": [
+              "error",
+              "warning"
+            ],
+            "title": "Level",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "level",
+          "detail",
+          "hint"
+        ],
+        "title": "DiagnosticOut",
+        "type": "object"
+      },
+      "DiagnosticRecord": {
+        "additionalProperties": false,
+        "description": "Проблема, найденная во время прогона: STUCK, DUPLICATE_TASK_ID или код диагностики входа.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hint"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "enum": [
+                  "error",
+                  "warning"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "seq": {
+            "minimum": 0.0,
+            "title": "Seq",
+            "type": "integer"
+          },
+          "t": {
+            "minimum": 0.0,
+            "title": "T",
+            "type": "integer"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          },
+          "type": {
+            "const": "DIAGNOSTIC",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "seq",
+          "t",
+          "type",
+          "code",
+          "task"
+        ],
+        "title": "DiagnosticRecord",
+        "type": "object"
+      },
+      "ErrorInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              "INPUT_TOO_LARGE",
+              "SCHEMA_INVALID",
+              "INVALID_REQUEST",
+              "POLICY_NOT_IMPLEMENTED",
+              "RUN_TIMEOUT",
+              "NOT_FOUND",
+              "METHOD_NOT_ALLOWED",
+              "INTERNAL"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorInfo",
+        "type": "object"
+      },
+      "ErrorOut": {
+        "additionalProperties": false,
+        "properties": {
+          "diagnostics": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DiagnosticOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diagnostics"
+          },
+          "error": {
+            "$ref": "#/components/schemas/ErrorInfo"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "ErrorOut",
+        "type": "object"
+      },
+      "EventIn": {
+        "additionalProperties": false,
+        "properties": {
+          "task": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "time": {
+            "minimum": 0.0,
+            "title": "Time",
+            "type": "integer"
+          },
+          "type": {
+            "enum": [
+              "worker_down",
+              "worker_up",
+              "submit_task"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "worker": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worker"
+          }
+        },
+        "required": [
+          "time",
+          "type"
+        ],
+        "title": "EventIn",
+        "type": "object"
+      },
+      "EventRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "event": {
+            "$ref": "#/components/schemas/EventIn"
+          }
+        },
+        "required": [
+          "event"
+        ],
+        "title": "EventRequest",
+        "type": "object"
+      },
+      "EventsPage": {
+        "additionalProperties": false,
+        "properties": {
+          "events": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "BLOCKED": "#/components/schemas/BlockedRecord",
+                  "DIAGNOSTIC": "#/components/schemas/DiagnosticRecord",
+                  "FINISH": "#/components/schemas/FinishRecord",
+                  "INTERRUPTED": "#/components/schemas/InterruptedRecord",
+                  "READY": "#/components/schemas/ReadyRecord",
+                  "REPLAN": "#/components/schemas/ReplanRecord",
+                  "RESERVE": "#/components/schemas/ReserveRecord",
+                  "START": "#/components/schemas/StartRecord",
+                  "SUBMIT": "#/components/schemas/SubmitRecord",
+                  "WAIT": "#/components/schemas/WaitRecord",
+                  "WORKER_DOWN": "#/components/schemas/WorkerRecord",
+                  "WORKER_UP": "#/components/schemas/WorkerRecord"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/SubmitRecord"
+                },
+                {
+                  "$ref": "#/components/schemas/ReadyRecord"
+                },
+                {
+                  "$ref": "#/components/schemas/WaitRecord"
+                },
+                {
+                  "$ref": "#/components/schemas/StartRecord"
+                },
+                {
+                  "$ref": "#/components/schemas/FinishRecord"
+                },
+                {
+                  "$ref": "#/components/schemas/WorkerRecord"
+                },
+                {
+                  "$ref": "#/components/schemas/InterruptedRecord"
+                },
+                {
+                  "$ref": "#/components/schemas/BlockedRecord"
+                },
+                {
+                  "$ref": "#/components/schemas/DiagnosticRecord"
+                },
+                {
+                  "$ref": "#/components/schemas/ReserveRecord"
+                },
+                {
+                  "$ref": "#/components/schemas/ReplanRecord"
+                }
+              ]
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "next_seq": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Seq"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "events",
+          "total",
+          "next_seq"
+        ],
+        "title": "EventsPage",
+        "type": "object"
+      },
+      "ExplainOut": {
+        "additionalProperties": false,
+        "properties": {
+          "chain": {
+            "items": {
+              "$ref": "#/components/schemas/ChainLink"
+            },
+            "title": "Chain",
+            "type": "array"
+          },
+          "decomposition": {
+            "$ref": "#/components/schemas/Decomposition"
+          },
+          "idle": {
+            "$ref": "#/components/schemas/IdleOut"
+          }
+        },
+        "required": [
+          "chain",
+          "decomposition",
+          "idle"
+        ],
+        "title": "ExplainOut",
+        "type": "object"
+      },
+      "ExplainView": {
+        "additionalProperties": false,
+        "description": "Объяснение прогона, суженное фильтрами запроса.",
+        "properties": {
+          "attempts": {
+            "items": {
+              "$ref": "#/components/schemas/AttemptOut"
+            },
+            "title": "Attempts",
+            "type": "array"
+          },
+          "chain": {
+            "items": {
+              "$ref": "#/components/schemas/ChainLink"
+            },
+            "title": "Chain",
+            "type": "array"
+          },
+          "decomposition": {
+            "$ref": "#/components/schemas/Decomposition"
+          },
+          "idle": {
+            "items": {
+              "$ref": "#/components/schemas/IdleInterval"
+            },
+            "title": "Idle",
+            "type": "array"
+          },
+          "waits": {
+            "items": {
+              "$ref": "#/components/schemas/WaitView"
+            },
+            "title": "Waits",
+            "type": "array"
+          }
+        },
+        "required": [
+          "chain",
+          "decomposition",
+          "attempts",
+          "waits",
+          "idle"
+        ],
+        "title": "ExplainView",
+        "type": "object"
+      },
+      "FinishRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt": {
+            "minimum": 1.0,
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "seq": {
+            "minimum": 0.0,
+            "title": "Seq",
+            "type": "integer"
+          },
+          "t": {
+            "minimum": 0.0,
+            "title": "T",
+            "type": "integer"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          },
+          "type": {
+            "const": "FINISH",
+            "title": "Type",
+            "type": "string"
+          },
+          "worker": {
+            "title": "Worker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "seq",
+          "t",
+          "type",
+          "task",
+          "attempt",
+          "worker"
+        ],
+        "title": "FinishRecord",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "IdleInterval": {
+        "additionalProperties": false,
+        "description": "На узле свободны `gpu` GPU с `from` до `to` по причине `code`.",
+        "properties": {
+          "code": {
+            "enum": [
+              "IDLE_DOWN",
+              "IDLE_NO_READY",
+              "IDLE_FRAGMENTATION",
+              "IDLE_RESERVED",
+              "IDLE_POLICY"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "detail": {
+            "additionalProperties": true,
+            "title": "Detail",
+            "type": "object"
+          },
+          "from": {
+            "minimum": 0.0,
+            "title": "From",
+            "type": "integer"
+          },
+          "gpu": {
+            "minimum": 1.0,
+            "title": "Gpu",
+            "type": "integer"
+          },
+          "to": {
+            "minimum": 0.0,
+            "title": "To",
+            "type": "integer"
+          },
+          "worker": {
+            "title": "Worker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "worker",
+          "from",
+          "to",
+          "code",
+          "gpu",
+          "detail"
+        ],
+        "title": "IdleInterval",
+        "type": "object"
+      },
+      "IdleOut": {
+        "additionalProperties": false,
+        "properties": {
+          "by_code": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "enum": [
+                "IDLE_DOWN",
+                "IDLE_NO_READY",
+                "IDLE_FRAGMENTATION",
+                "IDLE_RESERVED",
+                "IDLE_POLICY"
+              ]
+            },
+            "title": "By Code",
+            "type": "object"
+          },
+          "intervals": {
+            "items": {
+              "$ref": "#/components/schemas/IdleInterval"
+            },
+            "title": "Intervals",
+            "type": "array"
+          }
+        },
+        "required": [
+          "by_code",
+          "intervals"
+        ],
+        "title": "IdleOut",
+        "type": "object"
+      },
+      "InputAnalysis": {
+        "additionalProperties": false,
+        "properties": {
+          "critical_path": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Critical Path",
+            "type": "array"
+          },
+          "lower_bound": {
+            "title": "Lower Bound",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "lower_bound",
+          "critical_path"
+        ],
+        "title": "InputAnalysis",
+        "type": "object"
+      },
+      "InterruptedRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt": {
+            "minimum": 1.0,
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "cause": {
+            "enum": [
+              "WORKER_DOWN",
+              "PREEMPT"
+            ],
+            "title": "Cause",
+            "type": "string"
+          },
+          "lost": {
+            "minimum": 0.0,
+            "title": "Lost",
+            "type": "integer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "remaining": {
+            "minimum": 0.0,
+            "title": "Remaining",
+            "type": "integer"
+          },
+          "saved": {
+            "minimum": 0.0,
+            "title": "Saved",
+            "type": "integer"
+          },
+          "seq": {
+            "minimum": 0.0,
+            "title": "Seq",
+            "type": "integer"
+          },
+          "t": {
+            "minimum": 0.0,
+            "title": "T",
+            "type": "integer"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          },
+          "type": {
+            "const": "INTERRUPTED",
+            "title": "Type",
+            "type": "string"
+          },
+          "worker": {
+            "title": "Worker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "seq",
+          "t",
+          "type",
+          "task",
+          "attempt",
+          "worker",
+          "cause",
+          "saved",
+          "lost",
+          "remaining"
+        ],
+        "title": "InterruptedRecord",
+        "type": "object"
+      },
+      "MetricsOut": {
+        "additionalProperties": false,
+        "properties": {
+          "deadline_misses": {
+            "$ref": "#/components/schemas/DeadlineMisses"
+          },
+          "gap_to_lb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gap To Lb"
+          },
+          "lost_work_gpu": {
+            "title": "Lost Work Gpu",
+            "type": "integer"
+          },
+          "lower_bound": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lower Bound"
+          },
+          "makespan": {
+            "minimum": 0.0,
+            "title": "Makespan",
+            "type": "integer"
+          },
+          "mean_wait": {
+            "title": "Mean Wait",
+            "type": "number"
+          },
+          "utilization_gpu": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Utilization Gpu"
+          },
+          "weighted_tardiness": {
+            "title": "Weighted Tardiness",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "makespan",
+          "lower_bound",
+          "gap_to_lb",
+          "deadline_misses",
+          "weighted_tardiness",
+          "utilization_gpu",
+          "lost_work_gpu",
+          "mean_wait"
+        ],
+        "title": "MetricsOut",
+        "type": "object"
+      },
+      "PoliciesOut": {
+        "additionalProperties": false,
+        "properties": {
+          "defaults": {
+            "$ref": "#/components/schemas/PolicyIn"
+          },
+          "policies": {
+            "items": {
+              "enum": [
+                "fifo",
+                "fifo_skip",
+                "priority",
+                "priority_backfill",
+                "cpsat"
+              ],
+              "type": "string"
+            },
+            "title": "Policies",
+            "type": "array"
+          }
+        },
+        "required": [
+          "policies",
+          "defaults"
+        ],
+        "title": "PoliciesOut",
+        "type": "object"
+      },
+      "PolicyIn": {
+        "additionalProperties": false,
+        "properties": {
+          "aging": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 360,
+            "title": "Aging"
+          },
+          "max_forecast_tasks": {
+            "default": 1000,
+            "minimum": 0.0,
+            "title": "Max Forecast Tasks",
+            "type": "integer"
+          },
+          "max_preemptions_per_task": {
+            "default": 1,
+            "minimum": 0.0,
+            "title": "Max Preemptions Per Task",
+            "type": "integer"
+          },
+          "min_runtime_before_preempt": {
+            "default": 30,
+            "minimum": 0.0,
+            "title": "Min Runtime Before Preempt",
+            "type": "integer"
+          },
+          "name": {
+            "default": "priority_backfill",
+            "enum": [
+              "fifo",
+              "fifo_skip",
+              "priority",
+              "priority_backfill",
+              "cpsat"
+            ],
+            "title": "Name",
+            "type": "string"
+          },
+          "objective": {
+            "default": "lexicographic",
+            "enum": [
+              "lexicographic",
+              "weighted"
+            ],
+            "title": "Objective",
+            "type": "string"
+          },
+          "preemption": {
+            "default": "deadline_only",
+            "enum": [
+              "never",
+              "deadline_only",
+              "priority"
+            ],
+            "title": "Preemption",
+            "type": "string"
+          },
+          "validation_mode": {
+            "default": "lenient",
+            "enum": [
+              "strict",
+              "lenient"
+            ],
+            "title": "Validation Mode",
+            "type": "string"
+          }
+        },
+        "title": "PolicyIn",
+        "type": "object"
+      },
+      "ProblemIn": {
+        "additionalProperties": false,
+        "properties": {
+          "cluster": {
+            "$ref": "#/components/schemas/ClusterIn"
+          },
+          "events": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/EventIn"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "mode": {
+            "default": "simulate",
+            "enum": [
+              "simulate",
+              "emulate",
+              "shadow",
+              "replay"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/PolicyIn",
+            "default": {
+              "aging": 360,
+              "max_forecast_tasks": 1000,
+              "max_preemptions_per_task": 1,
+              "min_runtime_before_preempt": 30,
+              "name": "priority_backfill",
+              "objective": "lexicographic",
+              "preemption": "deadline_only",
+              "validation_mode": "lenient"
+            }
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "seed": {
+            "default": 0,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/TaskIn"
+            },
+            "maxItems": 100000,
+            "title": "Tasks",
+            "type": "array"
+          },
+          "time_unit": {
+            "default": "minute",
+            "enum": [
+              "minute",
+              "hour",
+              "second"
+            ],
+            "title": "Time Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cluster",
+          "tasks"
+        ],
+        "title": "ProblemIn",
+        "type": "object"
+      },
+      "ReadyRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "seq": {
+            "minimum": 0.0,
+            "title": "Seq",
+            "type": "integer"
+          },
+          "t": {
+            "minimum": 0.0,
+            "title": "T",
+            "type": "integer"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          },
+          "type": {
+            "const": "READY",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "seq",
+          "t",
+          "type",
+          "task"
+        ],
+        "title": "ReadyRecord",
+        "type": "object"
+      },
+      "RemoveFailures": {
+        "additionalProperties": false,
+        "description": "Убрать отказы и возвраты узла: как прошёл бы прогон, если бы узел не падал.",
+        "properties": {
+          "kind": {
+            "const": "remove_failures",
+            "title": "Kind",
+            "type": "string"
+          },
+          "worker": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+            "title": "Worker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "worker"
+        ],
+        "title": "RemoveFailures",
+        "type": "object"
+      },
+      "ReplanEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "task": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task"
+          },
+          "type": {
+            "enum": [
+              "worker_down",
+              "worker_up",
+              "submit_task"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "worker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worker"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "title": "ReplanEvent",
+        "type": "object"
+      },
+      "ReplanRecord": {
+        "additionalProperties": false,
+        "description": "Как внешние события момента сдвинули прогнозные старты задач.",
+        "properties": {
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/StartShift"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "dropped": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dropped",
+            "type": "array"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/ReplanEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "new_tasks": {
+            "additionalProperties": {
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "title": "New Tasks",
+            "type": "object"
+          },
+          "seq": {
+            "minimum": 0.0,
+            "title": "Seq",
+            "type": "integer"
+          },
+          "t": {
+            "minimum": 0.0,
+            "title": "T",
+            "type": "integer"
+          },
+          "trigger": {
+            "enum": [
+              "worker_down",
+              "worker_up",
+              "submit_task"
+            ],
+            "title": "Trigger",
+            "type": "string"
+          },
+          "type": {
+            "const": "REPLAN",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "seq",
+          "t",
+          "type",
+          "trigger",
+          "events",
+          "changes",
+          "new_tasks",
+          "dropped"
+        ],
+        "title": "ReplanRecord",
+        "type": "object"
+      },
+      "ReserveRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "seq": {
+            "minimum": 0.0,
+            "title": "Seq",
+            "type": "integer"
+          },
+          "t": {
+            "minimum": 0.0,
+            "title": "T",
+            "type": "integer"
+          },
+          "t_res": {
+            "minimum": 0.0,
+            "title": "T Res",
+            "type": "integer"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          },
+          "type": {
+            "const": "RESERVE",
+            "title": "Type",
+            "type": "string"
+          },
+          "worker": {
+            "title": "Worker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "seq",
+          "t",
+          "type",
+          "task",
+          "worker",
+          "t_res"
+        ],
+        "title": "ReserveRecord",
+        "type": "object"
+      },
+      "ResultOut": {
+        "additionalProperties": false,
+        "properties": {
+          "attempts": {
+            "items": {
+              "$ref": "#/components/schemas/AttemptOut"
+            },
+            "title": "Attempts",
+            "type": "array"
+          },
+          "diagnostics": {
+            "items": {
+              "$ref": "#/components/schemas/DiagnosticOut"
+            },
+            "title": "Diagnostics",
+            "type": "array"
+          },
+          "explain": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExplainOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "input_hash": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "title": "Input Hash",
+            "type": "string"
+          },
+          "metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricsOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "policy": {
+            "enum": [
+              "fifo",
+              "fifo_skip",
+              "priority",
+              "priority_backfill",
+              "cpsat"
+            ],
+            "title": "Policy",
+            "type": "string"
+          },
+          "replans": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReplanRecord"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replans"
+          },
+          "result_hash": {
+            "anyOf": [
+              {
+                "pattern": "^sha256:[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Hash"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "OK",
+              "PARTIAL",
+              "INFEASIBLE"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tasks": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/TaskOut"
+            },
+            "title": "Tasks",
+            "type": "object"
+          },
+          "violations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Violations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "schema_version",
+          "input_hash",
+          "result_hash",
+          "policy",
+          "status",
+          "attempts",
+          "tasks",
+          "metrics",
+          "explain",
+          "diagnostics",
+          "violations",
+          "replans"
+        ],
+        "title": "ResultOut",
+        "type": "object"
+      },
+      "RunListItem": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "makespan": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Makespan"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "policy": {
+            "enum": [
+              "fifo",
+              "fifo_skip",
+              "priority",
+              "priority_backfill",
+              "cpsat"
+            ],
+            "title": "Policy",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "OK",
+              "PARTIAL",
+              "INFEASIBLE"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tasks": {
+            "title": "Tasks",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "run_id",
+          "name",
+          "policy",
+          "status",
+          "tasks",
+          "makespan",
+          "created_at"
+        ],
+        "title": "RunListItem",
+        "type": "object"
+      },
+      "RunOut": {
+        "additionalProperties": false,
+        "properties": {
+          "result": {
+            "$ref": "#/components/schemas/ResultOut"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "result"
+        ],
+        "title": "RunOut",
+        "type": "object"
+      },
+      "RunRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "policy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PolicyIn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "problem": {
+            "$ref": "#/components/schemas/ProblemIn"
+          }
+        },
+        "required": [
+          "problem"
+        ],
+        "title": "RunRequest",
+        "type": "object"
+      },
+      "RunSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricsOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "OK",
+              "PARTIAL",
+              "INFEASIBLE"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "status",
+          "metrics"
+        ],
+        "title": "RunSummary",
+        "type": "object"
+      },
+      "RunsOut": {
+        "additionalProperties": false,
+        "properties": {
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/RunListItem"
+            },
+            "title": "Runs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "runs"
+        ],
+        "title": "RunsOut",
+        "type": "object"
+      },
+      "ScenarioInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "events": {
+            "title": "Events",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "policy": {
+            "enum": [
+              "fifo",
+              "fifo_skip",
+              "priority",
+              "priority_backfill",
+              "cpsat"
+            ],
+            "title": "Policy",
+            "type": "string"
+          },
+          "tasks": {
+            "title": "Tasks",
+            "type": "integer"
+          },
+          "time_unit": {
+            "title": "Time Unit",
+            "type": "string"
+          },
+          "workers": {
+            "title": "Workers",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "tasks",
+          "workers",
+          "events",
+          "policy",
+          "time_unit"
+        ],
+        "title": "ScenarioInfo",
+        "type": "object"
+      },
+      "ScenariosOut": {
+        "additionalProperties": false,
+        "properties": {
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/ScenarioInfo"
+            },
+            "title": "Scenarios",
+            "type": "array"
+          }
+        },
+        "required": [
+          "scenarios"
+        ],
+        "title": "ScenariosOut",
+        "type": "object"
+      },
+      "SetCheckpoint": {
+        "additionalProperties": false,
+        "properties": {
+          "checkpoint_interval": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkpoint Interval"
+          },
+          "kind": {
+            "const": "set_checkpoint",
+            "title": "Kind",
+            "type": "string"
+          },
+          "task": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+            "title": "Task",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "task",
+          "checkpoint_interval"
+        ],
+        "title": "SetCheckpoint",
+        "type": "object"
+      },
+      "SetDeadline": {
+        "additionalProperties": false,
+        "properties": {
+          "deadline": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline"
+          },
+          "kind": {
+            "const": "set_deadline",
+            "title": "Kind",
+            "type": "string"
+          },
+          "task": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+            "title": "Task",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "task",
+          "deadline"
+        ],
+        "title": "SetDeadline",
+        "type": "object"
+      },
+      "SetPreemptible": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "set_preemptible",
+            "title": "Kind",
+            "type": "string"
+          },
+          "preemptible": {
+            "default": true,
+            "title": "Preemptible",
+            "type": "boolean"
+          },
+          "task": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+            "title": "Task",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "task"
+        ],
+        "title": "SetPreemptible",
+        "type": "object"
+      },
+      "SetPriority": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "set_priority",
+            "title": "Kind",
+            "type": "string"
+          },
+          "priority": {
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Priority",
+            "type": "integer"
+          },
+          "task": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+            "title": "Task",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "task",
+          "priority"
+        ],
+        "title": "SetPriority",
+        "type": "object"
+      },
+      "StartRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt": {
+            "minimum": 1.0,
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "reason": {
+            "additionalProperties": true,
+            "title": "Reason",
+            "type": "object"
+          },
+          "resume_from": {
+            "minimum": 0.0,
+            "title": "Resume From",
+            "type": "integer"
+          },
+          "seq": {
+            "minimum": 0.0,
+            "title": "Seq",
+            "type": "integer"
+          },
+          "t": {
+            "minimum": 0.0,
+            "title": "T",
+            "type": "integer"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          },
+          "type": {
+            "const": "START",
+            "title": "Type",
+            "type": "string"
+          },
+          "worker": {
+            "title": "Worker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "seq",
+          "t",
+          "type",
+          "task",
+          "worker",
+          "attempt",
+          "resume_from",
+          "reason"
+        ],
+        "title": "StartRecord",
+        "type": "object"
+      },
+      "StartShift": {
+        "additionalProperties": false,
+        "properties": {
+          "delta": {
+            "title": "Delta",
+            "type": "integer"
+          },
+          "new_start": {
+            "minimum": 0.0,
+            "title": "New Start",
+            "type": "integer"
+          },
+          "old_start": {
+            "minimum": 0.0,
+            "title": "Old Start",
+            "type": "integer"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task",
+          "old_start",
+          "new_start",
+          "delta"
+        ],
+        "title": "StartShift",
+        "type": "object"
+      },
+      "SubmitRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "deadline": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline"
+          },
+          "priority": {
+            "title": "Priority",
+            "type": "integer"
+          },
+          "seq": {
+            "minimum": 0.0,
+            "title": "Seq",
+            "type": "integer"
+          },
+          "t": {
+            "minimum": 0.0,
+            "title": "T",
+            "type": "integer"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          },
+          "type": {
+            "const": "SUBMIT",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "seq",
+          "t",
+          "type",
+          "task",
+          "priority",
+          "deadline"
+        ],
+        "title": "SubmitRecord",
+        "type": "object"
+      },
+      "TaskIn": {
+        "additionalProperties": false,
+        "properties": {
+          "checkpoint_interval": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkpoint Interval"
+          },
+          "constraints": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "title": "Constraints",
+            "type": "object"
+          },
+          "deadline": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline"
+          },
+          "dependencies": {
+            "default": [],
+            "items": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+              "type": "string"
+            },
+            "title": "Dependencies",
+            "type": "array"
+          },
+          "duration": {
+            "minimum": 1.0,
+            "title": "Duration",
+            "type": "integer"
+          },
+          "id": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "default": "other",
+            "enum": [
+              "data",
+              "train",
+              "eval",
+              "infer",
+              "other"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "max_retries": {
+            "default": 2,
+            "maximum": 20.0,
+            "minimum": 0.0,
+            "title": "Max Retries",
+            "type": "integer"
+          },
+          "preemptible": {
+            "default": false,
+            "title": "Preemptible",
+            "type": "boolean"
+          },
+          "priority": {
+            "default": 1,
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Priority",
+            "type": "integer"
+          },
+          "release_time": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Release Time",
+            "type": "integer"
+          },
+          "resources": {
+            "default": {},
+            "patternProperties": {
+              "^[a-z][a-z0-9_]{0,31}$": {
+                "minimum": 0.0,
+                "type": "integer"
+              }
+            },
+            "title": "Resources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "duration"
+        ],
+        "title": "TaskIn",
+        "type": "object"
+      },
+      "TaskOut": {
+        "additionalProperties": false,
+        "properties": {
+          "deadline": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline"
+          },
+          "finish": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "tardiness": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tardiness"
+          },
+          "waits": {
+            "items": {
+              "$ref": "#/components/schemas/WaitInterval"
+            },
+            "title": "Waits",
+            "type": "array"
+          }
+        },
+        "required": [
+          "status",
+          "start",
+          "finish",
+          "deadline",
+          "tardiness",
+          "waits"
+        ],
+        "title": "TaskOut",
+        "type": "object"
+      },
+      "TaskStatus": {
+        "enum": [
+          "PENDING",
+          "READY",
+          "RUNNING",
+          "SUCCEEDED",
+          "FAILED",
+          "INFEASIBLE",
+          "BLOCKED",
+          "CANCELLED"
+        ],
+        "title": "TaskStatus",
+        "type": "string"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "ValidationOut": {
+        "additionalProperties": false,
+        "properties": {
+          "analysis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InputAnalysis"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "diagnostics": {
+            "items": {
+              "$ref": "#/components/schemas/DiagnosticOut"
+            },
+            "title": "Diagnostics",
+            "type": "array"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "valid",
+          "diagnostics",
+          "analysis"
+        ],
+        "title": "ValidationOut",
+        "type": "object"
+      },
+      "WaitInterval": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "detail": {
+            "additionalProperties": true,
+            "title": "Detail",
+            "type": "object"
+          },
+          "from": {
+            "minimum": 0.0,
+            "title": "From",
+            "type": "integer"
+          },
+          "to": {
+            "minimum": 0.0,
+            "title": "To",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "code",
+          "from",
+          "to",
+          "detail"
+        ],
+        "title": "WaitInterval",
+        "type": "object"
+      },
+      "WaitRecord": {
+        "additionalProperties": false,
+        "description": "Новая причина ожидания задачи; действует до следующей записи WAIT этой задачи или до её старта.",
+        "properties": {
+          "code": {
+            "enum": [
+              "WAIT_DEPS",
+              "WAIT_RELEASE",
+              "WAIT_WORKER_DOWN",
+              "WAIT_RESOURCES",
+              "WAIT_RESERVATION",
+              "WAIT_PRIORITY"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "detail": {
+            "additionalProperties": true,
+            "title": "Detail",
+            "type": "object"
+          },
+          "seq": {
+            "minimum": 0.0,
+            "title": "Seq",
+            "type": "integer"
+          },
+          "t": {
+            "minimum": 0.0,
+            "title": "T",
+            "type": "integer"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          },
+          "type": {
+            "const": "WAIT",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "seq",
+          "t",
+          "type",
+          "task",
+          "code",
+          "detail"
+        ],
+        "title": "WaitRecord",
+        "type": "object"
+      },
+      "WaitView": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "detail": {
+            "additionalProperties": true,
+            "title": "Detail",
+            "type": "object"
+          },
+          "from": {
+            "minimum": 0.0,
+            "title": "From",
+            "type": "integer"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          },
+          "to": {
+            "minimum": 0.0,
+            "title": "To",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "code",
+          "from",
+          "to",
+          "detail",
+          "task"
+        ],
+        "title": "WaitView",
+        "type": "object"
+      },
+      "WhatIfOut": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline": {
+            "$ref": "#/components/schemas/RunSummary"
+          },
+          "variants": {
+            "items": {
+              "$ref": "#/components/schemas/WhatIfVariant"
+            },
+            "title": "Variants",
+            "type": "array"
+          }
+        },
+        "required": [
+          "baseline",
+          "variants"
+        ],
+        "title": "WhatIfOut",
+        "type": "object"
+      },
+      "WhatIfRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "interventions": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "add_worker": "#/components/schemas/AddWorker",
+                  "remove_failures": "#/components/schemas/RemoveFailures",
+                  "set_checkpoint": "#/components/schemas/SetCheckpoint",
+                  "set_deadline": "#/components/schemas/SetDeadline",
+                  "set_preemptible": "#/components/schemas/SetPreemptible",
+                  "set_priority": "#/components/schemas/SetPriority"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/AddWorker"
+                },
+                {
+                  "$ref": "#/components/schemas/SetPreemptible"
+                },
+                {
+                  "$ref": "#/components/schemas/SetPriority"
+                },
+                {
+                  "$ref": "#/components/schemas/SetDeadline"
+                },
+                {
+                  "$ref": "#/components/schemas/SetCheckpoint"
+                },
+                {
+                  "$ref": "#/components/schemas/RemoveFailures"
+                }
+              ]
+            },
+            "maxItems": 16,
+            "minItems": 1,
+            "title": "Interventions",
+            "type": "array"
+          },
+          "policy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PolicyIn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "problem": {
+            "$ref": "#/components/schemas/ProblemIn"
+          }
+        },
+        "required": [
+          "problem",
+          "interventions"
+        ],
+        "title": "WhatIfRequest",
+        "type": "object"
+      },
+      "WhatIfVariant": {
+        "additionalProperties": false,
+        "properties": {
+          "delta": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta"
+          },
+          "intervention": {
+            "discriminator": {
+              "mapping": {
+                "add_worker": "#/components/schemas/AddWorker",
+                "remove_failures": "#/components/schemas/RemoveFailures",
+                "set_checkpoint": "#/components/schemas/SetCheckpoint",
+                "set_deadline": "#/components/schemas/SetDeadline",
+                "set_preemptible": "#/components/schemas/SetPreemptible",
+                "set_priority": "#/components/schemas/SetPriority"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AddWorker"
+              },
+              {
+                "$ref": "#/components/schemas/SetPreemptible"
+              },
+              {
+                "$ref": "#/components/schemas/SetPriority"
+              },
+              {
+                "$ref": "#/components/schemas/SetDeadline"
+              },
+              {
+                "$ref": "#/components/schemas/SetCheckpoint"
+              },
+              {
+                "$ref": "#/components/schemas/RemoveFailures"
+              }
+            ],
+            "title": "Intervention"
+          },
+          "metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricsOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "OK",
+              "PARTIAL",
+              "INFEASIBLE"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "status",
+          "metrics",
+          "intervention",
+          "delta"
+        ],
+        "title": "WhatIfVariant",
+        "type": "object"
+      },
+      "WorkerIn": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "title": "Labels",
+            "type": "object"
+          },
+          "resources": {
+            "patternProperties": {
+              "^[a-z][a-z0-9_]{0,31}$": {
+                "minimum": 0.0,
+                "type": "integer"
+              }
+            },
+            "title": "Resources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "resources"
+        ],
+        "title": "WorkerIn",
+        "type": "object"
+      },
+      "WorkerRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "seq": {
+            "minimum": 0.0,
+            "title": "Seq",
+            "type": "integer"
+          },
+          "t": {
+            "minimum": 0.0,
+            "title": "T",
+            "type": "integer"
+          },
+          "type": {
+            "enum": [
+              "WORKER_DOWN",
+              "WORKER_UP"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "worker": {
+            "title": "Worker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "seq",
+          "t",
+          "type",
+          "worker"
+        ],
+        "title": "WorkerRecord",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "expsched",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/v1/policies": {
+      "get": {
+        "description": "Реализованные политики и параметры по умолчанию — для формы клиента.",
+        "operationId": "policies_v1_policies_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PoliciesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Policies"
+      }
+    },
+    "/v1/runs": {
+      "get": {
+        "description": "Последние сохранённые прогоны, новые первыми.",
+        "operationId": "runs_v1_runs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Runs"
+      },
+      "post": {
+        "description": "Прогон {problem, policy?}. Тот же вход с той же политикой не пересчитывается: отдаётся сохранённый.",
+        "operationId": "create_run_v1_runs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        },
+        "summary": "Create Run"
+      }
+    },
+    "/v1/runs/{run_id}": {
+      "get": {
+        "operationId": "get_run_v1_runs__run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{16}$",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        },
+        "summary": "Get Run"
+      }
+    },
+    "/v1/runs/{run_id}/events": {
+      "get": {
+        "description": "Журнал страницами: записи с номерами [from_seq, from_seq + limit).",
+        "operationId": "get_events_v1_runs__run_id__events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{16}$",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from_seq",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "From Seq",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 1000,
+              "maximum": 10000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventsPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        },
+        "summary": "Get Events"
+      },
+      "post": {
+        "description": "Новый прогон: вход прогона `run_id` с его политикой и ещё одним событием. Исходный прогон не меняется.\n\nТак проверяют «а если узел упадёт в 12» или «а если подать срочную задачу»: что сдвинулось — в `replans`.",
+        "operationId": "add_event_v1_runs__run_id__events_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{16}$",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        },
+        "summary": "Add Event"
+      }
+    },
+    "/v1/runs/{run_id}/explain": {
+      "get": {
+        "description": "Почему прогон такой: цепочка, попытки, ожидания и простой, суженные до задачи, узла и момента.",
+        "operationId": "get_explain_v1_runs__run_id__explain_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{16}$",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "task",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Task"
+            }
+          },
+          {
+            "in": "query",
+            "name": "worker",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Worker"
+            }
+          },
+          {
+            "in": "query",
+            "name": "t",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "T"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplainView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        },
+        "summary": "Get Explain"
+      }
+    },
+    "/v1/runs/{run_id}/problem": {
+      "get": {
+        "description": "Вход прогона с политикой, которой он посчитан.",
+        "operationId": "get_problem_v1_runs__run_id__problem_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{16}$",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemIn"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        },
+        "summary": "Get Problem"
+      }
+    },
+    "/v1/scenarios": {
+      "get": {
+        "description": "Примеры входа: имя и размер, чтобы выбрать, с чего начать.",
+        "operationId": "scenarios_v1_scenarios_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScenariosOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Scenarios"
+      }
+    },
+    "/v1/scenarios/{name}": {
+      "get": {
+        "description": "Вход примера; без собственного `name` получает имя файла.",
+        "operationId": "scenario_v1_scenarios__name__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z0-9_-]{1,64}$",
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemIn"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        },
+        "summary": "Scenario"
+      }
+    },
+    "/v1/validate": {
+      "post": {
+        "description": "Диагностики входа. 422 — вход не соответствует схеме, остальные ошибки входа приходят с кодом 200.",
+        "operationId": "check_problem_v1_validate_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "default": "lenient",
+              "enum": [
+                "strict",
+                "lenient"
+              ],
+              "title": "Mode",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProblemIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        },
+        "summary": "Check Problem"
+      }
+    },
+    "/v1/whatif": {
+      "post": {
+        "description": "Исходный вход и его варианты с одним изменением каждый: метрики вариантов и разница с исходным.\n\nКаждый вариант — обычный сохранённый прогон: по его `run_id` открываются расписание и объяснения.",
+        "operationId": "what_if_v1_whatif_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WhatIfRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WhatIfOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        },
+        "summary": "What If"
+      }
+    }
+  }
+}

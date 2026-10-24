@@ -1,0 +1,88 @@
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font: var(--text-small);
+  color: var(--color-ink-2);
+}
+
+.field select {
+  height: var(--control-height);
+  max-width: 100%;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-raised);
+  color: var(--color-ink);
+}
+
+/* Выбор файла выглядит как второстепенная кнопка; само поле скрыто, но доступно с клавиатуры */
+.upload {
+  display: inline-flex;
+  align-items: center;
+  height: var(--control-height);
+  padding: 0 22px;
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1.5px var(--color-ink);
+  font: var(--text-label);
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.upload:focus-within {
+  outline: var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.upload input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.counts {
+  margin: 0;
+  font: var(--text-small);
+  color: var(--color-muted);
+}
+
+.error {
+  margin: 0;
+  color: var(--color-error);
+  font: var(--text-label);
+}
+
+.layout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+.main {
+  display: flex;
+  flex: 999 1 600px;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.layout > aside {
+  flex: 1 1 320px;
+  max-width: 100%;
+}
+
+.run {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+}

@@ -1,0 +1,95 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 22px;
+  border-radius: var(--radius-section);
+  background: var(--color-surface);
+}
+
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.head > :first-child {
+  flex: 1 1 auto;
+}
+
+.kindBadge {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  font: var(--text-small);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.label {
+  font: var(--text-small);
+  color: var(--color-ink-2);
+}
+
+.hint {
+  margin: 0;
+  font: var(--text-caption);
+  color: var(--color-muted);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: var(--space-3);
+}
+
+.input {
+  width: 100%;
+  min-height: var(--touch-min);
+  box-sizing: border-box;
+  padding: 0 14px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-tile);
+  background: var(--color-surface-raised);
+  color: var(--color-ink);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 16px;
+}
+
+.field input[type="range"] {
+  width: 100%;
+  accent-color: var(--color-ink);
+}
+
+.dep {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-raised);
+  color: var(--color-ink);
+  font: 400 12px/1 var(--font-mono);
+  cursor: pointer;
+}
+
+.dep:hover {
+  background: var(--color-error-soft);
+}
