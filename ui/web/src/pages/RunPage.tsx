@@ -1,9 +1,9 @@
-import { useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 
 import { ApiError } from "../api/client";
 import { useRun, useRunProblem } from "../api/hooks";
 import type { Problem, Result } from "../api/types";
-import { taskRows } from "../run/results";
+import { replanRows, taskRows } from "../run/results";
 import { Schedule } from "../run/Schedule";
 import { ButtonLink } from "../ui/controls";
 import { StatusChip } from "../ui/data";
@@ -11,6 +11,11 @@ import { PageHeader } from "../ui/PageHeader";
 import styles from "./RunPage.module.css";
 
 const UNITS = { hour: "ч", minute: "мин", second: "с" } as const;
+const TRIGGERS: Record<string, string> = {
+  worker_down: "отказ",
+  worker_up: "возврат",
+  submit_task: "подача",
+};
 
 export function RunPage() {
   const { runId = "" } = useParams();
@@ -36,11 +41,15 @@ export function RunPage() {
       <Metrics result={result} unit={unit} />
       <Schedule key={runId} runId={runId} result={result} problem={problem.data} unit={unit} />
       <TaskTable result={result} />
+      <ReplanTable result={result} unit={unit} />
     </>
   );
 }
 
 function RunHeader({ runId, result, problem }: { runId: string; result: Result; problem: Problem }) {
+  // Прогон, посчитанный из другого добавлением события, помнит исходный в адресе: ?from=<run_id>
+  const [search] = useSearchParams();
+  const source = search.get("from");
   const m = result.metrics;
   const ok = result.status === "OK" && result.violations.length === 0;
   const status =
@@ -57,6 +66,12 @@ function RunHeader({ runId, result, problem }: { runId: string; result: Result; 
       badge={
         <span className={styles.crumb}>
           Прогон <code>{runId}</code> · сохранён
+          {source && (
+            <>
+              {" "}
+              · из прогона <Link to={`/runs/${source}`}>{source}</Link>
+            </>
+          )}
         </span>
       }
       actions={
@@ -154,6 +169,47 @@ function TaskTable({ result }: { result: Result }) {
                 <td>
                   <code>{r.mainReason || "—"}</code>
                 </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+/** Перепланирования прогона: что случилось и как сдвинулись прогнозные старты. */
+function ReplanTable({ result, unit }: { result: Result; unit: string }) {
+  const rows = replanRows(result.replans);
+  if (rows.length === 0) return null;
+  // Причины — по-русски; остальные колонки как в Streamlit
+  const triggers = (result.replans ?? []).map((r) =>
+    r.events.map((e) => `${TRIGGERS[e.type] ?? e.type} ${e.task ?? e.worker ?? ""}`).join(", "),
+  );
+  return (
+    <section aria-labelledby="run-replans" className={styles.section}>
+      <h2 id="run-replans" className={styles.h2}>
+        Перепланирования
+      </h2>
+      <div className={styles.scroll}>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th scope="col">Момент, {unit}</th>
+              <th scope="col">Что случилось</th>
+              <th scope="col">Сдвиги стартов</th>
+              <th scope="col">Новые задачи</th>
+              <th scope="col">Сняты</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i}>
+                <th scope="row">{r.t}</th>
+                <td>{triggers[i]}</td>
+                <td>{r.shifted || "—"}</td>
+                <td>{r.added || "—"}</td>
+                <td>{r.dropped || "—"}</td>
               </tr>
             ))}
           </tbody>

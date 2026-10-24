@@ -1,17 +1,11 @@
 import { useExplain } from "../api/hooks";
 import type { Result } from "../api/types";
 import { StatusChip } from "../ui/data";
-import { replanRows } from "./results";
 import styles from "./Run.module.css";
 
 const OUTCOMES = { DONE: "готово", INT: "прервана", PRE: "вытеснена" } as const;
-const TRIGGERS: Record<string, string> = {
-  worker_down: "отказ",
-  worker_up: "возврат",
-  submit_task: "подача",
-};
 
-/** Подробности выбранной задачи: попытки, почему ждала (из /explain), перепланирования прогона. */
+/** Подробности выбранной задачи: попытки и почему ждала (из /explain). */
 export function TaskAside({
   runId,
   result,
@@ -26,13 +20,6 @@ export function TaskAside({
   const summary = task ? result.tasks[task] : undefined;
   const explain = useExplain(runId, { task: task ?? undefined }, task !== null);
   const tries = result.attempts.filter((a) => a.task === task);
-  // Строки перепланирований — как в Streamlit, только причины по-русски
-  const replans = replanRows(result.replans).map((r, i) => ({
-    ...r,
-    events: (result.replans?.[i]?.events ?? [])
-      .map((e) => `${TRIGGERS[e.type] ?? e.type} ${e.task ?? e.worker ?? ""}`)
-      .join(", "),
-  }));
   const U = unit.toUpperCase();
 
   return (
@@ -103,18 +90,6 @@ export function TaskAside({
             ))}
           </div>
         </>
-      )}
-      {replans.length > 0 && (
-        <div className={styles.asideBlock}>
-          <span className={styles.asideMuted}>Перепланирования</span>
-          {replans.map((r) => (
-            <span key={r.t} className={styles.replan}>
-              {r.t} {unit} · {r.events}: {r.shifted || "сдвигов нет"}
-              {r.added && `; новые: ${r.added}`}
-              {r.dropped && `; сняты: ${r.dropped}`}
-            </span>
-          ))}
-        </div>
       )}
     </aside>
   );

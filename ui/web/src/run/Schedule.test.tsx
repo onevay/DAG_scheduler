@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { useState } from "react";
+import { MemoryRouter } from "react-router";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createQueryClient } from "../api/hooks";
@@ -94,7 +95,9 @@ afterAll(() => server.close());
 function renderSchedule() {
   render(
     <QueryClientProvider client={createQueryClient()}>
-      <Schedule runId="0123456789abcdef" result={RESULT} problem={PROBLEM} unit="ч" />
+      <MemoryRouter>
+        <Schedule runId="0123456789abcdef" result={RESULT} problem={PROBLEM} unit="ч" />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -117,10 +120,9 @@ describe("Schedule", () => {
     expect(screen.getByText("train → b, попытка 2 с позиции 1")).toBeInTheDocument();
   });
 
-  it("shows attempts, waits and replans of the selected task", async () => {
+  it("shows attempts and waits of the selected task", async () => {
     renderSchedule();
     const aside = within(screen.getByRole("complementary", { name: "Задача" }));
-    expect(aside.getByText("2 ч · отказ a: eval +1")).toBeInTheDocument();
     await userEvent.click(bar(/^eval, попытка 1/));
     expect(bar(/^eval, попытка 1/)).toHaveAttribute("aria-pressed", "true");
     expect(await aside.findByText("WAIT_DEPS")).toBeInTheDocument();

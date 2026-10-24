@@ -4,6 +4,7 @@ import { useRunEvents } from "../api/hooks";
 import type { Problem, Result } from "../api/types";
 import { Gantt } from "./Gantt";
 import { MomentInfo, Scrubber } from "./Moment";
+import { RunEvents } from "./RunEvents";
 import { ganttBars, journalOutages, laneOrder, reservations } from "./results";
 import styles from "./Run.module.css";
 import { TaskAside } from "./TaskAside";
@@ -60,6 +61,7 @@ export function Schedule({
         <Scrubber t={t} onChange={setT} horizon={horizon} events={events} unit={unit} />
         {journal.isError && <p className={styles.muted}>Журнал не загрузился: {journal.error.message}</p>}
         <MomentInfo t={t} bars={bars} events={events} unit={unit} />
+        <RunEvents runId={runId} problem={problem} t={t} unit={unit} />
       </section>
       <TaskAside runId={runId} result={result} task={selected} unit={unit} />
     </div>

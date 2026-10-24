@@ -12,7 +12,18 @@ const RESULT = {
   status: "OK",
   policy: "priority",
   violations: [],
-  replans: null,
+  replans: [
+    {
+      seq: 3,
+      t: 2,
+      type: "REPLAN",
+      trigger: "event",
+      events: [{ type: "worker_down", worker: "n" }],
+      changes: [{ task: "a", old_start: 2, new_start: 3, delta: 1 }],
+      new_tasks: {},
+      dropped: [],
+    },
+  ],
   metrics: {
     makespan: 22,
     lower_bound: 21,
@@ -40,6 +51,7 @@ const RESULT = {
 };
 
 const server = setupServer(
+  http.get("/v1/runs/:id/events", () => HttpResponse.json({ events: [], total: 0, next_seq: null })),
   http.get("/v1/runs/:id", ({ params }) =>
     params.id === "missing"
       ? HttpResponse.json({ error: { code: "NOT_FOUND", message: "нет" } }, { status: 404 })
@@ -56,10 +68,10 @@ const server = setupServer(
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterAll(() => server.close());
 
-function renderAt(id: string) {
+function renderAt(id: string, from?: string) {
   render(
     <QueryClientProvider client={createQueryClient()}>
-      <MemoryRouter initialEntries={[`/runs/${id}`]}>
+      <MemoryRouter initialEntries={[`/runs/${id}${from ? `?from=${from}` : ""}`]}>
         <Routes>
           <Route path="/runs/:runId" element={<RunPage />} />
         </Routes>
@@ -83,13 +95,20 @@ describe("RunPage", () => {
     expect(metric("Потеряно")).toHaveTextContent("4 GPU·ч");
     expect(metric("Дедлайны")).toHaveTextContent("1 пропущено");
     expect(metric("Среднее ожидание")).toHaveTextContent("0.09 ч");
-    const row = within(screen.getByRole("table")).getByRole("row", { name: /^a / });
+    const row = within(screen.getByRole("region", { name: "Задачи" })).getByRole("row", { name: /^a / });
     expect(row).toHaveTextContent("SUCCEEDED");
     expect(
       within(row)
         .getAllByRole("cell")
         .map((c) => c.textContent),
     ).toEqual(["SUCCEEDED", "2", "0", "6", "5", "1", "0", "WAIT_RESOURCES"]);
+  });
+
+  it("links the source run and lists replans", async () => {
+    renderAt("child", "parent");
+    expect(await screen.findByRole("link", { name: "parent" })).toHaveAttribute("href", "/runs/parent");
+    const replans = within(screen.getByRole("region", { name: "Перепланирования" }));
+    expect(replans.getByRole("row", { name: /^2 / })).toHaveTextContent("2отказ na +1——");
   });
 
   it("says when a run is missing", async () => {
