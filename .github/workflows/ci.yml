@@ -24,6 +24,8 @@ jobs:
           cache: npm
           cache-dependency-path: ui/web/package-lock.json
       - run: make web-install
+      - name: Типы API совпадают со schemas/openapi.json
+        run: npm --prefix ui/web run gen:types && git diff --exit-code ui/web/src/api/schema.ts
       - run: make web-lint
       - run: make web-test
       - run: make web-build

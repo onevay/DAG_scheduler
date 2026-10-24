@@ -28,6 +28,7 @@ test-all:
 
 schema:
 	$(RUN) python -m expsched.contract.schemas schemas
+	$(RUN) python -m expsched.api.openapi schemas/openapi.json
 
 api:
 	$(RUN) uvicorn expsched.api.app:app --reload --port 8000
