@@ -2,14 +2,16 @@ import type { ReactNode } from "react";
 
 import styles from "./PageHeader.module.css";
 
-/** Заголовок экрана и короткое пояснение справа; `badge` — метка над заголовком. */
+/** Заголовок экрана, короткое пояснение и действия справа; `badge` — метка над заголовком. */
 export function PageHeader({
   title,
   badge,
+  actions,
   children,
 }: {
   title: string;
   badge?: ReactNode;
+  actions?: ReactNode;
   children?: ReactNode;
 }) {
   return (
@@ -19,6 +21,7 @@ export function PageHeader({
         <h1 className={styles.title}>{title}</h1>
       </div>
       {children && <p className={styles.note}>{children}</p>}
+      {actions}
     </header>
   );
 }

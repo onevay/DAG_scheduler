@@ -17,6 +17,7 @@ export type DraftAction =
   | { type: "updateWorker"; id: string; patch: Partial<Worker> }
   | { type: "removeWorker"; id: string }
   | { type: "addEvent"; event: InputEvent }
+  | { type: "updateEvent"; index: number; patch: Partial<InputEvent> }
   | { type: "removeEvent"; index: number }
   | { type: "setPolicy"; patch: Partial<Policy> };
 
@@ -103,6 +104,10 @@ export function draftReducer(draft: Draft, action: DraftAction): Draft {
       // Устойчивая сортировка по времени: события одного момента остаются в порядке добавления
       const events = [...(draft.events ?? []), action.event].sort((a, b) => a.time - b.time);
       return { ...draft, events };
+    }
+    case "updateEvent": {
+      const events = (draft.events ?? []).map((e, i) => (i === action.index ? { ...e, ...action.patch } : e));
+      return { ...draft, events: events.sort((a, b) => a.time - b.time) };
     }
     case "removeEvent":
       return { ...draft, events: draft.events?.filter((_, i) => i !== action.index) };

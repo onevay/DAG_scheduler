@@ -1,8 +1,12 @@
 import { type ChangeEvent, useMemo, useState } from "react";
+import { useNavigate } from "react-router";
 
 import { api } from "../api/client";
-import { useScenarios } from "../api/hooks";
+import { useCreateRun, useScenarios } from "../api/hooks";
+import type { Validation } from "../api/types";
 import { Canvas } from "../builder/Canvas";
+import { CheckStrip, PolicySettings } from "../builder/Checks";
+import { TaskPanel } from "../builder/TaskPanel";
 import { diagnosticsByTask, EMPTY_DRAFT } from "../draft/draft";
 import { useDraft, useDraftValidation } from "../draft/DraftContext";
 import { downloadDraft, readDraft } from "../draft/files";
@@ -23,19 +27,51 @@ export function BuilderPage() {
   }, [draft, validation.data]);
   return (
     <>
-      <PageHeader title="Сборка">
+      <PageHeader title="Сборка" actions={<RunButton validation={validation.data} />}>
         Задачи, зависимости и узлы эксперимента; проверка идёт по ходу ввода.
       </PageHeader>
       <DraftToolbar />
-      <Canvas
-        selected={selected}
-        onSelect={setSelected}
-        criticalPath={analysis?.critical_path ?? []}
-        invalid={invalid}
-        lowerBound={analysis?.lower_bound}
-      />
-      <ValidationSummary />
+      <div className={styles.layout}>
+        <div className={styles.main}>
+          <Canvas
+            selected={selected}
+            onSelect={setSelected}
+            criticalPath={analysis?.critical_path ?? []}
+            invalid={invalid}
+            lowerBound={analysis?.lower_bound}
+          />
+          <CheckStrip validation={validation} onSelect={setSelected} />
+        </div>
+        <TaskPanel selected={selected} onSelect={setSelected} />
+      </div>
+      <PolicySettings />
     </>
+  );
+}
+
+/** Запуск черновика: новый прогон сразу открывается на своей странице. */
+function RunButton({ validation }: { validation: Validation | undefined }) {
+  const { draft } = useDraft();
+  const navigate = useNavigate();
+  const run = useCreateRun();
+  const blocked = draft.tasks.length === 0 || validation?.valid === false;
+  return (
+    <div className={styles.run}>
+      <Button
+        disabled={blocked || run.isPending}
+        title={blocked ? "Сначала исправьте ошибки входа" : undefined}
+        onClick={() =>
+          run.mutate({ problem: draft }, { onSuccess: (r) => void navigate(`/runs/${r.run_id}`) })
+        }
+      >
+        {run.isPending ? "Запускаю…" : "Запустить"}
+      </Button>
+      {run.isError && (
+        <p role="alert" className={styles.error}>
+          {run.error.message}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -100,37 +136,6 @@ function DraftToolbar() {
           {error}
         </p>
       )}
-    </Section>
-  );
-}
-
-function ValidationSummary() {
-  const { draft } = useDraft();
-  const validation = useDraftValidation();
-  if (draft.tasks.length === 0) return null;
-  if (validation.isError)
-    return <p className={styles.error}>Проверка не удалась: {validation.error.message}</p>;
-  if (!validation.data) return <p className={styles.counts}>Проверка…</p>;
-
-  const { valid, diagnostics, analysis } = validation.data;
-  const groups = [...diagnosticsByTask(draft, diagnostics)];
-  return (
-    <Section title={valid ? "Вход корректен" : "Есть ошибки"} tone={valid ? "accent" : "raised"}>
-      {analysis && <p className={styles.counts}>Нижняя граница makespan: {analysis.lower_bound}</p>}
-      <ul className={styles.groups} aria-busy={validation.isFetching}>
-        {groups.map(([task, items]) => (
-          <li key={task}>
-            <code>{task || "весь вход"}</code>
-            <ul>
-              {items.map((d, i) => (
-                <li key={i} data-level={d.level}>
-                  <code>{d.code}</code> {d.hint}
-                </li>
-              ))}
-            </ul>
-          </li>
-        ))}
-      </ul>
     </Section>
   );
 }

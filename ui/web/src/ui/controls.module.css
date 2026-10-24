@@ -8,6 +8,13 @@
   cursor: pointer;
 }
 
+.link {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  text-decoration: none;
+}
+
 .primary {
   background: var(--color-ink);
   color: #ffffff;

@@ -1,5 +1,7 @@
 import type { ButtonHTMLAttributes, CSSProperties, KeyboardEvent, ReactNode } from "react";
 
+import { Link } from "react-router";
+
 import { Icon, type IconName } from "../shell/Icon";
 import styles from "./controls.module.css";
 
@@ -16,6 +18,23 @@ export function Button({
       className={`${styles.button} ${styles[variant]} motion-lift ${className ?? ""}`}
       {...rest}
     />
+  );
+}
+
+/** Переход, который выглядит как кнопка: «Объяснения», «Сравнить политики». */
+export function ButtonLink({
+  to,
+  variant = "primary",
+  children,
+}: {
+  to: string;
+  variant?: "primary" | "secondary" | "accent";
+  children: ReactNode;
+}) {
+  return (
+    <Link to={to} className={`${styles.button} ${styles[variant]} ${styles.link} motion-lift`}>
+      {children}
+    </Link>
   );
 }
 
