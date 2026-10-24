@@ -27,6 +27,7 @@ from starlette.exceptions import HTTPException
 from expsched.api.models import (
     ErrorCode,
     ErrorOut,
+    EventRequest,
     EventsPage,
     ExplainView,
     PoliciesOut,
@@ -50,7 +51,11 @@ ERRORS: dict[int | str, dict[str, Any]] = {
 }
 RunId = Annotated[str, Path(pattern=RUN_ID_PATTERN)]
 # Тела запросов читаются вручную, с обрывом на лимите, поэтому их схемы добавляются в OpenAPI отдельно.
-REQUEST_BODIES: dict[str, type[BaseModel]] = {"/v1/validate": ProblemIn, "/v1/runs": RunRequest}
+REQUEST_BODIES: dict[str, type[BaseModel]] = {
+    "/v1/validate": ProblemIn,
+    "/v1/runs": RunRequest,
+    "/v1/runs/{run_id}/events": EventRequest,
+}
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1")
@@ -85,20 +90,30 @@ async def create_run(request: Request) -> Any:
     except ValidationError as error:
         found = [d.to_dict() for d in schema_diagnostics(error)]
         return error_response(422, "SCHEMA_INVALID", "request does not match the schema", found)
-    problem, config = run_request.problem, run_request.policy or run_request.problem.policy
-    run_id = run_id_of(input_hash(problem, config))
-    stored = problem.model_copy(update={"policy": config}).model_dump(mode="json")
-    store: RunStore = request.app.state.store
+    return await _run_and_store(
+        request, run_request.problem, run_request.policy or run_request.problem.policy
+    )
+
+
+@router.post("/runs/{run_id}/events", status_code=201, response_model=RunOut, responses=ERRORS)
+async def add_event(request: Request, run_id: RunId) -> Any:
+    """Новый прогон: вход прогона `run_id` с его политикой и ещё одним событием. Исходный прогон не меняется.
+
+    Так проверяют «а если узел упадёт в 12» или «а если подать срочную задачу»: что сдвинулось — в `replans`.
+    """
+    store = _store(request)
     if store.find(run_id) is None:
-        runner: ProcessRunner = request.app.state.runner
-        try:
-            outcome = await runner.run(problem, config)
-        except NotImplementedError as error:
-            return error_response(400, "POLICY_NOT_IMPLEMENTED", str(error))
-        except RunTimeout as error:
-            return error_response(504, "RUN_TIMEOUT", str(error))
-        store.save(run_id, stored, outcome)
-    return {"run_id": run_id, "result": store.result(run_id)}
+        return _no_run(run_id)
+    try:
+        event = EventRequest.model_validate_json(await _read_body(request)).event
+    except InputTooLarge as error:
+        return error_response(413, "INPUT_TOO_LARGE", str(error))
+    except ValidationError as error:
+        found = [d.to_dict() for d in schema_diagnostics(error)]
+        return error_response(422, "SCHEMA_INVALID", "request does not match the schema", found)
+    base = ProblemIn.model_validate(store.problem(run_id))
+    problem = base.model_copy(update={"events": [*base.events, event]})
+    return await _run_and_store(request, problem, problem.policy)
 
 
 @router.get("/runs/{run_id}", response_model=RunOut, responses=ERRORS)
@@ -198,6 +213,22 @@ def error_response(
 ) -> JSONResponse:
     body = ErrorOut.model_validate({"error": {"code": code, "message": message}, "diagnostics": diagnostics})
     return JSONResponse(body.model_dump(mode="json", exclude_none=True), status_code=status)
+
+
+async def _run_and_store(request: Request, problem: ProblemIn, config: PolicyIn) -> Any:
+    """Сохранённый прогон входа с политикой или новый: в рабочем процессе, с таймаутом, затем в хранилище."""
+    run_id = run_id_of(input_hash(problem, config))
+    store = _store(request)
+    if store.find(run_id) is None:
+        runner: ProcessRunner = request.app.state.runner
+        try:
+            outcome = await runner.run(problem, config)
+        except NotImplementedError as error:
+            return error_response(400, "POLICY_NOT_IMPLEMENTED", str(error))
+        except RunTimeout as error:
+            return error_response(504, "RUN_TIMEOUT", str(error))
+        store.save(run_id, problem.model_copy(update={"policy": config}).model_dump(mode="json"), outcome)
+    return {"run_id": run_id, "result": store.result(run_id)}
 
 
 def _store(request: Request) -> RunStore:

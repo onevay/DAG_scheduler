@@ -203,3 +203,64 @@ def test_openapi_describes_requests_responses_and_errors(client):
     assert {r.removeprefix("#/components/schemas/") for r in refs(spec)} <= set(
         schemas
     )  # все ссылки разрешаются
+
+
+# ---- события к прогону ----
+
+FAILURE = json.loads(
+    (Path(__file__).resolve().parents[2] / "scenarios" / "urgent_failure.json").read_text(encoding="utf-8")
+)
+
+
+def test_event_makes_a_new_run_and_keeps_the_old_one(client):
+    base = client.post("/v1/runs", json={"problem": FAILURE}).json()
+    event = {"time": 12, "type": "worker_down", "worker": "node-B"}
+    response = client.post(f"/v1/runs/{base['run_id']}/events", json={"event": event})
+    assert response.status_code == 201
+    new = response.json()
+    assert new["run_id"] != base["run_id"]
+    assert client.get(f"/v1/runs/{base['run_id']}").json() == base  # исходный прогон не изменился
+    problem = client.get(f"/v1/runs/{new['run_id']}/problem").json()
+    added = {k: v for k, v in problem["events"][-1].items() if v is not None}
+    assert added == event and problem["policy"]["name"] == "priority"  # политика исходного прогона
+    replan = next(r for r in new["result"]["replans"] if r["t"] == 12)
+    assert replan["trigger"] == "worker_down" and replan["changes"]  # отказ сдвинул план
+    again = client.post(f"/v1/runs/{base['run_id']}/events", json={"event": event}).json()
+    assert again["run_id"] == new["run_id"]  # тот же вход — тот же прогон
+
+
+def test_submitted_task_joins_the_run(client):
+    base = client.post("/v1/runs", json={"problem": DEMO}).json()
+    task = {
+        "id": "late_eval",
+        "kind": "eval",
+        "duration": 2,
+        "resources": {"gpu": 1},
+        "dependencies": ["ft_det"],
+    }
+    new = client.post(
+        f"/v1/runs/{base['run_id']}/events", json={"event": {"time": 12, "type": "submit_task", "task": task}}
+    ).json()
+    assert new["result"]["tasks"]["late_eval"]["status"] == "SUCCEEDED"
+
+
+def test_event_for_an_unknown_worker_is_reported_and_dropped(client):
+    base = client.post("/v1/runs", json={"problem": DEMO}).json()
+    event = {"time": 3, "type": "worker_down", "worker": "node-Z"}
+    new = client.post(f"/v1/runs/{base['run_id']}/events", json={"event": event}).json()
+    assert [d["code"] for d in new["result"]["diagnostics"]] == ["E040"]
+    assert new["result"]["metrics"] == base["result"]["metrics"]  # lenient: событие отброшено
+
+
+@pytest.mark.parametrize(
+    ("run_id", "body", "status"),
+    [
+        ("0123456789abcdef", {"event": {"time": 1, "type": "worker_up", "worker": "node-A"}}, 404),
+        (None, {"event": {"time": 1, "type": "worker_down"}}, 422),  # без узла
+        (None, {"time": 1, "type": "worker_down", "worker": "node-A"}, 422),  # событие не обёрнуто
+    ],
+)
+def test_bad_event_requests(client, run_id, body, status):
+    run_id = run_id or client.post("/v1/runs", json={"problem": DEMO}).json()["run_id"]
+    response = client.post(f"/v1/runs/{run_id}/events", json=body)
+    assert response.status_code == status and "error" in response.json()
