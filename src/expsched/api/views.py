@@ -1,9 +1,15 @@
-"""Срезы сохранённого результата для ответов API."""
+"""Срезы сохранённого результата и сводки входа для ответов API."""
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from typing import Any
+
+from expsched.analysis import analyze, critical_path
+from expsched.domain.models import Problem
+from expsched.validation import quarantine
+from expsched.validation.diagnostics import Diagnostic
 
 
 def explain_view(
@@ -41,3 +47,22 @@ def explain_view(
             if task is None and (worker is None or i["worker"] == worker) and during(i["from"], i["to"])
         ],
     }
+
+
+def input_analysis(problem: Problem, diagnostics: Sequence[Diagnostic]) -> dict[str, Any] | None:
+    """Нижняя граница makespan и критический путь планируемой части входа (без задач с ошибками).
+
+    Поданные событиями задачи входят со своим моментом подачи как release_time, если все их зависимости
+    известны. None — планировать нечего.
+    """
+    runnable = quarantine(problem, diagnostics).problem
+    tasks = dict(runnable.tasks)
+    for event in runnable.events:
+        task = event.task
+        if task is not None and task.id not in tasks and set(task.deps) <= tasks.keys():
+            tasks[task.id] = replace(task, release=max(task.release, event.time))
+    if not tasks:
+        return None
+    planned = replace(runnable, tasks=tasks)
+    analysis = analyze(planned)
+    return {"lower_bound": analysis.lb, "critical_path": critical_path(planned, analysis)}

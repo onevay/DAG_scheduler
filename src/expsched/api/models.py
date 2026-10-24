@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
+
+from pydantic import Field
 
 from expsched.contract.io_models import EventIn, PolicyIn, PolicyName, ProblemIn, Strict
 from expsched.contract.output_models import (
@@ -12,9 +14,11 @@ from expsched.contract.output_models import (
     DiagnosticOut,
     EventRecord,
     IdleInterval,
+    MetricsOut,
     ResultOut,
     WaitInterval,
 )
+from expsched.contract.whatif import Intervention
 
 ErrorCode = Literal[
     "INPUT_TOO_LARGE",  # тело больше лимита
@@ -42,9 +46,42 @@ class PoliciesOut(Strict):
     defaults: PolicyIn
 
 
+class InputAnalysis(Strict):
+    lower_bound: int  # нижняя граница makespan
+    critical_path: list[str]  # задачи от начала к концу
+
+
 class ValidationOut(Strict):
     valid: bool
     diagnostics: list[DiagnosticOut]
+    analysis: InputAnalysis | None  # планируемой части входа; None — планировать нечего
+
+
+class ScenarioInfo(Strict):
+    name: str
+    tasks: int  # вместе с подаваемыми событиями
+    workers: int
+    events: int
+    policy: PolicyName
+    time_unit: str
+
+
+class ScenariosOut(Strict):
+    scenarios: list[ScenarioInfo]
+
+
+class RunListItem(Strict):
+    run_id: str
+    name: str | None
+    policy: PolicyName
+    status: Literal["OK", "PARTIAL", "INFEASIBLE"]
+    tasks: int
+    makespan: int | None
+    created_at: str  # ISO 8601, UTC
+
+
+class RunsOut(Strict):
+    runs: list[RunListItem]  # новые первыми
 
 
 class RunOut(Strict):
@@ -70,6 +107,28 @@ class ExplainView(Strict):
     attempts: list[AttemptOut]
     waits: list[WaitView]
     idle: list[IdleInterval]
+
+
+class WhatIfRequest(Strict):
+    problem: ProblemIn
+    policy: PolicyIn | None = None  # по умолчанию — политика из входа
+    interventions: Annotated[list[Intervention], Field(min_length=1, max_length=16)]
+
+
+class RunSummary(Strict):
+    run_id: str
+    status: Literal["OK", "PARTIAL", "INFEASIBLE"]
+    metrics: MetricsOut | None
+
+
+class WhatIfVariant(RunSummary):
+    intervention: Intervention
+    delta: dict[str, int | float] | None  # вариант минус исходный; None, если один из них не симулировался
+
+
+class WhatIfOut(Strict):
+    baseline: RunSummary
+    variants: list[WhatIfVariant]
 
 
 class ErrorInfo(Strict):
