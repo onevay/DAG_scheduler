@@ -49,7 +49,8 @@ export function IdleMap({
             ))}
           </div>
         </div>
-        <div className={styles.grid}>
+        {/* Сетка шире телефона и прокручивается: рамка в фокусе, чтобы прокрутить её с клавиатуры */}
+        <div className={styles.grid} tabIndex={0} role="region" aria-label="Простой по узлам и часам">
           <div className={styles.gridScale} aria-hidden="true">
             <span>0 {unit}</span>
             <span>

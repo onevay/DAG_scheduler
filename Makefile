@@ -2,7 +2,7 @@
 RUN := uv run
 WEB := npm --prefix ui/web
 
-.PHONY: setup lint types test perf test-all schema api ui web-install web-dev web-lint web-test web-build
+.PHONY: setup lint types test perf test-all schema api ui web-install web-dev web-lint web-test web-build web-e2e
 
 setup:
 	uv sync --all-extras
@@ -51,3 +51,7 @@ web-test:
 
 web-build:
 	$(WEB) run build
+
+# Сквозные проверки в Chromium: свой API на :8010, собранный клиент через vite preview на :4173
+web-e2e:
+	$(WEB) run e2e

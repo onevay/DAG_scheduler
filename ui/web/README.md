@@ -13,10 +13,11 @@ make web-dev       # интерфейс на http://127.0.0.1:5173; запрос
 make web-lint      # ESLint, Prettier, tsc
 make web-test      # Vitest
 make web-build     # сборка в ui/web/dist
+make web-e2e       # Playwright в Chromium: путь пример → сборка → прогон → объяснения → сравнение → what-if
 ```
 
 Типы API генерируются из `schemas/openapi.json`: после изменения моделей API — `make schema`, затем
-`npm --prefix ui/web run gen:types`; CI проверяет, что `src/api/schema.ts` совпадает со схемой. Запросы идут на тот
+`npm --prefix ui/web run gen:types` (генерация и Prettier — файл всегда один и тот же); CI проверяет, что `src/api/schema.ts` совпадает со схемой. Запросы идут на тот
 же адрес, что у страницы; другой API можно указать в `VITE_API_URL`.
 
 ```
@@ -42,3 +43,8 @@ src/
 
 Тексты интерфейса — на русском, прямо в компонентах. Новый компонент сначала появляется на `/system` во всех
 состояниях; цвета и размеры — только из `tokens.css`.
+
+Сквозные проверки (`e2e/`) сами поднимают API на :8010 с пустым каталогом прогонов (нужен `uv`) и собранный
+клиент через `vite preview` на :4173. Каждый экран проверяется axe (WCAG 2.1 A/AA) и на отсутствие горизонтальной
+прокрутки — на ширинах 1440 и 390. Один раз перед первым запуском: `npm --prefix ui/web exec -- playwright install
+chromium`. При падении в `ui/web/test-results` лежит трассировка: `npx playwright show-trace <файл>`.

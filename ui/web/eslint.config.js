@@ -5,7 +5,7 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", "node_modules", "src/api/schema.ts"] },
+  { ignores: ["dist", "node_modules", "src/api/schema.ts", "test-results", "playwright-report"] },
   js.configs.recommended,
   ...tseslint.configs.strict,
   jsxA11y.flatConfigs.recommended,
@@ -13,6 +13,10 @@ export default tseslint.config(
     files: ["**/*.{ts,tsx}"],
     languageOptions: { globals: globals.browser },
     plugins: { "react-hooks": reactHooks },
-    rules: reactHooks.configs.recommended.rules,
+    rules: {
+      ...reactHooks.configs.recommended.rules,
+      // Прокручиваемая область — подписанный region в фокусе: иначе её не прокрутить с клавиатуры
+      "jsx-a11y/no-noninteractive-tabindex": ["error", { roles: ["tabpanel", "region"] }],
+    },
   },
 );

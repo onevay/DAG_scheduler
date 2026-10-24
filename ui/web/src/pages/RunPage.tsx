@@ -136,7 +136,8 @@ function TaskTable({ result }: { result: Result }) {
       <h2 id="run-tasks" className={styles.h2}>
         Задачи
       </h2>
-      <div className={styles.scroll}>
+      {/* На узком экране таблица прокручивается: рамка в фокусе, чтобы прокрутить её с клавиатуры */}
+      <div className={styles.scroll} tabIndex={0} role="region" aria-label="Таблица задач">
         <table className={styles.table}>
           <thead>
             <tr>
@@ -191,7 +192,7 @@ function ReplanTable({ result, unit }: { result: Result; unit: string }) {
       <h2 id="run-replans" className={styles.h2}>
         Перепланирования
       </h2>
-      <div className={styles.scroll}>
+      <div className={styles.scroll} tabIndex={0} role="region" aria-label="Таблица перепланирований">
         <table className={styles.table}>
           <thead>
             <tr>

@@ -11,9 +11,12 @@ make perf      # замеры по времени (маркер slow); на на
 make test-all  # все тесты
 make schema    # пересобрать JSON Schema входа, результата и записи журнала в schemas/
 make web-lint web-test web-build   # проверки JS-клиента (нужен Node.js 20)
+make web-e2e                       # сквозные проверки клиента в Chromium (Playwright, axe)
 ```
 
-CI выполняет `make lint types test` и проверяет, что `schemas/` совпадает со сгенерированными схемами. Перед отправкой изменений должны проходить все три цели.
+CI выполняет `make lint types test perf`, проверяет, что `schemas/` и `ui/web/src/api/schema.ts` совпадают со
+сгенерированными, гоняет `make web-lint web-test web-build` и отдельной задачей `make web-e2e`. Перед отправкой
+изменений все эти цели должны проходить.
 
 ## Тесты
 
