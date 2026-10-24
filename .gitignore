@@ -17,3 +17,7 @@ runs/
 .vscode/
 
 .claude
+
+# JS-клиент
+ui/web/node_modules/
+ui/web/dist/
