@@ -14,6 +14,7 @@ import { Button } from "../ui/controls";
 import { Section } from "../ui/data";
 import { PageHeader } from "../ui/PageHeader";
 import styles from "./BuilderPage.module.css";
+import { EVENTS, NODES, plural, TASKS } from "../ui/plural";
 
 export function BuilderPage() {
   const { draft } = useDraft();
@@ -111,7 +112,7 @@ function DraftToolbar() {
             <option value="">{scenarios.isError ? "API недоступен" : "выбрать…"}</option>
             {scenarios.data?.map((s) => (
               <option key={s.name} value={s.name}>
-                {s.name} · {s.tasks} задач · {s.workers} узлов
+                {s.name} · {plural(s.tasks, TASKS)} · {plural(s.workers, NODES)}
               </option>
             ))}
           </select>
@@ -128,8 +129,8 @@ function DraftToolbar() {
         </Button>
       </div>
       <p className={styles.counts}>
-        {draft.tasks.length} задач · {draft.cluster.workers.length} узлов · {draft.events?.length ?? 0}{" "}
-        событий
+        {plural(draft.tasks.length, TASKS)} · {plural(draft.cluster.workers.length, NODES)} ·{" "}
+        {plural(draft.events?.length ?? 0, EVENTS)}
       </p>
       {error && (
         <p role="alert" className={styles.error}>

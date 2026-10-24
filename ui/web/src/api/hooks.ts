@@ -1,7 +1,7 @@
-import { QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { QueryClient, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { allEvents, api, ApiError, type ExplainFilter } from "./client";
-import type { InputEvent, Intervention, Policy, Problem, Run } from "./types";
+import type { InputEvent, Intervention, Policy, PolicyName, Problem, Run } from "./types";
 
 export const keys = {
   policies: ["policies"] as const,
@@ -92,6 +92,20 @@ export const useCreateRun = () =>
 
 export const useAddEvent = () =>
   useRunMutation(({ runId, event }: { runId: string; event: InputEvent }) => api.addEvent(runId, event));
+
+/**
+ * Прогоны одного входа под каждой политикой. Запрос POST, но повторять его безопасно: run_id — хеш входа и
+ * политики, сохранённый прогон API отдаёт без пересчёта.
+ */
+export const usePolicyRuns = (problem: Problem | undefined, names: readonly PolicyName[]) =>
+  useQueries({
+    queries: names.map((name) => ({
+      queryKey: ["compare", name, problem] as const,
+      queryFn: () => api.createRun(problem as Problem, { ...problem?.policy, name }),
+      enabled: problem !== undefined,
+      staleTime: Infinity,
+    })),
+  });
 
 export const useWhatIf = () => {
   const client = useQueryClient();

@@ -7,6 +7,7 @@ import { useDraft } from "../draft/DraftContext";
 import { type Option, Segmented, Stepper } from "../ui/controls";
 import { Section } from "../ui/data";
 import styles from "./Checks.module.css";
+import { EDGES, plural, TASKS } from "../ui/plural";
 
 /** Итог проверки входа: статус, объём работы и диагностики по задачам; id задачи выбирает её на холсте. */
 export function CheckStrip({
@@ -54,8 +55,8 @@ export function CheckStrip({
           {detail && <span className={styles.detail}>{detail}</span>}
         </span>
         <span className={styles.counts}>
-          <span>{draft.tasks.length} задач</span>
-          <span>{edges} связей</span>
+          <span>{plural(draft.tasks.length, TASKS)}</span>
+          <span>{plural(edges, EDGES)}</span>
           <span>
             {work} GPU·{draft.time_unit === "minute" ? "мин" : draft.time_unit === "second" ? "с" : "ч"}{" "}
             работы
