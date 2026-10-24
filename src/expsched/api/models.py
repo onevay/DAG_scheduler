@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from expsched.contract.io_models import PolicyIn, PolicyName, ProblemIn, Strict
+from expsched.contract.io_models import EventIn, PolicyIn, PolicyName, ProblemIn, Strict
 from expsched.contract.output_models import (
     AttemptOut,
     ChainLink,
@@ -31,6 +31,10 @@ ErrorCode = Literal[
 class RunRequest(Strict):
     problem: ProblemIn
     policy: PolicyIn | None = None  # по умолчанию — политика из входа
+
+
+class EventRequest(Strict):
+    event: EventIn  # отказ или возврат узла, подача задачи
 
 
 class PoliciesOut(Strict):
