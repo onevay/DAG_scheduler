@@ -72,9 +72,26 @@ describe("BuilderPage", () => {
     expect(await screen.findByText("Вход корректен")).toBeInTheDocument();
     expect(screen.getByText("Нижняя граница makespan — 5")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("radio", { name: "FIFO" }));
+    await userEvent.click(screen.getByRole("radio", { name: "строгая" }));
+    // Старение задают и выключают: пустое поле — null
+    await userEvent.type(screen.getByLabelText("Старение очереди, ч на класс"), "5");
+    await userEvent.clear(screen.getByLabelText("Старение очереди, ч на класс"));
+    await userEvent.type(screen.getByLabelText("Вытеснять не раньше, чем через, ч"), "2");
+    await userEvent.type(screen.getByLabelText("Прогноз перепланирования — до задач"), "0");
     await userEvent.click(screen.getByRole("button", { name: "Запустить" }));
     expect(await screen.findByRole("heading", { name: "прогон открыт" })).toBeInTheDocument();
-    expect(posted).toMatchObject({ problem: { tasks: DRAFT.tasks, policy: { name: "fifo" } } });
+    expect(posted).toMatchObject({
+      problem: {
+        tasks: DRAFT.tasks,
+        policy: {
+          name: "fifo",
+          validation_mode: "strict",
+          aging: null,
+          min_runtime_before_preempt: 2,
+          max_forecast_tasks: 0,
+        },
+      },
+    });
   });
 
   it("blocks the run on errors and selects the task from the strip", async () => {

@@ -1,12 +1,13 @@
 import { Link, useParams, useSearchParams } from "react-router";
 
 import { ApiError } from "../api/client";
-import { useRun, useRunProblem } from "../api/hooks";
+import { useRun, useRunEvents, useRunProblem } from "../api/hooks";
 import type { Problem, Result } from "../api/types";
 import { replanRows, taskRows } from "../run/results";
 import { Schedule } from "../run/Schedule";
-import { ButtonLink } from "../ui/controls";
+import { Button, ButtonLink } from "../ui/controls";
 import { StatusChip } from "../ui/data";
+import { downloadText, safeFileName } from "../ui/download";
 import { PageHeader } from "../ui/PageHeader";
 import styles from "./RunPage.module.css";
 
@@ -39,6 +40,7 @@ export function RunPage() {
     <>
       <RunHeader runId={runId} result={result} problem={problem.data} />
       <Metrics result={result} unit={unit} />
+      <Downloads runId={runId} result={result} name={problem.data.name} />
       <Schedule key={runId} runId={runId} result={result} problem={problem.data} unit={unit} />
       <TaskTable result={result} />
       <ReplanTable result={result} unit={unit} />
@@ -217,5 +219,45 @@ function ReplanTable({ result, unit }: { result: Result; unit: string }) {
         </table>
       </div>
     </section>
+  );
+}
+
+/** Выгрузка прогона: результат целиком и журнал по записи в строке — как отдаёт API. */
+function Downloads({
+  runId,
+  result,
+  name,
+}: {
+  runId: string;
+  result: Result;
+  name: string | null | undefined;
+}) {
+  const journal = useRunEvents(runId);
+  const base = `${safeFileName(name, "run")}-${runId}`;
+  return (
+    <div className={styles.downloads}>
+      <Button
+        variant="secondary"
+        onClick={() =>
+          downloadText(`${base}.result.json`, JSON.stringify(result, null, 2) + "\n", "application/json")
+        }
+      >
+        Скачать result.json
+      </Button>
+      <Button
+        variant="secondary"
+        disabled={!journal.data}
+        onClick={() =>
+          journal.data &&
+          downloadText(
+            `${base}.events.jsonl`,
+            journal.data.map((r) => JSON.stringify(r) + "\n").join(""),
+            "application/x-ndjson",
+          )
+        }
+      >
+        {journal.data ? "Скачать events.jsonl" : "Журнал загружается…"}
+      </Button>
+    </div>
   );
 }

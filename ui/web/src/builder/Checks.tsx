@@ -4,7 +4,7 @@ import { usePolicies } from "../api/hooks";
 import type { Policy, Validation } from "../api/types";
 import { diagnosticsByTask } from "../draft/draft";
 import { useDraft } from "../draft/DraftContext";
-import { type Option, Segmented, Stepper } from "../ui/controls";
+import { NumberField, type Option, Segmented, Stepper } from "../ui/controls";
 import { Section } from "../ui/data";
 import styles from "./Checks.module.css";
 import { EDGES, plural, TASKS } from "../ui/plural";
@@ -97,19 +97,27 @@ const POLICY_LABELS: Record<string, string> = {
   cpsat: "CP-SAT",
 };
 
+const VALIDATION: readonly Option<NonNullable<Policy["validation_mode"]>>[] = [
+  { value: "lenient", label: "мягкая" },
+  { value: "strict", label: "строгая" },
+];
+
+const UNITS = { hour: "ч", minute: "мин", second: "с" } as const;
+
 const PREEMPTION: readonly Option<NonNullable<Policy["preemption"]>>[] = [
   { value: "never", label: "никогда" },
   { value: "deadline_only", label: "ради дедлайна" },
   { value: "priority", label: "ради приоритета" },
 ];
 
-/** Политика планирования черновика; незаданные поля берутся из умолчаний API. */
+/** Политика планирования черновика — все параметры; незаданные поля берутся из умолчаний API. */
 export function PolicySettings() {
   const { draft, dispatch } = useDraft();
   const policies = usePolicies();
   const defaults = policies.data?.defaults as Partial<Policy> | undefined;
   const policy = { ...defaults, ...draft.policy };
   const set = (patch: Partial<Policy>) => dispatch({ type: "setPolicy", patch });
+  const unit = UNITS[draft.time_unit ?? "hour"];
   const names = (policies.data?.policies ?? []).map((name) => ({
     value: name,
     label: POLICY_LABELS[name] ?? name,
@@ -145,6 +153,37 @@ export function PolicySettings() {
           max={10}
           onChange={(n) => set({ max_preemptions_per_task: n })}
         />
+      </div>
+      <div className={styles.fields}>
+        <NumberField
+          label={`Вытеснять не раньше, чем через, ${unit}`}
+          value={policy.min_runtime_before_preempt}
+          onChange={(n) => set({ min_runtime_before_preempt: n ?? 0 })}
+          hint="столько задача должна проработать, прежде чем её можно прервать"
+        />
+        <NumberField
+          label={`Старение очереди, ${unit} на класс`}
+          value={policy.aging}
+          placeholder="выключено"
+          onChange={(aging) => set({ aging })}
+          hint="за каждые столько ожидания класс задачи растёт на 1; пусто — без старения"
+        />
+        <NumberField
+          label="Прогноз перепланирования — до задач"
+          value={policy.max_forecast_tasks}
+          onChange={(n) => set({ max_forecast_tasks: n ?? 0 })}
+          hint="на входах больше этого прогноз не строится; 0 — не строить вовсе"
+        />
+        <div className={styles.labelled}>
+          <span className={styles.detail}>Проверка входа</span>
+          <Segmented
+            label="Проверка входа"
+            options={VALIDATION}
+            value={policy.validation_mode ?? "lenient"}
+            onChange={(validation_mode) => set({ validation_mode })}
+          />
+          <span className={styles.detail}>строгая — при любой ошибке входа прогон не запускается</span>
+        </div>
       </div>
     </Section>
   );

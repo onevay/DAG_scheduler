@@ -143,3 +143,9 @@
   font-family: var(--font-mono);
   font-size: 12px;
 }
+
+.downloads {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}

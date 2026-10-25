@@ -1,4 +1,10 @@
-import type { ButtonHTMLAttributes, CSSProperties, KeyboardEvent, ReactNode } from "react";
+import {
+  type ButtonHTMLAttributes,
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactNode,
+  useId,
+} from "react";
 
 import { Link } from "react-router";
 
@@ -206,6 +212,43 @@ export function Stepper({
           +
         </button>
       </div>
+    </div>
+  );
+}
+
+/** Целое число ≥ 0 или пусто; пустое поле — `null` (например, «без дедлайна» или «выключено»). */
+export function NumberField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  hint,
+}: {
+  label: string;
+  value: number | null | undefined;
+  onChange: (value: number | null) => void;
+  placeholder?: string;
+  hint?: string;
+}) {
+  const id = useId();
+  return (
+    <div className={styles.numberField}>
+      <label htmlFor={id} className={styles.numberLabel}>
+        {label}
+      </label>
+      <input
+        id={id}
+        className={styles.numberInput}
+        type="number"
+        inputMode="numeric"
+        min={0}
+        value={value ?? ""}
+        placeholder={placeholder}
+        onChange={(e) =>
+          onChange(e.target.value === "" ? null : Math.max(0, Math.round(Number(e.target.value))))
+        }
+      />
+      {hint && <span className={styles.hint}>{hint}</span>}
     </div>
   );
 }

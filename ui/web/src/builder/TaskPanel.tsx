@@ -2,7 +2,7 @@ import { type ReactNode, useEffect, useId, useState } from "react";
 
 import type { Task, TaskKind } from "../api/types";
 import { useDraft } from "../draft/DraftContext";
-import { Chip, Stepper, Switch } from "../ui/controls";
+import { Chip, NumberField, Stepper, Switch } from "../ui/controls";
 import styles from "./TaskPanel.module.css";
 
 const KINDS: readonly TaskKind[] = ["data", "train", "eval", "infer", "other"];
@@ -232,40 +232,6 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
     <div role="group" aria-label={label} className={styles.field}>
       <span className={styles.label}>{label}</span>
       {children}
-    </div>
-  );
-}
-
-/** Число или пусто; пустое поле — `null`. */
-function NumberField({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  value: number | null | undefined;
-  onChange: (value: number | null) => void;
-  placeholder?: string;
-}) {
-  const id = useId();
-  return (
-    <div className={styles.field}>
-      <label htmlFor={id} className={styles.label}>
-        {label}
-      </label>
-      <input
-        id={id}
-        className={styles.input}
-        type="number"
-        inputMode="numeric"
-        min={0}
-        value={value ?? ""}
-        placeholder={placeholder}
-        onChange={(e) =>
-          onChange(e.target.value === "" ? null : Math.max(0, Math.round(Number(e.target.value))))
-        }
-      />
     </div>
   );
 }
