@@ -2,7 +2,7 @@
 RUN := uv run
 WEB := npm --prefix ui/web
 
-.PHONY: setup lint types test perf test-all schema run docker api ui web-install web-dev web-lint web-test web-build web-e2e audit audit-py audit-web
+.PHONY: setup lint types test perf test-all schema run docker api web-install web-dev web-lint web-test web-build web-e2e audit audit-py audit-web
 
 setup:
 	uv sync --all-extras
@@ -40,9 +40,6 @@ docker:
 
 api:
 	$(RUN) --extra api uvicorn expsched.api.app:app --reload --port 8000
-
-ui:
-	$(RUN) streamlit run ui/streamlit/app.py
 
 web-install:
 	$(WEB) ci

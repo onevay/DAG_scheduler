@@ -16,7 +16,6 @@ out
 docs
 playground
 tests
-ui/streamlit
 ui/web/node_modules
 ui/web/dist
 ui/web/test-results

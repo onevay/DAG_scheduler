@@ -185,7 +185,7 @@ function TaskTable({ result }: { result: Result }) {
 function ReplanTable({ result, unit }: { result: Result; unit: string }) {
   const rows = replanRows(result.replans);
   if (rows.length === 0) return null;
-  // Причины — по-русски; остальные колонки как в Streamlit
+  // Причины — по-русски, остальные колонки — как в результате
   const triggers = (result.replans ?? []).map((r) =>
     r.events.map((e) => `${TRIGGERS[e.type] ?? e.type} ${e.task ?? e.worker ?? ""}`).join(", "),
   );
