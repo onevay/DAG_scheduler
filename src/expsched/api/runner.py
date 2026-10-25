@@ -134,7 +134,11 @@ class ProcessRunner:
     def _run(self, problem: str, policy: str) -> RunResult:
         with self._slots:
             worker = self._take()
-            worker.conn.send((problem, policy))
+            try:
+                worker.conn.send((problem, policy))
+            except OSError:  # процесс успел завершиться, например упёрся в предел памяти
+                self._stop(worker)
+                raise RunFailed("worker process exited before the run") from None
             if not worker.conn.poll(self.timeout):
                 self._stop(worker)
                 raise RunTimeout(f"run did not finish in {self.timeout:g} s")

@@ -2,7 +2,7 @@
 RUN := uv run
 WEB := npm --prefix ui/web
 
-.PHONY: setup lint types test perf test-all schema run api ui web-install web-dev web-lint web-test web-build web-e2e audit audit-py audit-web
+.PHONY: setup lint types test perf test-all schema run docker api ui web-install web-dev web-lint web-test web-build web-e2e audit audit-py audit-web
 
 setup:
 	uv sync --all-extras
@@ -33,6 +33,10 @@ schema:
 # Всё одной командой: сборка клиента и API на http://127.0.0.1:8000 (клиент на /, API на /v1)
 run: web-build
 	$(RUN) --extra api uvicorn expsched.api.app:app --host 127.0.0.1 --port 8000
+
+# То же в контейнере: образ из Dockerfile, порт только на 127.0.0.1, прогоны в томе
+docker:
+	docker compose up --build
 
 api:
 	$(RUN) --extra api uvicorn expsched.api.app:app --reload --port 8000

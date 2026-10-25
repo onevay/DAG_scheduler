@@ -110,10 +110,12 @@ def test_memory_limit_is_skipped_where_the_os_has_none():
 
 @pytest.mark.skipif(sys.platform == "win32", reason="на Windows предела памяти процесса нет")
 def test_worker_over_its_memory_limit_fails_instead_of_eating_the_machine():
-    runner = ProcessRunner(workers=1, memory_mb=64)  # интерпретатору с pydantic этого не хватит
-    demo = ProblemIn.model_validate(DEMO)
+    # Предел ставится уже запущенному процессу: маленький вход может уложиться в выделенную ранее память,
+    # а вход в несколько мегабайт — нет
+    runner = ProcessRunner(timeout=30, workers=1, memory_mb=64)
+    big = ProblemIn.model_validate(wide(20_000))
     with pytest.raises(RunFailed):
-        asyncio.run(runner.run(demo, demo.policy))
+        asyncio.run(runner.run(big, big.policy))
     runner.close()
 
 

@@ -58,3 +58,25 @@ jobs:
             ui/web/playwright-report
             ui/web/test-results
           retention-days: 7
+
+  docker:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker build -t expsched:ci .
+      - name: Контейнер поднимается, отдаёт клиент и API
+        run: |
+          docker run -d --name expsched -p 127.0.0.1:8000:8000 --read-only --tmpfs /tmp --cap-drop ALL expsched:ci
+          for i in $(seq 30); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' expsched)" = healthy ] && break
+            sleep 2
+          done
+          docker inspect -f '{{.State.Health.Status}}' expsched | grep -qx healthy
+          curl -fsS http://127.0.0.1:8000/builder | grep -q '<div id="root">'
+          curl -fsS http://127.0.0.1:8000/v1/scenarios | grep -q '"name"'
+          curl -fsS -X POST http://127.0.0.1:8000/v1/runs -H 'Content-Type: application/json' \
+            --data "{\"problem\": $(curl -fsS http://127.0.0.1:8000/v1/scenarios/cascade)}" | grep -q '"run_id"'
+          [ "$(docker exec expsched id -u)" = 10001 ]
+      - name: Журнал контейнера при падении
+        if: failure()
+        run: docker logs expsched
