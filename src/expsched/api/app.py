@@ -46,6 +46,7 @@ from expsched.api.models import (
 from expsched.api.runner import ProcessRunner, RunFailed, RunQueueFull, RunTimeout
 from expsched.api.store import RUN_ID_PATTERN, RunNotFound, RunStore, run_id_of
 from expsched.api.views import explain_view, input_analysis
+from expsched.api.web import add_security_headers, mount_web
 from expsched.contract.io_models import PolicyIn, ProblemIn, load
 from expsched.contract.limits import MAX_BODY_BYTES, InputTooLarge
 from expsched.contract.whatif import apply, deltas
@@ -262,6 +263,7 @@ def create_app(
     store: RunStore | None = None,
     runner: ProcessRunner | None = None,
     scenarios_dir: FilePath | None = None,
+    web_dir: FilePath | None = None,
 ) -> FastAPI:
     runner = runner or ProcessRunner(
         float(os.environ.get("EXPSCHED_RUN_TIMEOUT", "60")),
@@ -286,6 +288,9 @@ def create_app(
         int(os.environ.get("EXPSCHED_MAX_RUNS_MB", "2048")) << 20,
     )
     app.include_router(router)
+    add_security_headers(app)
+    if web_dir is not None:
+        mount_web(app, web_dir, lambda path: error_response(404, "NOT_FOUND", f"/{path} not found"))
     if cors_origins:
         app.add_middleware(
             CORSMiddleware,
@@ -434,4 +439,14 @@ def _cors_origins() -> list[str]:
     return [o.strip() for o in os.environ.get("EXPSCHED_CORS_ORIGINS", "").split(",") if o.strip()]
 
 
-app = create_app(_cors_origins())
+def _web_dir() -> FilePath | None:
+    """Сборка клиента, если она есть: `EXPSCHED_WEB_DIR` или `ui/web/dist` в репозитории."""
+    default = FilePath(__file__).resolve().parents[3] / "ui" / "web" / "dist"
+    web_dir = FilePath(os.environ.get("EXPSCHED_WEB_DIR", default))
+    if (web_dir / "index.html").is_file():
+        return web_dir
+    log.warning("no client build in %s: serving the API only", web_dir)
+    return None
+
+
+app = create_app(_cors_origins(), web_dir=_web_dir())

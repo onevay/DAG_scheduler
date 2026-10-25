@@ -2,7 +2,7 @@
 RUN := uv run
 WEB := npm --prefix ui/web
 
-.PHONY: setup lint types test perf test-all schema api ui web-install web-dev web-lint web-test web-build web-e2e audit audit-py audit-web
+.PHONY: setup lint types test perf test-all schema run api ui web-install web-dev web-lint web-test web-build web-e2e audit audit-py audit-web
 
 setup:
 	uv sync --all-extras
@@ -30,6 +30,10 @@ schema:
 	$(RUN) python -m expsched.contract.schemas schemas
 	$(RUN) python -m expsched.api.openapi schemas/openapi.json
 
+# Всё одной командой: сборка клиента и API на http://127.0.0.1:8000 (клиент на /, API на /v1)
+run: web-build
+	$(RUN) --extra api uvicorn expsched.api.app:app --host 127.0.0.1 --port 8000
+
 api:
 	$(RUN) --extra api uvicorn expsched.api.app:app --reload --port 8000
 
@@ -52,7 +56,7 @@ web-test:
 web-build:
 	$(WEB) run build
 
-# Сквозные проверки в Chromium (ставится сам при первом запуске): свой API на :8010, клиент через vite preview на :4173
+# Сквозные проверки в Chromium (ставится сам при первом запуске): сборка и свой API одним сервером на :8010
 web-e2e:
 	$(WEB) run e2e
 
