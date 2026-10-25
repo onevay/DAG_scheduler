@@ -1,0 +1,25 @@
+{
+  "time_unit": "hour",
+  "cluster": {
+    "workers": [
+      {"id": "node-A", "resources": {"gpu": 4, "cpu": 32}},
+      {"id": "node-B", "resources": {"gpu": 4, "cpu": 32}}
+    ]
+  },
+  "tasks": [
+    {"id": "batch_mon", "kind": "data", "duration": 2, "resources": {"cpu": 16}},
+    {"id": "batch_wed", "kind": "data", "duration": 2, "resources": {"cpu": 16}, "release_time": 8},
+    {"id": "batch_fri", "kind": "data", "duration": 2, "resources": {"cpu": 16}, "release_time": 14},
+    {"id": "train_mon", "kind": "train", "duration": 4, "resources": {"gpu": 2}, "dependencies": ["batch_mon"]},
+    {"id": "train_wed", "kind": "train", "duration": 4, "resources": {"gpu": 2},
+     "dependencies": ["batch_wed", "train_mon"], "checkpoint_interval": 2},
+    {"id": "train_fri", "kind": "train", "duration": 4, "resources": {"gpu": 2},
+     "dependencies": ["batch_fri", "train_wed"], "checkpoint_interval": 2},
+    {"id": "eval_mon", "kind": "eval", "duration": 1, "resources": {"gpu": 1}, "dependencies": ["train_mon"]},
+    {"id": "eval_wed", "kind": "eval", "duration": 1, "resources": {"gpu": 1}, "dependencies": ["train_wed"]},
+    {"id": "eval_fri", "kind": "eval", "duration": 1, "resources": {"gpu": 1}, "dependencies": ["train_fri"]},
+    {"id": "weekly_report", "kind": "other", "duration": 1, "resources": {"cpu": 4},
+     "dependencies": ["eval_mon", "eval_wed", "eval_fri"], "deadline": 22}
+  ],
+  "policy": {"name": "priority_backfill"}
+}

@@ -1,0 +1,33 @@
+{
+  "time_unit": "hour",
+  "cluster": {
+    "workers": [
+      {"id": "node-A", "resources": {"gpu": 4, "cpu": 32}},
+      {"id": "node-B", "resources": {"gpu": 4, "cpu": 32}},
+      {"id": "node-C", "resources": {"gpu": 4, "cpu": 32}}
+    ]
+  },
+  "tasks": [
+    {"id": "prep", "kind": "data", "duration": 2, "resources": {"cpu": 24}},
+    {"id": "trial_lr1e-3", "kind": "train", "duration": 4, "resources": {"gpu": 1}, "dependencies": ["prep"]},
+    {"id": "trial_lr3e-4", "kind": "train", "duration": 5, "resources": {"gpu": 1}, "dependencies": ["prep"]},
+    {"id": "trial_lr1e-4", "kind": "train", "duration": 6, "resources": {"gpu": 1}, "dependencies": ["prep"]},
+    {"id": "trial_bs64", "kind": "train", "duration": 3, "resources": {"gpu": 2}, "dependencies": ["prep"]},
+    {"id": "trial_bs128", "kind": "train", "duration": 4, "resources": {"gpu": 2}, "dependencies": ["prep"]},
+    {"id": "trial_bs256", "kind": "train", "duration": 5, "resources": {"gpu": 4}, "dependencies": ["prep"]},
+    {"id": "trial_wd0", "kind": "train", "duration": 2, "resources": {"gpu": 1}, "dependencies": ["prep"]},
+    {"id": "trial_wd01", "kind": "train", "duration": 3, "resources": {"gpu": 1}, "dependencies": ["prep"]},
+    {"id": "trial_dropout", "kind": "train", "duration": 7, "resources": {"gpu": 1}, "dependencies": ["prep"]},
+    {"id": "trial_warmup", "kind": "train", "duration": 4, "resources": {"gpu": 2}, "dependencies": ["prep"]},
+    {"id": "trial_cosine", "kind": "train", "duration": 5, "resources": {"gpu": 2}, "dependencies": ["prep"]},
+    {"id": "trial_mixup", "kind": "train", "duration": 6, "resources": {"gpu": 2}, "dependencies": ["prep"]},
+    {"id": "select_best", "kind": "eval", "duration": 1, "resources": {"cpu": 4},
+     "dependencies": ["trial_lr1e-3", "trial_lr3e-4", "trial_lr1e-4", "trial_bs64", "trial_bs128", "trial_bs256",
+                      "trial_wd0", "trial_wd01", "trial_dropout", "trial_warmup", "trial_cosine", "trial_mixup"]},
+    {"id": "final_train", "kind": "train", "duration": 8, "resources": {"gpu": 4}, "dependencies": ["select_best"],
+     "checkpoint_interval": 2, "priority": 6},
+    {"id": "final_eval", "kind": "eval", "duration": 2, "resources": {"gpu": 2}, "dependencies": ["final_train"],
+     "priority": 6}
+  ],
+  "policy": {"name": "priority_backfill"}
+}

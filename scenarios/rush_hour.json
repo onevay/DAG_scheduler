@@ -1,0 +1,32 @@
+{
+  "time_unit": "hour",
+  "cluster": {
+    "workers": [
+      {"id": "node-A", "resources": {"gpu": 4}},
+      {"id": "node-B", "resources": {"gpu": 4}}
+    ]
+  },
+  "tasks": [
+    {"id": "bg_pretrain", "kind": "train", "duration": 12, "resources": {"gpu": 4}, "priority": 0,
+     "preemptible": true, "checkpoint_interval": 2},
+    {"id": "bg_distill", "kind": "train", "duration": 10, "resources": {"gpu": 4}, "priority": 0,
+     "preemptible": true, "checkpoint_interval": 3}
+  ],
+  "events": [
+    {"time": 2, "type": "submit_task",
+     "task": {"id": "hotfix_eval", "kind": "eval", "duration": 2, "resources": {"gpu": 2}, "priority": 9, "deadline": 5}},
+    {"time": 4, "type": "submit_task",
+     "task": {"id": "customer_demo", "kind": "infer", "duration": 3, "resources": {"gpu": 4}, "priority": 10,
+              "deadline": 8}},
+    {"time": 6, "type": "submit_task",
+     "task": {"id": "batch_infer", "kind": "infer", "duration": 4, "resources": {"gpu": 1}, "priority": 3}},
+    {"time": 9, "type": "submit_task",
+     "task": {"id": "regression_test", "kind": "eval", "duration": 1, "resources": {"gpu": 2}, "priority": 8,
+              "deadline": 11}},
+    {"time": 10, "type": "submit_task",
+     "task": {"id": "hotfix_2", "kind": "eval", "duration": 2, "resources": {"gpu": 4}, "priority": 9,
+              "deadline": 13, "dependencies": ["regression_test"]}}
+  ],
+  "policy": {"name": "priority", "preemption": "deadline_only", "min_runtime_before_preempt": 1,
+             "max_preemptions_per_task": 1}
+}

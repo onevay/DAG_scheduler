@@ -5,6 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from expsched.api.app import create_app
+from expsched.api.openapi import dump_openapi
 from expsched.api.store import RunStore
 from expsched.pipeline import run
 
@@ -187,6 +188,12 @@ def test_cors_is_enabled_only_for_listed_origins(client):
     )
     assert "access-control-allow-origin" not in other.headers
     assert "access-control-allow-origin" not in client.get("/v1/policies", headers=preflight).headers
+
+
+def test_committed_openapi_is_up_to_date():
+    # То же, что проверяет CI: `make schema` не должен менять файл, из него генерируются типы клиента.
+    path = Path(__file__).resolve().parents[2] / "schemas" / "openapi.json"
+    assert path.read_bytes().decode("utf-8") == dump_openapi() + "\n"
 
 
 def test_openapi_describes_requests_responses_and_errors(client):

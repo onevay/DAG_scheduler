@@ -41,7 +41,8 @@ assert out.result["metrics"]["lost_work_gpu"] == 4  # час работы на 4
 assert out.result["violations"] == []
 ```
 
-Через API:
+Через API (ответ — `run_id` и результат; по `run_id` читаются журнал, объяснения и варианты what-if, см.
+[REST API](docs/api.md)):
 
 ```bash
 curl -s localhost:8000/v1/runs -H 'content-type: application/json' \

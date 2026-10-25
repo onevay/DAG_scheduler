@@ -1,0 +1,33 @@
+{
+  "time_unit": "hour",
+  "cluster": {
+    "workers": [
+      {"id": "node-A", "resources": {"gpu": 4}, "labels": {"rack": "a"}},
+      {"id": "node-B", "resources": {"gpu": 4}, "labels": {"rack": "b"}},
+      {"id": "node-C", "resources": {"gpu": 4}, "labels": {"rack": "c"}}
+    ]
+  },
+  "tasks": [
+    {"id": "prep", "kind": "data", "duration": 1, "resources": {"gpu": 1}},
+    {"id": "train_main", "kind": "train", "duration": 10, "resources": {"gpu": 4}, "dependencies": ["prep"],
+     "checkpoint_interval": 2, "max_retries": 3, "priority": 6},
+    {"id": "train_aux", "kind": "train", "duration": 6, "resources": {"gpu": 2}, "dependencies": ["prep"],
+     "max_retries": 2, "priority": 3},
+    {"id": "fragile_train", "kind": "train", "duration": 6, "resources": {"gpu": 2}, "dependencies": ["prep"],
+     "constraints": {"rack": "b"}, "max_retries": 0, "priority": 4},
+    {"id": "fragile_report", "kind": "eval", "duration": 1, "resources": {"gpu": 1},
+     "dependencies": ["fragile_train"]},
+    {"id": "eval_main", "kind": "eval", "duration": 2, "resources": {"gpu": 2}, "dependencies": ["train_main"]},
+    {"id": "eval_aux", "kind": "eval", "duration": 1, "resources": {"gpu": 1}, "dependencies": ["train_aux"]},
+    {"id": "rack_b_smoke", "kind": "eval", "duration": 1, "resources": {"gpu": 1}, "dependencies": ["eval_main"],
+     "constraints": {"rack": "b"}}
+  ],
+  "events": [
+    {"time": 3, "type": "worker_down", "worker": "node-A"},
+    {"time": 6, "type": "worker_up", "worker": "node-A"},
+    {"time": 4, "type": "worker_down", "worker": "node-B"},
+    {"time": 9, "type": "worker_down", "worker": "node-C"},
+    {"time": 12, "type": "worker_up", "worker": "node-C"}
+  ],
+  "policy": {"name": "priority_backfill"}
+}

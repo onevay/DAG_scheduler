@@ -1,0 +1,616 @@
+{
+  "time_unit": "hour",
+  "cluster": {
+    "workers": [
+      {
+        "id": "a100-1",
+        "resources": {
+          "gpu": 8,
+          "cpu": 64
+        },
+        "labels": {
+          "gpu_type": "a100"
+        }
+      },
+      {
+        "id": "a100-2",
+        "resources": {
+          "gpu": 8,
+          "cpu": 64
+        },
+        "labels": {
+          "gpu_type": "a100"
+        }
+      },
+      {
+        "id": "v100-1",
+        "resources": {
+          "gpu": 4,
+          "cpu": 32
+        },
+        "labels": {
+          "gpu_type": "v100"
+        }
+      },
+      {
+        "id": "v100-2",
+        "resources": {
+          "gpu": 4,
+          "cpu": 32
+        },
+        "labels": {
+          "gpu_type": "v100"
+        }
+      },
+      {
+        "id": "cpu-1",
+        "resources": {
+          "cpu": 96
+        },
+        "labels": {
+          "gpu_type": "none"
+        }
+      }
+    ]
+  },
+  "tasks": [
+    {
+      "id": "ingest_raw",
+      "kind": "data",
+      "duration": 3,
+      "resources": {
+        "cpu": 64
+      }
+    },
+    {
+      "id": "dedup",
+      "kind": "data",
+      "duration": 2,
+      "resources": {
+        "cpu": 48
+      },
+      "dependencies": [
+        "ingest_raw"
+      ]
+    },
+    {
+      "id": "vision_prep",
+      "kind": "data",
+      "duration": 2,
+      "resources": {
+        "cpu": 24
+      },
+      "dependencies": [
+        "dedup"
+      ]
+    },
+    {
+      "id": "vision_pretrain",
+      "kind": "train",
+      "duration": 9,
+      "resources": {
+        "gpu": 8
+      },
+      "dependencies": [
+        "vision_prep"
+      ],
+      "priority": 6,
+      "max_retries": 3,
+      "constraints": {
+        "gpu_type": "a100"
+      },
+      "checkpoint_interval": 3
+    },
+    {
+      "id": "vision_ft1",
+      "kind": "train",
+      "duration": 3,
+      "resources": {
+        "gpu": 4
+      },
+      "dependencies": [
+        "vision_pretrain"
+      ],
+      "priority": 5
+    },
+    {
+      "id": "vision_eval1",
+      "kind": "eval",
+      "duration": 1,
+      "resources": {
+        "gpu": 1
+      },
+      "dependencies": [
+        "vision_ft1"
+      ],
+      "priority": 5
+    },
+    {
+      "id": "vision_ft2",
+      "kind": "train",
+      "duration": 4,
+      "resources": {
+        "gpu": 4
+      },
+      "dependencies": [
+        "vision_pretrain"
+      ],
+      "priority": 5
+    },
+    {
+      "id": "vision_eval2",
+      "kind": "eval",
+      "duration": 1,
+      "resources": {
+        "gpu": 1
+      },
+      "dependencies": [
+        "vision_ft2"
+      ],
+      "priority": 5
+    },
+    {
+      "id": "vision_ft3",
+      "kind": "train",
+      "duration": 2,
+      "resources": {
+        "gpu": 2
+      },
+      "dependencies": [
+        "vision_pretrain"
+      ],
+      "priority": 5
+    },
+    {
+      "id": "vision_eval3",
+      "kind": "eval",
+      "duration": 1,
+      "resources": {
+        "gpu": 1
+      },
+      "dependencies": [
+        "vision_ft3"
+      ],
+      "priority": 5
+    },
+    {
+      "id": "vision_bench",
+      "kind": "infer",
+      "duration": 2,
+      "resources": {
+        "gpu": 1
+      },
+      "dependencies": [
+        "vision_eval1",
+        "vision_eval2",
+        "vision_eval3"
+      ],
+      "constraints": {
+        "gpu_type": "v100"
+      },
+      "priority": 6
+    },
+    {
+      "id": "speech_prep",
+      "kind": "data",
+      "duration": 3,
+      "resources": {
+        "cpu": 24
+      },
+      "dependencies": [
+        "dedup"
+      ]
+    },
+    {
+      "id": "speech_pretrain",
+      "kind": "train",
+      "duration": 7,
+      "resources": {
+        "gpu": 8
+      },
+      "dependencies": [
+        "speech_prep"
+      ],
+      "priority": 5,
+      "max_retries": 3,
+      "constraints": {
+        "gpu_type": "a100"
+      },
+      "checkpoint_interval": 2
+    },
+    {
+      "id": "speech_ft1",
+      "kind": "train",
+      "duration": 3,
+      "resources": {
+        "gpu": 2
+      },
+      "dependencies": [
+        "speech_pretrain"
+      ],
+      "priority": 4
+    },
+    {
+      "id": "speech_eval1",
+      "kind": "eval",
+      "duration": 1,
+      "resources": {
+        "gpu": 1
+      },
+      "dependencies": [
+        "speech_ft1"
+      ],
+      "priority": 4
+    },
+    {
+      "id": "speech_ft2",
+      "kind": "train",
+      "duration": 3,
+      "resources": {
+        "gpu": 2
+      },
+      "dependencies": [
+        "speech_pretrain"
+      ],
+      "priority": 4
+    },
+    {
+      "id": "speech_eval2",
+      "kind": "eval",
+      "duration": 1,
+      "resources": {
+        "gpu": 1
+      },
+      "dependencies": [
+        "speech_ft2"
+      ],
+      "priority": 4
+    },
+    {
+      "id": "speech_ft3",
+      "kind": "train",
+      "duration": 4,
+      "resources": {
+        "gpu": 4
+      },
+      "dependencies": [
+        "speech_pretrain"
+      ],
+      "priority": 4
+    },
+    {
+      "id": "speech_eval3",
+      "kind": "eval",
+      "duration": 1,
+      "resources": {
+        "gpu": 1
+      },
+      "dependencies": [
+        "speech_ft3"
+      ],
+      "priority": 4
+    },
+    {
+      "id": "speech_bench",
+      "kind": "infer",
+      "duration": 2,
+      "resources": {
+        "gpu": 1
+      },
+      "dependencies": [
+        "speech_eval1",
+        "speech_eval2",
+        "speech_eval3"
+      ],
+      "constraints": {
+        "gpu_type": "v100"
+      },
+      "priority": 5
+    },
+    {
+      "id": "nlp_prep",
+      "kind": "data",
+      "duration": 2,
+      "resources": {
+        "cpu": 24
+      },
+      "dependencies": [
+        "dedup"
+      ]
+    },
+    {
+      "id": "nlp_pretrain",
+      "kind": "train",
+      "duration": 11,
+      "resources": {
+        "gpu": 8
+      },
+      "dependencies": [
+        "nlp_prep"
+      ],
+      "priority": 7,
+      "max_retries": 3,
+      "constraints": {
+        "gpu_type": "a100"
+      }
+    },
+    {
+      "id": "nlp_ft1",
+      "kind": "train",
+      "duration": 5,
+      "resources": {
+        "gpu": 4
+      },
+      "dependencies": [
+        "nlp_pretrain"
+      ],
+      "priority": 6
+    },
+    {
+      "id": "nlp_eval1",
+      "kind": "eval",
+      "duration": 1,
+      "resources": {
+        "gpu": 1
+      },
+      "dependencies": [
+        "nlp_ft1"
+      ],
+      "priority": 6
+    },
+    {
+      "id": "nlp_ft2",
+      "kind": "train",
+      "duration": 4,
+      "resources": {
+        "gpu": 4
+      },
+      "dependencies": [
+        "nlp_pretrain"
+      ],
+      "priority": 6
+    },
+    {
+      "id": "nlp_eval2",
+      "kind": "eval",
+      "duration": 1,
+      "resources": {
+        "gpu": 1
+      },
+      "dependencies": [
+        "nlp_ft2"
+      ],
+      "priority": 6
+    },
+    {
+      "id": "nlp_ft3",
+      "kind": "train",
+      "duration": 3,
+      "resources": {
+        "gpu": 2
+      },
+      "dependencies": [
+        "nlp_pretrain"
+      ],
+      "priority": 6
+    },
+    {
+      "id": "nlp_eval3",
+      "kind": "eval",
+      "duration": 1,
+      "resources": {
+        "gpu": 1
+      },
+      "dependencies": [
+        "nlp_ft3"
+      ],
+      "priority": 6
+    },
+    {
+      "id": "nlp_bench",
+      "kind": "infer",
+      "duration": 2,
+      "resources": {
+        "gpu": 1
+      },
+      "dependencies": [
+        "nlp_eval1",
+        "nlp_eval2",
+        "nlp_eval3"
+      ],
+      "constraints": {
+        "gpu_type": "v100"
+      },
+      "priority": 7
+    },
+    {
+      "id": "recsys_prep",
+      "kind": "data",
+      "duration": 4,
+      "resources": {
+        "cpu": 24
+      },
+      "dependencies": [
+        "dedup"
+      ]
+    },
+    {
+      "id": "recsys_pretrain",
+      "kind": "train",
+      "duration": 5,
+      "resources": {
+        "gpu": 4
+      },
+      "dependencies": [
+        "recsys_prep"
+      ],
+      "priority": 3,
+      "max_retries": 3,
+      "checkpoint_interval": 1
+    },
+    {
+      "id": "recsys_ft1",
+      "kind": "train",
+      "duration": 2,
+      "resources": {
+        "gpu": 2
+      },
+      "dependencies": [
+        "recsys_pretrain"
+      ],
+      "priority": 2
+    },
+    {
+      "id": "recsys_eval1",
+      "kind": "eval",
+      "duration": 1,
+      "resources": {
+        "gpu": 1
+      },
+      "dependencies": [
+        "recsys_ft1"
+      ],
+      "priority": 2
+    },
+    {
+      "id": "recsys_ft2",
+      "kind": "train",
+      "duration": 2,
+      "resources": {
+        "gpu": 1
+      },
+      "dependencies": [
+        "recsys_pretrain"
+      ],
+      "priority": 2
+    },
+    {
+      "id": "recsys_eval2",
+      "kind": "eval",
+      "duration": 1,
+      "resources": {
+        "gpu": 1
+      },
+      "dependencies": [
+        "recsys_ft2"
+      ],
+      "priority": 2
+    },
+    {
+      "id": "recsys_ft3",
+      "kind": "train",
+      "duration": 3,
+      "resources": {
+        "gpu": 2
+      },
+      "dependencies": [
+        "recsys_pretrain"
+      ],
+      "priority": 2
+    },
+    {
+      "id": "recsys_eval3",
+      "kind": "eval",
+      "duration": 1,
+      "resources": {
+        "gpu": 1
+      },
+      "dependencies": [
+        "recsys_ft3"
+      ],
+      "priority": 2
+    },
+    {
+      "id": "recsys_bench",
+      "kind": "infer",
+      "duration": 2,
+      "resources": {
+        "gpu": 1
+      },
+      "dependencies": [
+        "recsys_eval1",
+        "recsys_eval2",
+        "recsys_eval3"
+      ],
+      "constraints": {
+        "gpu_type": "v100"
+      },
+      "priority": 3
+    },
+    {
+      "id": "quarterly_report",
+      "kind": "other",
+      "duration": 1,
+      "resources": {
+        "cpu": 8
+      },
+      "dependencies": [
+        "vision_bench",
+        "speech_bench",
+        "nlp_bench",
+        "recsys_bench"
+      ],
+      "deadline": 40,
+      "priority": 8
+    }
+  ],
+  "events": [
+    {
+      "time": 10,
+      "type": "worker_down",
+      "worker": "a100-2"
+    },
+    {
+      "time": 18,
+      "type": "worker_up",
+      "worker": "a100-2"
+    },
+    {
+      "time": 14,
+      "type": "submit_task",
+      "task": {
+        "id": "exec_demo",
+        "kind": "infer",
+        "duration": 2,
+        "resources": {
+          "gpu": 4
+        },
+        "priority": 10,
+        "deadline": 20,
+        "dependencies": [
+          "vision_pretrain"
+        ]
+      }
+    },
+    {
+      "time": 21,
+      "type": "worker_down",
+      "worker": "v100-1"
+    },
+    {
+      "time": 27,
+      "type": "worker_up",
+      "worker": "v100-1"
+    },
+    {
+      "time": 24,
+      "type": "submit_task",
+      "task": {
+        "id": "safety_eval",
+        "kind": "eval",
+        "duration": 3,
+        "resources": {
+          "gpu": 2
+        },
+        "priority": 9,
+        "deadline": 32,
+        "dependencies": [
+          "nlp_ft1"
+        ]
+      }
+    }
+  ],
+  "policy": {
+    "name": "priority_backfill"
+  }
+}
