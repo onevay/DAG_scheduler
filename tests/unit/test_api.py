@@ -1,4 +1,6 @@
 import json
+import shutil
+from contextlib import nullcontext
 from pathlib import Path
 
 import pytest
@@ -6,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from expsched.api.app import create_app
 from expsched.api.openapi import dump_openapi
+from expsched.api.runner import RunFailed, RunQueueFull
 from expsched.api.store import RunStore
 from expsched.pipeline import run
 
@@ -31,6 +34,9 @@ class InlineRunner:
     async def run(self, problem, policy):
         self.calls += 1
         return self.compute(problem, policy)
+
+    def reserve(self, count=1):
+        return nullcontext()
 
     def close(self):
         pass
@@ -279,3 +285,72 @@ def test_bad_event_requests(client, run_id, body, status):
     run_id = run_id or client.post("/v1/runs", json={"problem": DEMO}).json()["run_id"]
     response = client.post(f"/v1/runs/{run_id}/events", json=body)
     assert response.status_code == status and "error" in response.json()
+
+
+# ---- очередь, сбои прогона, вытесненные прогоны ----
+
+
+class CountingRunner(InlineRunner):
+    """InlineRunner с очередью на `capacity` мест; запоминает, сколько мест просили."""
+
+    def __init__(self, capacity=32, compute=run):
+        super().__init__(compute)
+        self.capacity = capacity
+        self.reserved = []
+
+    def reserve(self, count=1):
+        self.reserved.append(count)
+        if count > self.capacity:
+            raise RunQueueFull(f"{count} > {self.capacity}")
+        return nullcontext()
+
+
+def test_full_queue_answers_503(tmp_path):
+    client = TestClient(create_app(store=RunStore(tmp_path), runner=CountingRunner(capacity=0)))
+    response = client.post("/v1/runs", json={"problem": DEMO})
+    assert response.status_code == 503 and response.json()["error"]["code"] == "RUN_QUEUE_FULL"
+    assert not any(tmp_path.iterdir())
+
+
+def test_whatif_takes_queue_places_only_for_runs_not_yet_stored(tmp_path):
+    runner = CountingRunner()
+    client = TestClient(create_app(store=RunStore(tmp_path), runner=runner))
+    body = {"problem": DEMO, "interventions": [{"kind": "set_priority", "task": "prep_data", "priority": 9}]}
+    assert client.post("/v1/whatif", json=body).status_code == 200
+    assert client.post("/v1/whatif", json=body).status_code == 200
+    assert runner.reserved == [2, 0] and runner.calls == 2  # второй раз всё уже в хранилище
+
+
+def test_whatif_larger_than_the_queue_is_refused_whole(tmp_path):
+    runner = CountingRunner(capacity=2)
+    client = TestClient(create_app(store=RunStore(tmp_path), runner=runner))
+    interventions = [{"kind": "set_priority", "task": "prep_data", "priority": p} for p in (3, 9)]
+    response = client.post("/v1/whatif", json={"problem": DEMO, "interventions": interventions})
+    assert response.status_code == 503 and runner.calls == 0  # ни один вариант не начат
+
+
+def test_failed_run_is_500_without_the_worker_traceback(tmp_path):
+    def failing(*args):
+        raise RunFailed("Traceback ... secret detail")
+
+    app = create_app(store=RunStore(tmp_path), runner=InlineRunner(failing))
+    response = TestClient(app).post("/v1/runs", json={"problem": DEMO})
+    assert response.status_code == 500 and response.json()["error"]["code"] == "RUN_FAILED"
+    assert "secret" not in response.text
+
+
+@pytest.mark.parametrize("path", ["", "/problem", "/events", "/explain"])
+def test_run_evicted_after_it_was_listed_is_404_not_500(tmp_path, path):
+    client = TestClient(create_app(store=RunStore(tmp_path), runner=InlineRunner()))
+    run_id = client.post("/v1/runs", json={"problem": DEMO}).json()["run_id"]
+    shutil.rmtree(tmp_path / run_id)
+    response = client.get(f"/v1/runs/{run_id}{path}")
+    assert response.status_code == 404 and response.json()["error"]["code"] == "NOT_FOUND"
+
+
+def test_event_for_an_evicted_run_is_404(tmp_path):
+    client = TestClient(create_app(store=RunStore(tmp_path), runner=InlineRunner()))
+    run_id = client.post("/v1/runs", json={"problem": DEMO}).json()["run_id"]
+    shutil.rmtree(tmp_path / run_id)
+    event = {"event": {"time": 1, "type": "worker_down", "worker": "node-A"}}
+    assert client.post(f"/v1/runs/{run_id}/events", json=event).status_code == 404

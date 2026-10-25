@@ -1,7 +1,9 @@
 import os
 from concurrent.futures import ThreadPoolExecutor
 
-from expsched.api.store import RunStore
+import pytest
+
+from expsched.api.store import RunNotFound, RunStore
 from expsched.pipeline import RunResult
 
 
@@ -53,3 +55,31 @@ def test_recent_runs_come_from_summaries(tmp_path):
         ("a" * 16, "first", 4),
     ]
     assert len(store.recent(1)) == 1 and RunStore(tmp_path / "none").recent(5) == []
+
+
+def test_missing_run_is_reported_as_not_found(tmp_path):
+    store = RunStore(tmp_path)
+    for read in (store.result, store.problem, lambda run_id: store.events(run_id, 0, 10)):
+        with pytest.raises(RunNotFound) as error:
+            read("a" * 16)
+        assert error.value.run_id == "a" * 16
+
+
+def test_oldest_runs_are_evicted_when_they_take_too_much_space(tmp_path):
+    one_run = sum(f.stat().st_size for f in _saved(RunStore(tmp_path / "probe"), "a" * 16).iterdir())
+    store = RunStore(tmp_path / "runs", max_runs=100, max_bytes=2 * one_run + one_run // 2)
+    for i, run_id in enumerate(["a" * 16, "b" * 16, "c" * 16]):
+        _saved(store, run_id)
+        os.utime(tmp_path / "runs" / run_id, (i, i))
+    assert sorted(p.name for p in (tmp_path / "runs").iterdir()) == ["b" * 16, "c" * 16]
+
+
+def test_the_run_just_saved_is_kept_even_if_alone_it_is_too_big(tmp_path):
+    store = RunStore(tmp_path, max_bytes=1)
+    _saved(store, "a" * 16)
+    assert [p.name for p in tmp_path.iterdir()] == ["a" * 16]
+
+
+def _saved(store, run_id):
+    store.save(run_id, {}, outcome(50))
+    return store.root / run_id

@@ -1,0 +1,24 @@
+# Локальный запуск: docker compose up --build → http://127.0.0.1:8000. Прогоны — в томе expsched-runs.
+services:
+  expsched:
+    build: .
+    image: expsched:local
+    ports:
+      - "127.0.0.1:8000:8000"  # только с этой машины: авторизации в сервисе нет
+    volumes:
+      - expsched-runs:/runs
+    environment:
+      EXPSCHED_RUN_WORKERS: "2"
+      EXPSCHED_RUN_MEMORY_MB: "2048"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 6g
+    pids_limit: 256
+    restart: unless-stopped
+
+volumes:
+  expsched-runs:

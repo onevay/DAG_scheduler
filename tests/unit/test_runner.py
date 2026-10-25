@@ -1,5 +1,6 @@
 import asyncio
 import json
+import sys
 from pathlib import Path
 
 import httpx
@@ -7,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from expsched.api.app import create_app
-from expsched.api.runner import ProcessRunner, RunTimeout
+from expsched.api.runner import ProcessRunner, RunFailed, RunQueueFull, RunTimeout, _limit_memory
 from expsched.api.store import RunStore
 from expsched.contract.io_models import PolicyIn, ProblemIn
 
@@ -86,4 +87,50 @@ def test_server_keeps_answering_during_a_long_run(tmp_path):
             return policies.status_code, finished_first, (await long_run).status_code
 
     assert asyncio.run(scenario()) == (200, False, 201)  # справка ответила, пока прогон ещё шёл
+    app.state.runner.close()
+
+
+def test_queue_takes_all_or_nothing_and_frees_places():
+    runner = ProcessRunner(workers=1, queue_size=3)
+    with runner.reserve(2):
+        with pytest.raises(RunQueueFull), runner.reserve(2):
+            pass
+        with runner.reserve(1):
+            pass
+    with runner.reserve(3):  # места вернулись
+        pass
+    runner.close()
+
+
+def test_memory_limit_is_skipped_where_the_os_has_none():
+    assert _limit_memory(None) is False
+    if sys.platform == "win32":
+        assert _limit_memory(1024) is False
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="на Windows предела памяти процесса нет")
+def test_worker_over_its_memory_limit_fails_instead_of_eating_the_machine():
+    # Предел ставится уже запущенному процессу: маленький вход может уложиться в выделенную ранее память,
+    # а вход в несколько мегабайт — нет
+    runner = ProcessRunner(timeout=30, workers=1, memory_mb=64)
+    big = ProblemIn.model_validate(wide(20_000))
+    with pytest.raises(RunFailed):
+        asyncio.run(runner.run(big, big.policy))
+    runner.close()
+
+
+def test_server_keeps_answering_during_a_heavy_validation(tmp_path):
+    app = create_app(store=RunStore(tmp_path), runner=ProcessRunner(workers=1))
+    big = wide(60_000)
+
+    async def scenario():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://api", timeout=120) as client:
+            check = asyncio.create_task(client.post("/v1/validate", json=big))
+            await asyncio.sleep(0.05)
+            policies = await client.get("/v1/policies")
+            finished_first = check.done()
+            return policies.status_code, finished_first, (await check).status_code
+
+    assert asyncio.run(scenario()) == (200, False, 200)  # проверка большого входа не держит остальные запросы
     app.state.runner.close()

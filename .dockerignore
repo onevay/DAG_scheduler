@@ -1,0 +1,24 @@
+# В образ попадает только то, что нужно для сборки: код, зависимости по lock-файлам, клиент, примеры
+.git
+.github
+.venv
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.hypothesis
+.claude
+.idea
+.vscode
+runs
+out
+docs
+playground
+tests
+ui/streamlit
+ui/web/node_modules
+ui/web/dist
+ui/web/test-results
+ui/web/playwright-report
+.audit-requirements.txt

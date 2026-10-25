@@ -20,9 +20,20 @@
 
 ```bash
 uv sync --all-extras
-make api    # REST API на http://127.0.0.1:8000
-make ui     # в соседнем терминале: интерфейс на http://localhost:8501
+make web-install   # зависимости JS-клиента, нужен Node.js 20
+make run           # клиент и REST API на http://127.0.0.1:8000
 ```
+
+Или в Docker, без Python и Node на машине:
+
+```bash
+docker compose up --build   # http://127.0.0.1:8000, прогоны — в томе expsched-runs
+```
+
+Образ ([`Dockerfile`](Dockerfile)) собирает клиент на Node и окружение через uv, а работает на `python:3.12-slim`
+от непривилегированного пользователя. [`compose.yaml`](compose.yaml) открывает порт только на 127.0.0.1
+(авторизации в сервисе нет), монтирует корень только для чтения, сбрасывает capabilities и ограничивает память.
+Состояние — `docker compose ps` (HEALTHCHECK опрашивает `/v1/policies`).
 
 Из Python:
 

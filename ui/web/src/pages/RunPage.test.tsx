@@ -1,9 +1,10 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createQueryClient } from "../api/hooks";
 import { RunPage } from "./RunPage";
@@ -50,8 +51,15 @@ const RESULT = {
   },
 };
 
+const JOURNAL = [
+  { seq: 0, t: 0, type: "READY", task: "a" },
+  { seq: 1, t: 0, type: "START", task: "a", worker: "n", attempt: 1, resume_from: 0, reason: {} },
+];
+
 const server = setupServer(
-  http.get("/v1/runs/:id/events", () => HttpResponse.json({ events: [], total: 0, next_seq: null })),
+  http.get("/v1/runs/:id/events", () =>
+    HttpResponse.json({ events: JOURNAL, total: JOURNAL.length, next_seq: null }),
+  ),
   http.get("/v1/runs/:id", ({ params }) =>
     params.id === "missing"
       ? HttpResponse.json({ error: { code: "NOT_FOUND", message: "нет" } }, { status: 404 })
@@ -114,5 +122,41 @@ describe("RunPage", () => {
   it("says when a run is missing", async () => {
     renderAt("missing");
     expect(await screen.findByRole("heading", { name: "Прогон не найден" })).toBeInTheDocument();
+  });
+});
+
+// У Blob в jsdom нет text(): содержимое читается через FileReader
+function readText(blob: Blob): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.readAsText(blob);
+  });
+}
+
+describe("downloads", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("saves the result and the journal as files", async () => {
+    const saved: { name: string; text: Promise<string> }[] = [];
+    let blob: Blob | undefined;
+    vi.spyOn(URL, "createObjectURL").mockImplementation((b) => {
+      blob = b as Blob;
+      return "blob:x";
+    });
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+    vi.spyOn(HTMLElement.prototype, "click").mockImplementation(function (this: HTMLElement) {
+      saved.push({ name: (this as HTMLAnchorElement).download, text: readText(blob as Blob) });
+    });
+    renderAt("0123456789abcdef");
+    await userEvent.click(await screen.findByRole("button", { name: "Скачать result.json" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Скачать events.jsonl" }));
+    expect(saved.map((f) => f.name)).toEqual([
+      "urgent_failure-0123456789abcdef.result.json",
+      "urgent_failure-0123456789abcdef.events.jsonl",
+    ]);
+    expect(JSON.parse(await (saved[0] as (typeof saved)[number]).text)).toMatchObject({ policy: "priority" });
+    const lines = (await (saved[1] as (typeof saved)[number]).text).trimEnd().split("\n");
+    expect(lines.map((l) => JSON.parse(l).seq)).toEqual([0, 1]);
   });
 });

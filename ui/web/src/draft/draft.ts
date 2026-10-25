@@ -1,4 +1,5 @@
 import type { Diagnostic, InputEvent, Policy, Problem, Task, Worker } from "../api/types";
+import { draftIssue } from "./shape";
 
 /** Черновик входа — это и есть `problem.json`: что собрано, то и уходит в API. */
 export type Draft = Problem;
@@ -30,6 +31,18 @@ export function freeId(prefix: string, taken: Iterable<string>): string {
 }
 
 const mapTasks = (draft: Draft, f: (task: Task) => Task): Draft => ({ ...draft, tasks: draft.tasks.map(f) });
+/** Переименование задачи тянет за собой ссылки на неё — и во входе, и в задачах, поданных событиями. */
+function renameRefs(draft: Draft, from: string, to: string): Draft {
+  const fix = (task: Task): Task =>
+    task.dependencies?.includes(from)
+      ? { ...task, dependencies: task.dependencies.map((d) => (d === from ? to : d)) }
+      : task;
+  return {
+    ...mapTasks(draft, fix),
+    events: draft.events?.map((e) => (e.task ? { ...e, task: fix(e.task) } : e)),
+  };
+}
+
 const mapWorkers = (draft: Draft, f: (worker: Worker) => Worker): Draft => ({
   ...draft,
   cluster: { ...draft.cluster, workers: draft.cluster.workers.map(f) },
@@ -54,14 +67,9 @@ export function draftReducer(draft: Draft, action: DraftAction): Draft {
       };
     }
     case "updateTask": {
-      const renamed = action.patch.id !== undefined && action.patch.id !== action.id ? action.patch.id : null;
-      return mapTasks(draft, (task) => {
-        const next = task.id === action.id ? { ...task, ...action.patch } : task;
-        // Переименование тянет за собой ссылки на задачу в зависимостях
-        return renamed && next.dependencies?.includes(action.id)
-          ? { ...next, dependencies: next.dependencies.map((d) => (d === action.id ? renamed : d)) }
-          : next;
-      });
+      const next = mapTasks(draft, (task) => (task.id === action.id ? { ...task, ...action.patch } : task));
+      const renamed = action.patch.id;
+      return renamed !== undefined && renamed !== action.id ? renameRefs(next, action.id, renamed) : next;
     }
     case "removeTask":
       return mapTasks({ ...draft, tasks: draft.tasks.filter((t) => t.id !== action.id) }, (task) =>
@@ -106,8 +114,13 @@ export function draftReducer(draft: Draft, action: DraftAction): Draft {
       return { ...draft, events };
     }
     case "updateEvent": {
+      const before = draft.events?.[action.index]?.task?.id;
       const events = (draft.events ?? []).map((e, i) => (i === action.index ? { ...e, ...action.patch } : e));
-      return { ...draft, events: events.sort((a, b) => a.time - b.time) };
+      const next = { ...draft, events: events.sort((a, b) => a.time - b.time) };
+      const after = action.patch.task?.id;
+      return before !== undefined && after !== undefined && after !== before
+        ? renameRefs(next, before, after)
+        : next;
     }
     case "removeEvent":
       return { ...draft, events: draft.events?.filter((_, i) => i !== action.index) };
@@ -116,7 +129,7 @@ export function draftReducer(draft: Draft, action: DraftAction): Draft {
   }
 }
 
-/** Разбор `problem.json`: проверяется только форма, достаточная для редактора; остальное проверит API. */
+/** Разбор `problem.json`: форма проверяется настолько, чтобы редактор не упал; смысл проверит API. */
 export function parseDraft(text: string): Draft {
   let data: unknown;
   try {
@@ -124,14 +137,9 @@ export function parseDraft(text: string): Draft {
   } catch {
     throw new Error("Файл не в формате JSON");
   }
-  if (!isDraft(data)) throw new Error("Это не problem.json: нужны tasks и cluster.workers");
-  return data;
-}
-
-function isDraft(data: unknown): data is Draft {
-  if (typeof data !== "object" || data === null) return false;
-  const { tasks, cluster } = data as { tasks?: unknown; cluster?: { workers?: unknown } };
-  return Array.isArray(tasks) && Array.isArray(cluster?.workers);
+  const issue = draftIssue(data);
+  if (issue) throw new Error(`Это не problem.json: ${issue}`);
+  return data as Draft;
 }
 
 export function serializeDraft(draft: Draft): string {
@@ -147,6 +155,15 @@ export function loadDraft(storage: Storage | undefined = globalThis.localStorage
     return text ? parseDraft(text) : EMPTY_DRAFT;
   } catch {
     return EMPTY_DRAFT;
+  }
+}
+
+/** Сброс черновика: следующий запуск начнётся с пустого. */
+export function clearDraft(storage: Storage | undefined = globalThis.localStorage): void {
+  try {
+    storage?.removeItem(STORAGE_KEY);
+  } catch {
+    // Хранилище недоступно — сбрасывать нечего
   }
 }
 

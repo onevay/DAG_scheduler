@@ -2,9 +2,12 @@
 
 Ошибка всегда приходит в одном формате — `{"error": {"code", "message"}, "diagnostics"?}` (ErrorOut).
 Браузерные клиенты с другого адреса перечисляются в EXPSCHED_CORS_ORIGINS через запятую. Прогоны хранятся
-в каталоге EXPSCHED_RUNS_DIR (по умолчанию runs/), не больше EXPSCHED_MAX_RUNS (100) штук. Каждый прогон
-идёт в отдельном процессе: не дольше EXPSCHED_RUN_TIMEOUT секунд (60), не больше EXPSCHED_RUN_WORKERS (2)
-одновременно.
+в каталоге EXPSCHED_RUNS_DIR (по умолчанию runs/), не больше EXPSCHED_MAX_RUNS (100) штук и не больше
+EXPSCHED_MAX_RUNS_MB (2048) мегабайт. Каждый прогон идёт в отдельном процессе: не дольше EXPSCHED_RUN_TIMEOUT
+секунд (60), не больше EXPSCHED_RUN_WORKERS (2) одновременно, с пределом памяти EXPSCHED_RUN_MEMORY_MB (8192;
+0 — без предела, на Windows предела нет). Идущих и ждущих прогонов — не больше EXPSCHED_RUN_QUEUE (32), сверх
+этого — 503. Проверка входа, разбор тел и работа с хранилищем идут вне цикла событий: большой вход не
+останавливает остальные запросы.
 """
 
 from __future__ import annotations
@@ -13,7 +16,7 @@ import asyncio
 import logging
 import os
 from collections.abc import AsyncIterator, Sequence
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, nullcontext
 from pathlib import Path as FilePath
 from typing import Annotated, Any, Literal
 
@@ -40,9 +43,10 @@ from expsched.api.models import (
     WhatIfOut,
     WhatIfRequest,
 )
-from expsched.api.runner import ProcessRunner, RunTimeout
-from expsched.api.store import RUN_ID_PATTERN, RunStore, run_id_of
+from expsched.api.runner import ProcessRunner, RunFailed, RunQueueFull, RunTimeout
+from expsched.api.store import RUN_ID_PATTERN, RunNotFound, RunStore, run_id_of
 from expsched.api.views import explain_view, input_analysis
+from expsched.api.web import add_security_headers, mount_web
 from expsched.contract.io_models import PolicyIn, ProblemIn, load
 from expsched.contract.limits import MAX_BODY_BYTES, InputTooLarge
 from expsched.contract.whatif import apply, deltas
@@ -53,7 +57,7 @@ from expsched.validation.schema import schema_diagnostics
 
 SCHEMA_CODES = frozenset({Code.E001, Code.E070})  # вход не разобран: остальные проверки не выполнялись
 ERRORS: dict[int | str, dict[str, Any]] = {
-    status: {"model": ErrorOut} for status in (400, 404, 413, 422, 500, 504)
+    status: {"model": ErrorOut} for status in (400, 404, 413, 422, 500, 503, 504)
 }
 RunId = Annotated[str, Path(pattern=RUN_ID_PATTERN)]
 # Тела запросов читаются вручную, с обрывом на лимите, поэтому их схемы добавляются в OpenAPI отдельно.
@@ -78,9 +82,15 @@ def policies() -> dict[str, Any]:
 async def check_problem(request: Request, mode: Literal["strict", "lenient"] = "lenient") -> Any:
     """Диагностики входа. 422 — вход не соответствует схеме, остальные ошибки входа приходят с кодом 200."""
     try:
-        problem, diagnostics = validate(await _read_body(request), mode)
+        body = await _read_body(request)
     except InputTooLarge as error:
         return error_response(413, "INPUT_TOO_LARGE", str(error))
+    return await asyncio.to_thread(_check, body, mode)
+
+
+def _check(body: bytes, mode: Literal["strict", "lenient"]) -> Any:
+    """Проверка и анализ графа — секунды работы процессора на большом входе, поэтому в отдельном потоке."""
+    problem, diagnostics = validate(body, mode)
     found = [d.to_dict() for d in diagnostics]
     if any(d.code in SCHEMA_CODES for d in diagnostics):
         return error_response(422, "SCHEMA_INVALID", "input does not match the schema", found)
@@ -126,7 +136,7 @@ def runs(request: Request, limit: Annotated[int, Query(ge=1, le=500)] = 50) -> A
 async def create_run(request: Request) -> Any:
     """Прогон {problem, policy?}. Тот же вход с той же политикой не пересчитывается: отдаётся сохранённый."""
     try:
-        run_request = RunRequest.model_validate_json(await _read_body(request))
+        run_request = await asyncio.to_thread(RunRequest.model_validate_json, await _read_body(request))
     except InputTooLarge as error:
         return error_response(413, "INPUT_TOO_LARGE", str(error))
     except ValidationError as error:
@@ -144,16 +154,14 @@ async def add_event(request: Request, run_id: RunId) -> Any:
     Так проверяют «а если узел упадёт в 12» или «а если подать срочную задачу»: что сдвинулось — в `replans`.
     """
     store = _store(request)
-    if store.find(run_id) is None:
-        return _no_run(run_id)
+    base = await asyncio.to_thread(lambda: ProblemIn.model_validate(store.problem(run_id)))
     try:
-        event = EventRequest.model_validate_json(await _read_body(request)).event
+        event = (await asyncio.to_thread(EventRequest.model_validate_json, await _read_body(request))).event
     except InputTooLarge as error:
         return error_response(413, "INPUT_TOO_LARGE", str(error))
     except ValidationError as error:
         found = [d.to_dict() for d in schema_diagnostics(error)]
         return error_response(422, "SCHEMA_INVALID", "request does not match the schema", found)
-    base = ProblemIn.model_validate(store.problem(run_id))
     problem = base.model_copy(update={"events": [*base.events, event]})
     return await _run_and_store(request, problem, problem.policy)
 
@@ -165,7 +173,7 @@ async def what_if(request: Request) -> Any:
     Каждый вариант — обычный сохранённый прогон: по его `run_id` открываются расписание и объяснения.
     """
     try:
-        body = WhatIfRequest.model_validate_json(await _read_body(request))
+        body = await asyncio.to_thread(WhatIfRequest.model_validate_json, await _read_body(request))
     except InputTooLarge as error:
         return error_response(413, "INPUT_TOO_LARGE", str(error))
     except ValidationError as error:
@@ -176,12 +184,18 @@ async def what_if(request: Request) -> Any:
         variants = [apply(body.problem, change) for change in body.interventions]
     except ValueError as error:
         return error_response(422, "INVALID_REQUEST", str(error))
+    problems = [body.problem, *variants]
+    store = _store(request)
+    # Места в очереди — сразу под все ещё не посчитанные варианты: what-if принимается целиком или никак
+    missing = await asyncio.to_thread(
+        lambda: len({i for p in problems if store.find(i := run_id_of(input_hash(p, config))) is None})
+    )
+    runner: ProcessRunner = request.app.state.runner
     try:
-        runs = await asyncio.gather(*(_stored_run(request, p, config) for p in [body.problem, *variants]))
-    except NotImplementedError as error:
-        return error_response(400, "POLICY_NOT_IMPLEMENTED", str(error))
-    except RunTimeout as error:
-        return error_response(504, "RUN_TIMEOUT", str(error))
+        with runner.reserve(missing):
+            runs = await asyncio.gather(*(_stored_run(request, p, config, reserved=True) for p in problems))
+    except (NotImplementedError, RunTimeout, RunQueueFull, RunFailed) as error:
+        return _run_error(error)
     (base_id, base), *others = runs
     return {
         "baseline": _summary(base_id, base),
@@ -202,16 +216,12 @@ def _summary(run_id: str, result: dict[str, Any]) -> dict[str, Any]:
 
 @router.get("/runs/{run_id}", response_model=RunOut, responses=ERRORS)
 def get_run(request: Request, run_id: RunId) -> Any:
-    if _store(request).find(run_id) is None:
-        return _no_run(run_id)
     return {"run_id": run_id, "result": _store(request).result(run_id)}
 
 
 @router.get("/runs/{run_id}/problem", response_model=ProblemIn, responses=ERRORS)
 def get_problem(request: Request, run_id: RunId) -> Any:
     """Вход прогона с политикой, которой он посчитан."""
-    if _store(request).find(run_id) is None:
-        return _no_run(run_id)
     return _store(request).problem(run_id)
 
 
@@ -223,8 +233,6 @@ def get_events(
     limit: Annotated[int, Query(ge=1, le=10_000)] = 1000,
 ) -> Any:
     """Журнал страницами: записи с номерами [from_seq, from_seq + limit)."""
-    if _store(request).find(run_id) is None:
-        return _no_run(run_id)
     events, total = _store(request).events(run_id, from_seq, limit)
     next_seq = from_seq + len(events)
     return {"events": events, "total": total, "next_seq": next_seq if next_seq < total else None}
@@ -240,8 +248,6 @@ def get_explain(
 ) -> Any:
     """Почему прогон такой: цепочка, попытки, ожидания и простой, суженные до задачи, узла и момента."""
     store = _store(request)
-    if store.find(run_id) is None:
-        return _no_run(run_id)
     result = store.result(run_id)
     if result["explain"] is None:
         return error_response(404, "NOT_FOUND", f"run {run_id} was not simulated: the input has errors")
@@ -257,9 +263,13 @@ def create_app(
     store: RunStore | None = None,
     runner: ProcessRunner | None = None,
     scenarios_dir: FilePath | None = None,
+    web_dir: FilePath | None = None,
 ) -> FastAPI:
     runner = runner or ProcessRunner(
-        float(os.environ.get("EXPSCHED_RUN_TIMEOUT", "60")), int(os.environ.get("EXPSCHED_RUN_WORKERS", "2"))
+        float(os.environ.get("EXPSCHED_RUN_TIMEOUT", "60")),
+        int(os.environ.get("EXPSCHED_RUN_WORKERS", "2")),
+        int(os.environ.get("EXPSCHED_RUN_QUEUE", "32")),
+        int(os.environ.get("EXPSCHED_RUN_MEMORY_MB", "8192")) or None,
     )
 
     @asynccontextmanager
@@ -273,9 +283,14 @@ def create_app(
         os.environ.get("EXPSCHED_SCENARIOS_DIR", FilePath(__file__).resolve().parents[3] / "scenarios")
     )
     app.state.store = store or RunStore(
-        FilePath(os.environ.get("EXPSCHED_RUNS_DIR", "runs")), int(os.environ.get("EXPSCHED_MAX_RUNS", "100"))
+        FilePath(os.environ.get("EXPSCHED_RUNS_DIR", "runs")),
+        int(os.environ.get("EXPSCHED_MAX_RUNS", "100")),
+        int(os.environ.get("EXPSCHED_MAX_RUNS_MB", "2048")) << 20,
     )
     app.include_router(router)
+    add_security_headers(app)
+    if web_dir is not None:
+        mount_web(app, web_dir, lambda path: error_response(404, "NOT_FOUND", f"/{path} not found"))
     if cors_origins:
         app.add_middleware(
             CORSMiddleware,
@@ -283,6 +298,7 @@ def create_app(
             allow_methods=["GET", "POST"],
             allow_headers=["*"],
         )
+    app.add_exception_handler(RunNotFound, _run_not_found)
     app.add_exception_handler(HTTPException, _http_error)
     app.add_exception_handler(RequestValidationError, _request_error)
     app.add_exception_handler(Exception, _internal_error)
@@ -306,25 +322,45 @@ def error_response(
 
 
 async def _run_and_store(request: Request, problem: ProblemIn, config: PolicyIn) -> Any:
-    """Ответ `{run_id, result}` или ошибка: политика не реализована, прогон не уложился в таймаут."""
+    """Ответ `{run_id, result}` или ошибка прогона (см. `_run_error`)."""
     try:
         run_id, result = await _stored_run(request, problem, config)
-    except NotImplementedError as error:
-        return error_response(400, "POLICY_NOT_IMPLEMENTED", str(error))
-    except RunTimeout as error:
-        return error_response(504, "RUN_TIMEOUT", str(error))
+    except (NotImplementedError, RunTimeout, RunQueueFull, RunFailed) as error:
+        return _run_error(error)
     return {"run_id": run_id, "result": result}
 
 
-async def _stored_run(request: Request, problem: ProblemIn, config: PolicyIn) -> tuple[str, dict[str, Any]]:
-    """Сохранённый прогон входа с политикой или новый: в рабочем процессе, с таймаутом, затем в хранилище."""
-    run_id = run_id_of(input_hash(problem, config))
+def _run_error(error: Exception) -> JSONResponse:
+    """Политика не реализована — 400, очередь полна — 503, таймаут — 504, падение прогона — 500."""
+    if isinstance(error, NotImplementedError):
+        return error_response(400, "POLICY_NOT_IMPLEMENTED", str(error))
+    if isinstance(error, RunQueueFull):
+        return error_response(503, "RUN_QUEUE_FULL", str(error))
+    if isinstance(error, RunTimeout):
+        return error_response(504, "RUN_TIMEOUT", str(error))
+    log.error("run failed: %s", error)  # трассировка рабочего процесса — только в журнал сервера
+    return error_response(500, "RUN_FAILED", "the run failed in the worker process; see the server log")
+
+
+async def _stored_run(
+    request: Request, problem: ProblemIn, config: PolicyIn, reserved: bool = False
+) -> tuple[str, dict[str, Any]]:
+    """Сохранённый прогон входа с политикой или новый: в рабочем процессе, с таймаутом, затем в хранилище.
+
+    Прогон, вытесненный между проверкой и чтением, считается заново. `reserved` — место в очереди уже взято.
+    """
     store = _store(request)
-    if store.find(run_id) is None:
-        runner: ProcessRunner = request.app.state.runner
+    run_id = await asyncio.to_thread(lambda: run_id_of(input_hash(problem, config)))
+    try:
+        return run_id, await asyncio.to_thread(store.result, run_id)
+    except RunNotFound:
+        pass
+    runner: ProcessRunner = request.app.state.runner
+    with nullcontext() if reserved else runner.reserve():
         outcome = await runner.run(problem, config)
-        store.save(run_id, problem.model_copy(update={"policy": config}).model_dump(mode="json"), outcome)
-    return run_id, store.result(run_id)
+    stored = problem.model_copy(update={"policy": config}).model_dump(mode="json")
+    await asyncio.to_thread(store.save, run_id, stored, outcome)
+    return run_id, outcome.result
 
 
 def _scenarios(request: Request) -> dict[str, ProblemIn]:
@@ -348,6 +384,10 @@ def _no_run(run_id: str) -> JSONResponse:
     return error_response(
         404, "NOT_FOUND", f"run {run_id} is not stored: it was never made or has been evicted"
     )
+
+
+async def _run_not_found(request: Request, error: Exception) -> JSONResponse:
+    return _no_run(error.run_id if isinstance(error, RunNotFound) else "")
 
 
 async def _read_body(request: Request) -> bytes:
@@ -399,4 +439,14 @@ def _cors_origins() -> list[str]:
     return [o.strip() for o in os.environ.get("EXPSCHED_CORS_ORIGINS", "").split(",") if o.strip()]
 
 
-app = create_app(_cors_origins())
+def _web_dir() -> FilePath | None:
+    """Сборка клиента, если она есть: `EXPSCHED_WEB_DIR` или `ui/web/dist` в репозитории."""
+    default = FilePath(__file__).resolve().parents[3] / "ui" / "web" / "dist"
+    web_dir = FilePath(os.environ.get("EXPSCHED_WEB_DIR", default))
+    if (web_dir / "index.html").is_file():
+        return web_dir
+    log.warning("no client build in %s: serving the API only", web_dir)
+    return None
+
+
+app = create_app(_cors_origins(), web_dir=_web_dir())
