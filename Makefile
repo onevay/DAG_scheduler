@@ -2,7 +2,7 @@
 RUN := uv run
 WEB := npm --prefix ui/web
 
-.PHONY: setup lint types test perf test-all schema api ui web-install web-dev web-lint web-test web-build web-e2e
+.PHONY: setup lint types test perf test-all schema api ui web-install web-dev web-lint web-test web-build web-e2e audit audit-py audit-web
 
 setup:
 	uv sync --all-extras
@@ -55,3 +55,13 @@ web-build:
 # Сквозные проверки в Chromium (ставится сам при первом запуске): свой API на :8010, клиент через vite preview на :4173
 web-e2e:
 	$(WEB) run e2e
+
+# Известные уязвимости зависимостей: Python — по uv.lock (pip-audit), JS — по package-lock.json, от high и выше
+audit: audit-py audit-web
+
+audit-py:
+	uv export --locked --all-extras --no-hashes --no-emit-project -o .audit-requirements.txt
+	uvx pip-audit -r .audit-requirements.txt --disable-pip --no-deps; status=$$?; rm -f .audit-requirements.txt; exit $$status
+
+audit-web:
+	$(WEB) audit --audit-level=high

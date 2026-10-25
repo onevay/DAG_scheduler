@@ -5,20 +5,22 @@ jobs:
   py:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - run: uv sync --all-extras
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.2
+      - run: uv sync --locked --all-extras
       - run: make lint types
       - run: make test
       - run: make perf
       - name: schemas are up to date
         run: make schema && git diff --exit-code schemas/
+      - name: Уязвимости Python-зависимостей
+        run: make audit-py
 
   web:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
@@ -29,14 +31,16 @@ jobs:
       - run: make web-lint
       - run: make web-test
       - run: make web-build
+      - name: Уязвимости JS-зависимостей
+        run: make audit-web
 
   e2e:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
-      - run: uv sync --extra api  # API для сквозных проверок: fastapi и uvicorn
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.2
+      - run: uv sync --locked --extra api  # API для сквозных проверок: fastapi и uvicorn
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
@@ -47,7 +51,7 @@ jobs:
       - run: make web-e2e
       - name: Отчёт Playwright при падении
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: |

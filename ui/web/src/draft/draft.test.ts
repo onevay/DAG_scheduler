@@ -91,7 +91,7 @@ describe("parseDraft", () => {
   it("accepts problem.json and rejects anything else", () => {
     expect(parseDraft(JSON.stringify(BASE))).toEqual(BASE);
     expect(() => parseDraft("{")).toThrow("Файл не в формате JSON");
-    expect(() => parseDraft('{"tasks": []}')).toThrow("нужны tasks и cluster.workers");
+    expect(() => parseDraft('{"tasks": []}')).toThrow("нет списка cluster.workers");
   });
 });
 
@@ -155,5 +155,32 @@ describe("diagnosticsByTask", () => {
       train: ["E012", "E070"],
       "": ["E050"],
     });
+  });
+});
+
+describe("rename", () => {
+  const withSubmitted: Draft = {
+    ...BASE,
+    events: [
+      { time: 2, type: "submit_task", task: { id: "u1", duration: 1, dependencies: ["train"] } },
+      { time: 4, type: "submit_task", task: { id: "u2", duration: 1, dependencies: ["u1", "prep"] } },
+    ],
+  };
+
+  it("follows a renamed input task into submitted ones", () => {
+    const draft = draftReducer(withSubmitted, { type: "updateTask", id: "train", patch: { id: "fit" } });
+    expect(draft.events?.[0]?.task?.dependencies).toEqual(["fit"]);
+    expect(deps(draft).eval).toEqual(["fit", "prep"]);
+  });
+
+  it("follows a renamed submitted task into later submissions", () => {
+    const task = withSubmitted.events?.[0]?.task;
+    const draft = draftReducer(withSubmitted, {
+      type: "updateEvent",
+      index: 0,
+      patch: { task: { ...task, id: "urgent", duration: 1 } },
+    });
+    expect(draft.events?.map((e) => e.task?.id)).toEqual(["urgent", "u2"]);
+    expect(draft.events?.[1]?.task?.dependencies).toEqual(["urgent", "prep"]);
   });
 });

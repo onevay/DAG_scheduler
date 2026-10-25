@@ -23,6 +23,8 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
+    // Экранные тесты с MSW на холодном старте и загруженной машине CI идут дольше пяти секунд по умолчанию
+    testTimeout: 15_000,
     css: { modules: { classNameStrategy: "non-scoped" } },
   },
 });

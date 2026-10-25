@@ -3,8 +3,9 @@
 `run_id` — начало `input_hash`: повторный запрос с тем же входом и политикой отдаёт сохранённый прогон.
 В problem.json вход лежит вместе с политикой, которой он был посчитан.
 Прогон пишется во временный каталог и переименовывается целиком: читатель не увидит наполовину записанный.
-Когда прогонов больше `max_runs`, удаляются самые старые. summary.json — строка списка прогонов, чтобы список
-не читал result.json целиком.
+Когда прогонов больше `max_runs` или они вместе занимают больше `max_bytes`, удаляются самые старые.
+summary.json — строка списка прогонов, чтобы список не читал result.json целиком. Прогон может исчезнуть между
+проверкой и чтением (его вытеснил параллельный запрос) — чтение тогда бросает RunNotFound.
 """
 
 from __future__ import annotations
@@ -23,14 +24,23 @@ from expsched.pipeline import RunResult
 RUN_ID_PATTERN = r"^[0-9a-f]{16}$"
 
 
+class RunNotFound(LookupError):
+    """Прогона нет в хранилище: его не было или он вытеснен."""
+
+    def __init__(self, run_id: str) -> None:
+        super().__init__(run_id)
+        self.run_id = run_id
+
+
 def run_id_of(input_hash: str) -> str:
     return input_hash.removeprefix("sha256:")[:16]
 
 
 class RunStore:
-    def __init__(self, root: Path, max_runs: int = 100) -> None:
+    def __init__(self, root: Path, max_runs: int = 100, max_bytes: int | None = None) -> None:
         self.root = root
         self.max_runs = max_runs
+        self.max_bytes = max_bytes
 
     def find(self, run_id: str) -> Path | None:
         path = self.root / run_id
@@ -42,24 +52,26 @@ class RunStore:
         self._evict(keep=run_id)
 
     def result(self, run_id: str) -> dict[str, Any]:
-        return dict(json.loads((self.root / run_id / "result.json").read_text(encoding="utf-8")))
+        return dict(json.loads(self._read(run_id, "result.json")))
 
     def problem(self, run_id: str) -> dict[str, Any]:
-        return dict(json.loads((self.root / run_id / "problem.json").read_text(encoding="utf-8")))
+        return dict(json.loads(self._read(run_id, "problem.json")))
 
     def recent(self, limit: int) -> list[dict[str, Any]]:
         """Сводки последних прогонов, новые первыми."""
         summaries = []
         for path in self.root.iterdir() if self.root.is_dir() else []:
-            if path.is_dir() and not path.name.startswith(".") and (path / "summary.json").is_file():
-                summaries.append(json.loads((path / "summary.json").read_text(encoding="utf-8")))
+            if path.is_dir() and not path.name.startswith("."):
+                try:
+                    summaries.append(json.loads((path / "summary.json").read_text(encoding="utf-8")))
+                except FileNotFoundError:
+                    continue  # вытеснен, пока шёл список
         summaries.sort(key=lambda s: (s["created_at"], s["run_id"]), reverse=True)
         return summaries[:limit]
 
     def events(self, run_id: str, from_seq: int, limit: int) -> tuple[list[dict[str, Any]], int]:
         """Записи журнала с номерами [from_seq, from_seq + limit) и общее число записей."""
-        with (self.root / run_id / "events.jsonl").open(encoding="utf-8") as lines:
-            records = lines.readlines()
+        records = self._read(run_id, "events.jsonl").splitlines()
         return [json.loads(line) for line in records[from_seq : from_seq + limit]], len(records)
 
     def _write(self, run_id: str, problem: dict[str, Any], outcome: RunResult) -> None:
@@ -76,14 +88,37 @@ class RunStore:
         except OSError:
             shutil.rmtree(staging)  # тот же прогон уже сохранил параллельный запрос
 
+    def _read(self, run_id: str, name: str) -> str:
+        try:
+            return (self.root / run_id / name).read_text(encoding="utf-8")
+        except FileNotFoundError:
+            raise RunNotFound(run_id) from None
+
     def _evict(self, keep: str) -> None:
+        """Удаляет самые старые прогоны, пока их больше max_runs или они занимают больше max_bytes."""
         runs = sorted(
             (p for p in self.root.iterdir() if p.is_dir() and not p.name.startswith(".")),
             key=lambda p: (p.stat().st_mtime, p.name),
         )
-        for path in runs[: max(0, len(runs) - self.max_runs)]:
-            if path.name != keep:
-                shutil.rmtree(path, ignore_errors=True)
+        sizes = {p: _size(p) for p in runs}
+        total = sum(sizes.values())
+        for path in runs:
+            over_count = len(runs) > self.max_runs
+            over_size = self.max_bytes is not None and total > self.max_bytes
+            if not (over_count or over_size):
+                return
+            if path.name == keep:
+                continue
+            shutil.rmtree(path, ignore_errors=True)
+            runs = [p for p in runs if p != path]
+            total -= sizes[path]
+
+
+def _size(path: Path) -> int:
+    try:
+        return sum(f.stat().st_size for f in path.iterdir())
+    except FileNotFoundError:
+        return 0
 
 
 def _summary(run_id: str, problem: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:

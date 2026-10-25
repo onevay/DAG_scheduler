@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Link, Navigate, Route, Routes } from "react-router";
+import { Link, Navigate, Route, Routes, useLocation } from "react-router";
 
 import { useRuns } from "./api/hooks";
 import styles from "./App.module.css";
@@ -10,6 +10,7 @@ import { ExplainPage } from "./pages/ExplainPage";
 import { OverviewPage } from "./pages/OverviewPage";
 import { RunPage } from "./pages/RunPage";
 import { SystemPage } from "./pages/SystemPage";
+import { ErrorBoundary } from "./shell/ErrorBoundary";
 import { Rail } from "./shell/Rail";
 import { PageHeader } from "./ui/PageHeader";
 
@@ -17,35 +18,41 @@ import { PageHeader } from "./ui/PageHeader";
 const BuilderPage = lazy(() => import("./pages/BuilderPage").then((m) => ({ default: m.BuilderPage })));
 
 export function App() {
+  const { pathname } = useLocation();
   return (
     <div className={styles.page}>
       <Rail />
       <main className={styles.main}>
-        <Routes>
-          <Route path="/" element={<OverviewPage />} />
-          <Route
-            path="/builder"
-            element={
-              <Suspense fallback={<PageHeader title="Сборка">Загружаю редактор…</PageHeader>}>
-                <BuilderPage />
-              </Suspense>
-            }
-          />
-          <Route path="/cluster" element={<ClusterPage />} />
-          <Route path="/runs" element={<LatestRun to="runs" title="Прогон" />} />
-          <Route path="/runs/:runId" element={<RunPage />} />
-          <Route path="/compare" element={<ComparePage />} />
-          <Route path="/explain" element={<LatestRun to="explain" title="Объяснения" />} />
-          <Route path="/explain/:runId" element={<ExplainPage />} />
-          <Route path="/system" element={<SystemPage />} />
-          <Route path="/containers" element={<ContainersPage />} />
-          <Route
-            path="*"
-            element={
-              <PageHeader title="Страница не найдена">Такого адреса нет — выберите раздел слева.</PageHeader>
-            }
-          />
-        </Routes>
+        {/* Ключ по адресу: переход в другой раздел сбрасывает ошибку прошлого экрана */}
+        <ErrorBoundary key={pathname}>
+          <Routes>
+            <Route path="/" element={<OverviewPage />} />
+            <Route
+              path="/builder"
+              element={
+                <Suspense fallback={<PageHeader title="Сборка">Загружаю редактор…</PageHeader>}>
+                  <BuilderPage />
+                </Suspense>
+              }
+            />
+            <Route path="/cluster" element={<ClusterPage />} />
+            <Route path="/runs" element={<LatestRun to="runs" title="Прогон" />} />
+            <Route path="/runs/:runId" element={<RunPage />} />
+            <Route path="/compare" element={<ComparePage />} />
+            <Route path="/explain" element={<LatestRun to="explain" title="Объяснения" />} />
+            <Route path="/explain/:runId" element={<ExplainPage />} />
+            <Route path="/system" element={<SystemPage />} />
+            <Route path="/containers" element={<ContainersPage />} />
+            <Route
+              path="*"
+              element={
+                <PageHeader title="Страница не найдена">
+                  Такого адреса нет — выберите раздел слева.
+                </PageHeader>
+              }
+            />
+          </Routes>
+        </ErrorBoundary>
       </main>
     </div>
   );

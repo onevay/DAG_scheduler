@@ -375,6 +375,8 @@ export interface components {
         | "INVALID_REQUEST"
         | "POLICY_NOT_IMPLEMENTED"
         | "RUN_TIMEOUT"
+        | "RUN_QUEUE_FULL"
+        | "RUN_FAILED"
         | "NOT_FOUND"
         | "METHOD_NOT_ALLOWED"
         | "INTERNAL";
@@ -1321,6 +1323,15 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Gateway Timeout */
       504: {
         headers: {
@@ -1390,6 +1401,15 @@ export interface operations {
       };
       /** @description Internal Server Error */
       500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
         headers: {
           [name: string]: unknown;
         };
@@ -1469,6 +1489,15 @@ export interface operations {
       };
       /** @description Internal Server Error */
       500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
         headers: {
           [name: string]: unknown;
         };
@@ -1556,6 +1585,15 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Gateway Timeout */
       504: {
         headers: {
@@ -1636,6 +1674,15 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Gateway Timeout */
       504: {
         headers: {
@@ -1705,6 +1752,15 @@ export interface operations {
       };
       /** @description Internal Server Error */
       500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
         headers: {
           [name: string]: unknown;
         };
@@ -1808,6 +1864,15 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Gateway Timeout */
       504: {
         headers: {
@@ -1888,6 +1953,15 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Gateway Timeout */
       504: {
         headers: {
@@ -1959,6 +2033,15 @@ export interface operations {
       };
       /** @description Internal Server Error */
       500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
         headers: {
           [name: string]: unknown;
         };
