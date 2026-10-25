@@ -35,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
-      - run: uv sync
+      - run: uv sync --extra api  # API для сквозных проверок: fastapi и uvicorn
       - uses: actions/setup-node@v4
         with:
           node-version: 20

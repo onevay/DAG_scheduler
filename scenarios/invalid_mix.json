@@ -1,0 +1,24 @@
+{
+  "time_unit": "hour",
+  "cluster": {
+    "workers": [
+      {"id": "node-A", "resources": {"gpu": 4}, "labels": {"gpu_type": "a100"}},
+      {"id": "node-B", "resources": {"gpu": 4}, "labels": {"gpu_type": "v100"}}
+    ]
+  },
+  "tasks": [
+    {"id": "prep", "kind": "data", "duration": 2, "resources": {"gpu": 1}},
+    {"id": "train", "kind": "train", "duration": 5, "resources": {"gpu": 4}, "dependencies": ["prep"]},
+    {"id": "eval", "kind": "eval", "duration": 1, "resources": {"gpu": 1}, "dependencies": ["train"]},
+    {"id": "too_big", "kind": "train", "duration": 3, "resources": {"gpu": 16}, "dependencies": ["prep"]},
+    {"id": "after_too_big", "kind": "eval", "duration": 1, "resources": {"gpu": 1}, "dependencies": ["too_big"]},
+    {"id": "wants_h100", "kind": "train", "duration": 2, "resources": {"gpu": 2},
+     "constraints": {"gpu_type": "h100"}},
+    {"id": "rushed_report", "kind": "eval", "duration": 2, "resources": {"gpu": 1}, "dependencies": ["train"],
+     "deadline": 4, "priority": 8}
+  ],
+  "events": [
+    {"time": 3, "type": "worker_down", "worker": "node-Z"}
+  ],
+  "policy": {"name": "priority_backfill"}
+}

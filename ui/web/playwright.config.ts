@@ -31,7 +31,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `uv run --project ../.. uvicorn expsched.api.app:app --host 127.0.0.1 --port ${API_PORT}`,
+      command: `uv run --project ../.. --extra api uvicorn expsched.api.app:app --host 127.0.0.1 --port ${API_PORT}`,
       url: `${API_URL}/v1/policies`,
       env: { EXPSCHED_RUNS_DIR: runsDir, EXPSCHED_RUN_WORKERS: "2" },
       reuseExistingServer: false,

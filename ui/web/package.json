@@ -14,7 +14,7 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "gen:types": "openapi-typescript ../../schemas/openapi.json -o src/api/schema.ts --default-non-nullable false && prettier --write src/api/schema.ts",
-    "e2e": "playwright test"
+    "e2e": "playwright install chromium && playwright test"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.5",

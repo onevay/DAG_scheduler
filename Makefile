@@ -31,7 +31,7 @@ schema:
 	$(RUN) python -m expsched.api.openapi schemas/openapi.json
 
 api:
-	$(RUN) uvicorn expsched.api.app:app --reload --port 8000
+	$(RUN) --extra api uvicorn expsched.api.app:app --reload --port 8000
 
 ui:
 	$(RUN) streamlit run ui/streamlit/app.py
@@ -52,6 +52,6 @@ web-test:
 web-build:
 	$(WEB) run build
 
-# Сквозные проверки в Chromium: свой API на :8010, собранный клиент через vite preview на :4173
+# Сквозные проверки в Chromium (ставится сам при первом запуске): свой API на :8010, клиент через vite preview на :4173
 web-e2e:
 	$(WEB) run e2e
