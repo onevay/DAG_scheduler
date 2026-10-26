@@ -6,10 +6,14 @@ import type {
   InputEvent,
   Intervention,
   JournalRecord,
+  Live,
+  LiveStarted,
   Policies,
   Policy,
   Problem,
+  Replay,
   Run,
+  RunAction,
   RunListItem,
   Scenario,
   Validation,
@@ -102,6 +106,13 @@ export const api = {
     request<EventsPage>(`/v1/runs/${runId}/events`, { query: { from_seq: fromSeq, limit }, signal }),
   explain: (runId: string, filter: ExplainFilter = {}, signal?: AbortSignal) =>
     request<ExplainView>(`/v1/runs/${runId}/explain`, { query: { ...filter }, signal }),
+  /** Прогон на агентах (вход в режиме emulate или shadow): ответ 202 сразу, прогон идёт в фоне. */
+  startOnAgents: (problem: Problem, policy?: Policy) =>
+    request<LiveStarted>("/v1/runs", { method: "POST", body: { problem, policy } }),
+  live: (runId: string, signal?: AbortSignal) => request<Live>(`/v1/runs/${runId}/containers`, { signal }),
+  action: (runId: string, action: RunAction) =>
+    request<Live>(`/v1/runs/${runId}/actions`, { method: "POST", body: action }),
+  replay: (runId: string) => request<Replay>(`/v1/runs/${runId}/replay`, { method: "POST" }),
   addEvent: (runId: string, event: InputEvent) =>
     request<Run>(`/v1/runs/${runId}/events`, { method: "POST", body: { event } }),
   whatIf: (problem: Problem, interventions: Intervention[], policy?: Policy) =>

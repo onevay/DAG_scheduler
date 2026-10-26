@@ -5,7 +5,7 @@ import pytest
 from expsched.agent.__main__ import machine_capacity
 from expsched.agent.core import Agent
 from expsched.agent.runtime import FakeRuntime
-from expsched.contract.agent import EventsAck, PollReply
+from expsched.contract.agent import EventsAck, HelloAck, PollReply
 
 RUN = "0123456789abcdef"
 
@@ -140,6 +140,14 @@ def test_restart_replays_the_journal_and_reconciles(make, runtime, tmp_path):
     again.watch()
     assert f"{RUN}:stray:1" not in runtime.containers  # чужой контейнер остановлен
     assert kinds(again)[-3:] == [("late", "accepted"), ("late", "started"), ("gone", "lost")]
+
+
+def test_fresh_agent_continues_the_numbering_the_scheduler_remembers(make, runtime):
+    agent = make()
+    agent.welcome(HelloAck(agent="laptop", poll_timeout_s=25, heartbeat_timeout_s=15, next_event_seq=7))
+    agent.handle(reply(start()))
+    assert [e.seq for e in agent.outbox] == [7, 8]
+    assert make().next_seq == 9  # и после перезапуска агента
 
 
 def test_torn_last_line_of_the_journal_is_ignored(make, tmp_path):

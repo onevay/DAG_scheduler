@@ -1,7 +1,7 @@
 import { QueryClient, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { allEvents, api, ApiError, type ExplainFilter } from "./client";
-import type { InputEvent, Intervention, Policy, PolicyName, Problem, Run } from "./types";
+import type { InputEvent, Intervention, Live, Policy, PolicyName, Problem, Run, RunAction } from "./types";
 
 export const keys = {
   policies: ["policies"] as const,
@@ -12,6 +12,8 @@ export const keys = {
   runEvents: (runId: string) => ["run", runId, "events"] as const,
   explain: (runId: string, filter: ExplainFilter) => ["run", runId, "explain", filter] as const,
   validation: (problem: Problem, mode: string) => ["validation", mode, problem] as const,
+  live: (runId: string) => ["live", runId] as const,
+  liveEvents: (runId: string) => ["live", runId, "events"] as const,
 };
 
 // Прогон по run_id не меняется никогда: однажды загруженный, он не перезапрашивается.
@@ -89,6 +91,43 @@ export const useCreateRun = () =>
   useRunMutation(({ problem, policy }: { problem: Problem; policy?: Policy }) =>
     api.createRun(problem, policy),
   );
+
+/** Запуск на агентах: ответ не прогон, а его id — состояние смотрят на экране «Контейнеры». */
+export const useStartOnAgents = () => {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ problem, policy }: { problem: Problem; policy?: Policy }) =>
+      api.startOnAgents(problem, policy),
+    onSuccess: () => void client.invalidateQueries({ queryKey: ["runs"] }),
+  });
+};
+
+/** Прогон на агентах сейчас; пока идёт — раз в секунду. */
+export const useLive = (runId: string | undefined) =>
+  useQuery({
+    queryKey: keys.live(runId ?? ""),
+    queryFn: ({ signal }) => api.live(runId as string, signal),
+    enabled: runId !== undefined,
+    refetchInterval: (query) => (query.state.data?.status === "running" ? 1000 : false),
+  });
+
+/** Журнал идущего прогона: обновляется вместе с его состоянием. */
+export const useLiveEvents = (runId: string | undefined, running: boolean) =>
+  useQuery({
+    queryKey: keys.liveEvents(runId ?? ""),
+    queryFn: ({ signal }) => api.eventsPage(runId as string, 0, 10_000, signal).then((p) => p.events),
+    enabled: runId !== undefined,
+    refetchInterval: running ? 1000 : false,
+  });
+
+/** Действие над прогоном на агентах; ответ — его новое состояние. */
+export const useRunAction = (runId: string) => {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (action: RunAction) => api.action(runId, action),
+    onSuccess: (live: Live) => client.setQueryData(keys.live(runId), live),
+  });
+};
 
 export const useAddEvent = () =>
   useRunMutation(({ runId, event }: { runId: string; event: InputEvent }) => api.addEvent(runId, event));

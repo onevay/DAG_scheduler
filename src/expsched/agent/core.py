@@ -96,6 +96,11 @@ class Agent:
         )
 
     def welcome(self, ack: HelloAck) -> None:
+        """Ответ на hello. Сервер помнит этот id по прежнему агенту дальше нашего журнала (журнал новый или
+        потерян) — нумерация событий продолжается с его номера, иначе он примет их за повторы."""
+        if ack.next_event_seq > self.next_seq:
+            self._write({"kind": "renumber", "next_event_seq": ack.next_event_seq})
+            self.next_seq = ack.next_event_seq
         self.acked(EventsAck(next_event_seq=ack.next_event_seq))
 
     def poll(self, wait_s: int) -> Poll:
@@ -251,5 +256,7 @@ class Agent:
                 self.attempts[record["key"]].container_id = record["container_id"]
             elif record["kind"] == "event":
                 self._account(AgentEvent.model_validate(record["event"]))
+            elif record["kind"] == "renumber":
+                self.next_seq = max(self.next_seq, record["next_event_seq"])
             elif record["kind"] == "ack":
                 self.outbox = [e for e in self.outbox if e.seq >= record["next_event_seq"]]

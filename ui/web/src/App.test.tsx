@@ -53,7 +53,7 @@ describe("оболочка", () => {
     expect(screen.getByRole("link", { name: "Дизайн-система" })).toHaveAttribute("aria-current", "page");
     await userEvent.click(screen.getByRole("link", { name: "Контейнеры" }));
     expect(heading()).toHaveTextContent("Контейнеры");
-    expect(screen.getByText("следующий этап")).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Эмуляция" })).toBeInTheDocument();
   });
 
   it("незнакомый путь — не раздел", () => {

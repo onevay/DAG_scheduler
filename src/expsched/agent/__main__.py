@@ -99,11 +99,12 @@ def serve(agent: Agent, scheduler: Scheduler) -> None:
             while True:
                 busy = any(not a.done for a in agent.attempts.values())
                 wait = 1 if busy or agent.outbox else 25
-                agent.handle(scheduler.call("poll", agent.poll(wait), PollReply, timeout=wait + 30))
-                if isinstance(agent.runtime, FakeRuntime):  # у подделки работа идёт по часам стены
-                    now = time.monotonic()
+                reply = scheduler.call("poll", agent.poll(wait), PollReply, timeout=wait + 30)
+                if isinstance(agent.runtime, FakeRuntime):  # у подделки работа идёт по часам стены —
+                    now = time.monotonic()  # только у уже запущенных: новые стартуют с нуля
                     agent.runtime.advance(round((now - clock) * 1000))
                     clock = now
+                agent.handle(reply)
                 agent.watch()
                 if batch := agent.batch():
                     agent.acked(scheduler.call("events", batch, EventsAck))
