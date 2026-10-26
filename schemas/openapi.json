@@ -1105,7 +1105,7 @@
             "type": "string"
           },
           "time_limit": {
-            "default": 10.0,
+            "default": 5.0,
             "exclusiveMinimum": 0.0,
             "maximum": 300.0,
             "title": "Time Limit",
@@ -1172,7 +1172,7 @@
               "name": "priority_backfill",
               "objective": "lexicographic",
               "preemption": "deadline_only",
-              "time_limit": 10.0,
+              "time_limit": 5.0,
               "validation_mode": "lenient"
             }
           },

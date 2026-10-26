@@ -69,7 +69,7 @@ def run(problem: ProblemIn, policy: PolicyIn | None = None) -> RunResult:
 
     plan = quarantine(validated, diagnostics)
     forecast = 0 < len(plan.problem.all_tasks()) <= config.max_forecast_tasks
-    sim = Simulator(plan.problem, make_policy(config), forecast=forecast)
+    sim = Simulator(plan.problem, make_policy(config, problem.seed), forecast=forecast)
     log = sim.run_all()
     status = {**plan.excluded, **sim.state.status}
     planned = {k: t for k, t in sim.state.tasks.items() if status[k] is not TaskStatus.INFEASIBLE}

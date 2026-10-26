@@ -24,6 +24,7 @@ def build_snapshot(state: SimState, now: int) -> Snapshot:
         t=now,
         tasks=MappingProxyType(state.tasks),
         ready=tuple(sorted(state.ready)),
+        status=MappingProxyType(state.status),
         running=MappingProxyType(state.run),
         rem=MappingProxyType(state.rem),
         free=MappingProxyType(state.free),

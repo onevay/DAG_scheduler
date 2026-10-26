@@ -45,6 +45,7 @@ class PreemptivePolicy:
         if not any(snapshot.tasks[k].preemptible for k in snapshot.running):
             return decisions
         started = [(d.task, d.worker) for d in decisions if d.action == "START"]
+        promised = {d.task: d.reason.get("t_res") for d in decisions if d.action == "RESERVE"}
         free = dict(snapshot.free)
         for key, worker in started:
             free[worker] = free[worker] - snapshot.tasks[key].resources
@@ -67,7 +68,7 @@ class PreemptivePolicy:
             if self.trigger == "priority":
                 if _fits_somewhere(view, key, free):
                     continue
-            elif not self._misses_deadline(view, key, free, started):
+            elif not self._misses_deadline(view, key, free, started, promised.get(key)):
                 continue
             plan = self.victims(view, key, free)
             if plan is None:
@@ -92,12 +93,19 @@ class PreemptivePolicy:
 
     @staticmethod
     def _misses_deadline(
-        snapshot: Snapshot, key: str, free: Mapping[str, Resources], started: list[tuple[str, str]]
+        snapshot: Snapshot,
+        key: str,
+        free: Mapping[str, Resources],
+        started: list[tuple[str, str]],
+        promised: object = None,
     ) -> bool:
-        """Задача успеет, только если стартует сейчас: по окончаниям идущих задач она опоздает."""
+        """Задача успеет, только если стартует сейчас: по окончаниям идущих задач она опоздает. `promised` —
+        резерв базовой политики (её план): если он успевает к дедлайну, задачу не спасают."""
         deadline = snapshot.tasks[key].deadline
         if deadline is None or snapshot.t + snapshot.rem[key] > deadline:
             return False  # не успеет даже сейчас: вытеснение ничего не даст
+        if isinstance(promised, int) and promised + snapshot.rem[key] <= deadline:
+            return False
         on_time = reservation(snapshot, key, free, started)
         return on_time is None or on_time.t + snapshot.rem[key] > deadline
 

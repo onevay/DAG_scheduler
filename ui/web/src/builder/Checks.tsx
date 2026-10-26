@@ -179,6 +179,14 @@ export function PolicySettings() {
           onChange={(n) => set({ max_forecast_tasks: n ?? 0 })}
           hint="на входах больше этого прогноз не строится; 0 — не строить вовсе"
         />
+        {policy.name === "cpsat" && (
+          <NumberField
+            label="Бюджет решателя cpsat"
+            value={policy.time_limit}
+            onChange={(n) => set({ time_limit: n && n > 0 ? Math.min(n, 300) : 5 })}
+            hint="условные секунды на одно решение; больше — план лучше, но прогон дольше"
+          />
+        )}
         <div className={styles.labelled}>
           <span className={styles.detail}>Проверка входа</span>
           <Segmented

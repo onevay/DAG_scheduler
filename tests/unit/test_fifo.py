@@ -6,6 +6,7 @@ from expsched.analysis import analyze
 from expsched.contract.io_models import PolicyIn
 from expsched.domain.states import TaskStatus
 from expsched.engine.simulator import Simulator
+from expsched.policies import registry
 from expsched.policies.fifo import FifoPolicy
 from expsched.policies.registry import make_policy
 
@@ -59,6 +60,7 @@ def test_registry_builds_policies_by_name():
     assert make_policy(PolicyIn(name="fifo_skip", preemption="never")).name == "fifo_skip"
 
 
-def test_registry_reports_policies_that_are_not_implemented():
+def test_registry_reports_policies_that_are_not_implemented(monkeypatch):
+    monkeypatch.delitem(registry._FACTORIES, "cpsat", raising=False)  # как без ortools
     with pytest.raises(NotImplementedError, match="cpsat"):
         make_policy(PolicyIn(name="cpsat"))

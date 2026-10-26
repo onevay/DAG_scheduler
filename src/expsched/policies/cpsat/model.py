@@ -5,6 +5,10 @@
 задача стартует не раньше release и окончания зависимостей; дедлайны мягкие. Цель — как `metrics.score`:
 lexicographic решается стадиями (каждая следующая — при лучшем значении предыдущих), weighted — одной.
 Решатель детерминирован: один поток, `seed` и бюджет детерминированного времени вместо секунд.
+
+Найденный план сдвигается влево: старт каждой задачи совпадает с release, окончанием зависимости или
+окончанием задачи на узле — с моментом, когда в симуляции есть эпоха. Без сдвига неоптимальный план мог бы
+назначить старт на момент, когда решений не принимают, и задача ушла бы со своего места.
 """
 
 from __future__ import annotations
@@ -57,7 +61,7 @@ class Plan:
 
 
 def solve(
-    plan: PlanInput, objective: str = "lexicographic", time_limit: float = 10.0, seed: int = 0
+    plan: PlanInput, objective: str = "lexicographic", time_limit: float = 5.0, seed: int = 0
 ) -> Plan | None:
     """План остатка прогона или None, если за бюджет решение не найдено (или его нет)."""
     model = cp_model.CpModel()
@@ -87,6 +91,7 @@ def solve(
             picks[key].append((worker, picked))
             on_worker[worker].append((interval, task.resources))
         model.add_exactly_one(p for _, p in picks[key])
+    for key, task in sorted(plan.tasks.items()):
         for dep in sorted(set(task.deps)):
             if dep in plan.tasks:
                 model.add(start[key] >= end[dep])
@@ -151,4 +156,58 @@ def solve(
             model.add_hint(var, solver.value(var))
     if best is None:
         return None
-    return Plan(best, key_values, optimal and len(key_values) == len(stages))
+    starts = compact(plan, best)
+    return Plan(starts, score(plan, starts, objective), optimal and len(key_values) == len(stages))
+
+
+def compact(plan: PlanInput, starts: Mapping[str, tuple[str, int]]) -> dict[str, tuple[str, int]]:
+    """Сдвиг влево: в порядке плановых стартов каждая задача на своём узле встаёт на самый ранний момент,
+    где хватает ресурсов. Задачам с более ранним плановым стартом сдвиг только освобождает место, поэтому
+    плановый старт всегда остаётся допустимым и сдвиг не ухудшает ни окончаний, ни цели."""
+    placed: dict[str, tuple[str, int]] = {}
+    for key in sorted(starts, key=lambda k: (starts[k][1], k)):
+        worker, planned = starts[key]
+        task = plan.tasks[key]
+        ready = max(
+            [
+                task.release,
+                *(placed[d][1] + plan.tasks[d].duration for d in task.deps if d in placed),
+                *(plan.busy[d].end for d in task.deps if d in plan.busy),
+            ]
+        )
+        load = [
+            (s, s + plan.tasks[k].duration, plan.tasks[k].resources)
+            for k, (w, s) in placed.items()
+            if w == worker
+        ]
+        load += [(plan.now, b.end, b.resources) for b in plan.busy.values() if b.worker == worker]
+        candidates = sorted({ready, *(end for _, end, _ in load if end > ready)})
+        start = next(
+            (t for t in candidates if t <= planned and _room(plan.capacity[worker], load, task, t)), planned
+        )
+        placed[key] = (worker, start)
+    return placed
+
+
+def _room(capacity: Resources, load: list[tuple[int, int, Resources]], task: PlanTask, t: int) -> bool:
+    """Хватает ли ресурсов на [t, t + duration): загрузка растёт только в стартах, их и проверяем."""
+    for x in [t, *(s for s, _, _ in load if t < s < t + task.duration)]:
+        used = task.resources
+        for s, e, need in load:
+            if s <= x < e:
+                used = used + need
+        if not used.fits(capacity):
+            return False
+    return True
+
+
+def score(plan: PlanInput, starts: Mapping[str, tuple[str, int]], objective: str) -> list[int]:
+    """Оценка плана по цели, как `metrics.score`; дедлайны идущих задач в неё не входят."""
+    ends = {k: s + plan.tasks[k].duration for k, (_, s) in starts.items()}
+    makespan = max([plan.now, *ends.values(), *(b.end for b in plan.busy.values())])
+    tardy = {k: max(0, ends[k] - t.deadline) for k, t in plan.tasks.items() if t.deadline is not None}
+    weighted = sum(2 ** plan.tasks[k].cls * v for k, v in tardy.items())
+    if objective == "weighted":
+        return [weighted + makespan]
+    misses = [sum(1 for k, v in tardy.items() if v and plan.tasks[k].cls == c) for c in CLASSES]
+    return [*misses, weighted, makespan]

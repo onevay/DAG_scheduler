@@ -6,6 +6,7 @@ import pytest
 from expsched.contract.io_models import PolicyIn
 from expsched.domain.models import Event, EvType, Problem, Task, Worker
 from expsched.domain.resources import Resources
+from expsched.domain.snapshot import Decision
 from expsched.engine.simulator import Simulator
 from expsched.policies.backfill import BackfillPolicy
 from expsched.policies.fifo import FifoPolicy
@@ -56,6 +57,33 @@ def test_no_preemption_when_the_deadline_is_met_anyway(urgent):
     problem = urgent()
     late = dataclasses.replace(problem.tasks["U"], deadline=20)
     assert preempted(run(dataclasses.replace(problem, tasks={**problem.tasks, "U": late}))) == []
+
+
+class Reserving:
+    """Базовая политика с планом: запускает всё, что помещается, кроме U, а U обещает старт в `t_res`."""
+
+    name = "reserving"
+
+    def __init__(self, t_res):
+        self.t_res = t_res
+
+    def decide(self, snapshot):
+        free, out = snapshot.free["n0"], []
+        for key in snapshot.ready:
+            need = snapshot.tasks[key].resources
+            if key == "U":
+                out.append(Decision("RESERVE", key, "n0", {"t_res": max(self.t_res, snapshot.t)}))
+            elif need.fits(free):
+                free = free - need
+                out.append(Decision("START", key, "n0"))
+        return out
+
+
+@pytest.mark.parametrize(("t_res", "expected"), [(4, []), (5, [(3, "L", "U")])])
+def test_reservation_of_the_base_policy_that_meets_the_deadline_is_trusted(urgent, t_res, expected):
+    """U (2 ч, дедлайн 6) с обещанным стартом в 4 успевает — L не трогают; со стартом в 5 — U спасают."""
+    log = Simulator(urgent(), PreemptivePolicy(Reserving(t_res))).run_all()
+    assert preempted(log) == expected
 
 
 def test_no_preemption_when_the_deadline_is_lost_anyway(urgent):

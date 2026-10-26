@@ -130,15 +130,6 @@ def test_what_if_on_a_failure(client):
         ),
         ({"problem": FAILURE, "interventions": []}, 422, "SCHEMA_INVALID"),
         ({"problem": FAILURE, "interventions": [{"kind": "teleport"}]}, 422, "SCHEMA_INVALID"),
-        (
-            {
-                "problem": FAILURE,
-                "policy": {"name": "cpsat"},
-                "interventions": [{"kind": "remove_failures", "worker": "node-A"}],
-            },
-            400,
-            "POLICY_NOT_IMPLEMENTED",
-        ),
     ],
 )
 def test_bad_what_if_requests(client, body, status, code):

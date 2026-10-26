@@ -70,7 +70,7 @@ class PolicyIn(Strict):
     max_forecast_tasks: Annotated[int, Field(ge=0)] = 1000
     # Только для cpsat: бюджет решателя на одно решение в детерминированном времени (условных секундах).
     # Бюджет, а не часы, делает журнал воспроизводимым на любой машине.
-    time_limit: Annotated[float, Field(gt=0, le=300)] = 10.0
+    time_limit: Annotated[float, Field(gt=0, le=300)] = 5.0
     validation_mode: Literal["strict", "lenient"] = "lenient"
 
 

@@ -48,10 +48,11 @@ def test_run_happens_in_a_worker_process_that_is_reused(runner):
     runner._idle.put(worker)
 
 
-def test_errors_of_the_run_come_back(runner):
+def test_cpsat_runs_in_a_worker_process(runner):
+    pytest.importorskip("ortools")
     problem = ProblemIn.model_validate(DEMO)
-    with pytest.raises(NotImplementedError, match="cpsat"):
-        asyncio.run(runner.run(problem, PolicyIn(name="cpsat")))
+    outcome = asyncio.run(runner.run(problem, PolicyIn(name="cpsat")))
+    assert outcome.result["status"] == "OK" and outcome.result["violations"] == []
 
 
 def test_run_over_the_timeout_is_killed():

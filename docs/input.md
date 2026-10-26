@@ -80,14 +80,14 @@
 
 | Поле | По умолчанию | |
 |---|---|---|
-| `name` | `priority_backfill` | `fifo`, `fifo_skip`, `priority`, `priority_backfill`; `cpsat` пока не реализована |
+| `name` | `priority_backfill` | `fifo`, `fifo_skip`, `priority`, `priority_backfill`, `cpsat` ([план решателем CP-SAT](scheduling.md#cpsat); нужен extra `cpsat`) |
 | `aging` | 360 | для `priority` и `priority_backfill`: класс растёт на 1 за каждые `aging` единиц ожидания; `null` — выключено |
 | `validation_mode` | `lenient` | `strict` — при любой ошибке входа прогон не запускается |
 | `preemption` | `deadline_only` | `never` — не вытеснять; `deadline_only` — [вытеснять ради дедлайна](scheduling.md#вытеснение-ради-дедлайна); `priority` — [по приоритету](scheduling.md#вытеснение-по-приоритету) |
 | `max_preemptions_per_task` | 1 | сколько раз можно вытеснить одну задачу |
 | `min_runtime_before_preempt` | 30 | сколько задача должна проработать, прежде чем её можно вытеснить, в единицах `time_unit` |
 | `max_forecast_tasks` | 1000 | [прогноз перепланирования](scheduling.md#перепланирование) строится, если задач (вместе с поданными) не больше; 0 — не строить |
-| `time_limit` | 10 | только для `cpsat`: бюджет решателя на одно решение в детерминированном времени (условных секундах), от 0 до 300; бюджет, а не часы, делает журнал воспроизводимым |
+| `time_limit` | 5 | только для `cpsat`: бюджет решателя на одно решение в детерминированном времени (условных секундах), от 0 до 300; бюджет, а не часы, делает журнал воспроизводимым |
 
 `objective` — `lexicographic` (по умолчанию) или `weighted`: по ней оценивается результат (`metrics.score`, см.
 [цель](scheduling.md#цель)), расписание эвристических политик она не меняет. `seed` и `mode` верхнего уровня

@@ -144,6 +144,15 @@ def test_objectives_disagree_on_one_miss_versus_smaller_tardiness():
     assert order(weighted) == ["x", "z", "y"] and weighted.key == [37]
 
 
+def test_dependency_may_come_later_by_name():
+    tasks = {
+        "a_report": PlanTask(1, R({"gpu": 1}), ("n",), 0, deps=("z_train",)),
+        "z_train": PlanTask(2, R({"gpu": 1}), ("n",), 0),
+    }
+    result = solve(PlanInput(0, tasks, {}, {"n": R({"gpu": 2})}))
+    assert result is not None and result.starts == {"z_train": ("n", 0), "a_report": ("n", 2)}
+
+
 def test_same_input_gives_the_same_plan():
     plan = random_plan(3)
     assert solve(plan, seed=7) == solve(plan, seed=7)

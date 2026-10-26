@@ -14,11 +14,11 @@ FROM python:3.12-slim AS python
 COPY --from=ghcr.io/astral-sh/uv:0.12.1 /uv /bin/uv
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
 WORKDIR /app
-# Зависимости отдельным слоем: правка кода не пересобирает их
+# Зависимости отдельным слоем: правка кода не пересобирает их; cpsat — решатель OR-Tools для политики cpsat
 COPY pyproject.toml uv.lock ./
-RUN uv sync --locked --extra api --no-install-project
+RUN uv sync --locked --extra api --extra cpsat --no-install-project
 COPY src ./src
-RUN uv sync --locked --extra api --no-editable
+RUN uv sync --locked --extra api --extra cpsat --no-editable
 
 
 FROM python:3.12-slim
