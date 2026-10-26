@@ -10,6 +10,7 @@ import { StatusChip } from "../ui/data";
 import { downloadText, safeFileName } from "../ui/download";
 import { PageHeader } from "../ui/PageHeader";
 import styles from "./RunPage.module.css";
+import { mainResource, resourceLabel, sortResources, work } from "../ui/resources";
 
 const UNITS = { hour: "ч", minute: "мин", second: "с" } as const;
 const TRIGGERS: Record<string, string> = {
@@ -100,19 +101,27 @@ function Metrics({ result, unit }: { result: Result; unit: string }) {
   const m = result.metrics;
   if (!m) return <p className={styles.note}>Метрик нет: прогон не дошёл до расписания ({result.status}).</p>;
   const misses = Object.values(m.deadline_misses).reduce((s, v) => s + v, 0);
-  const cards = [
+  const resources = sortResources(Object.keys(m.utilization));
+  const main = mainResource(resources);
+  const lost = resources
+    .filter((r) => (m.lost_work[r] ?? 0) > 0)
+    .map((r) => work(r, m.lost_work[r] ?? 0, unit));
+  const cards: { label: string; value: string | number; unit: string; accent?: boolean }[] = [
     {
       label: "Makespan",
       value: m.makespan,
       unit: m.lower_bound != null ? `/ ${m.lower_bound} ${unit}` : unit,
     },
-    {
-      label: "Загрузка GPU",
-      value: m.utilization.gpu != null ? Math.round(m.utilization.gpu * 100) : "—",
-      unit: "%",
-      accent: true,
-    },
-    { label: "Потеряно", value: m.lost_work.gpu ?? "—", unit: `GPU·${unit}` },
+    ...resources.map((r) => {
+      const share = m.utilization[r];
+      return {
+        label: `Загрузка ${resourceLabel(r)}`,
+        value: share != null ? Math.round(share * 100) : "—",
+        unit: "%",
+        accent: r === main,
+      };
+    }),
+    { label: "Потеряно", value: lost.length ? lost.join(" · ") : "0", unit: lost.length ? "" : "работы" },
     { label: "Дедлайны", value: misses, unit: "пропущено" },
     { label: "Среднее ожидание", value: Number(m.mean_wait.toFixed(2)), unit },
   ];

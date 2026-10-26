@@ -4,6 +4,8 @@ import type { Task, TaskKind } from "../api/types";
 import { useDraft } from "../draft/DraftContext";
 import { Chip, NumberField, Stepper, Switch } from "../ui/controls";
 import styles from "./TaskPanel.module.css";
+import { ResourceFields } from "../ui/ResourceFields";
+import { fits } from "../ui/resources";
 
 const KINDS: readonly TaskKind[] = ["data", "train", "eval", "infer", "other"];
 const UNITS = { hour: "ч", minute: "мин", second: "с" } as const;
@@ -64,8 +66,7 @@ export function TaskPanel({
     update({ id });
     onSelect(id);
   };
-  const gpu = task.resources?.gpu ?? 0;
-  const fits = draft.cluster.workers.filter((w) => (w.resources.gpu ?? 0) >= gpu).length;
+  const placed = draft.cluster.workers.filter((w) => fits(task.resources, w.resources)).length;
   const priority = task.priority ?? 1;
   const deps = task.dependencies ?? [];
   const candidates = draft.tasks.filter((t) => t.id !== task.id && !deps.includes(t.id));
@@ -104,19 +105,11 @@ export function TaskPanel({
           less="Короче"
           more="Дольше"
         />
-        <Stepper
-          label="GPU"
-          value={gpu}
-          min={0}
-          max={16}
-          onChange={(n) => update({ resources: { ...task.resources, gpu: n } })}
-          less="Меньше GPU"
-          more="Больше GPU"
-        />
       </div>
+      <ResourceFields value={task.resources} onChange={(resources) => update({ resources })} of="задачи" />
       <p className={styles.hint}>
-        {fits > 0
-          ? `помещается на ${fits} из ${draft.cluster.workers.length} узлов`
+        {placed > 0
+          ? `помещается на ${placed} из ${draft.cluster.workers.length} узлов`
           : "не помещается ни на один узел"}
       </p>
 

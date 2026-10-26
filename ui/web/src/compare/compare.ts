@@ -1,13 +1,15 @@
 import type { comparisonRows } from "../run/results";
+import { resourceLabel, sortResources, work } from "../ui/resources";
 
 export type Row = ReturnType<typeof comparisonRows>[number];
 export type MetricKey = "makespan" | "util" | "wait" | "lost";
 
+/** Метрика сравнения; загрузка и потери — по ресурсу `res`, остальным он не нужен. */
 interface Metric {
   label: string;
-  title: (unit: string) => string;
-  get: (r: Row) => number | null;
-  format: (v: number, unit: string) => string;
+  title: (unit: string, res: string) => string;
+  get: (r: Row, res: string) => number | null;
+  format: (v: number, unit: string, res: string) => string;
   /** Что лучше: меньше или больше. */
   better: "low" | "high";
 }
@@ -24,8 +26,8 @@ export const METRICS: Record<MetricKey, Metric> = {
   },
   util: {
     label: "Загрузка",
-    title: () => "Загрузка GPU",
-    get: (r) => r.utilizationGpu,
+    title: (_, res) => `Загрузка ${resourceLabel(res)}`,
+    get: (r, res) => r.utilization?.[res] ?? null,
     format: (v) => `${Math.round(v * 100)}%`,
     better: "high",
   },
@@ -38,9 +40,9 @@ export const METRICS: Record<MetricKey, Metric> = {
   },
   lost: {
     label: "Потери",
-    title: (u) => `Потерянная работа, GPU·${u}`,
-    get: (r) => r.lostWorkGpu,
-    format: (v, u) => `${v} GPU·${u}`,
+    title: (_, res) => `Потерянная работа, ${resourceLabel(res)}`,
+    get: (r, res) => r.lostWork?.[res] ?? null,
+    format: (v, u, res) => work(res, v, u),
     better: "low",
   },
 };
@@ -54,13 +56,13 @@ export interface Capsule {
 }
 
 /** Капсулы по метрике: высота пропорциональна значению, лучшее значение отмечено (их может быть несколько). */
-export function capsules(rows: readonly Row[], key: MetricKey): Capsule[] {
+export function capsules(rows: readonly Row[], key: MetricKey, res: string): Capsule[] {
   const metric = METRICS[key];
-  const values = rows.map(metric.get).filter((v): v is number => v !== null);
+  const values = rows.map((r) => metric.get(r, res)).filter((v): v is number => v !== null);
   const max = Math.max(...values, 1e-9);
   const best = values.length ? (metric.better === "low" ? Math.min(...values) : Math.max(...values)) : null;
   return rows.map((r) => {
-    const value = metric.get(r);
+    const value = metric.get(r, res);
     return {
       policy: r.policy,
       value,
@@ -74,12 +76,12 @@ export function capsules(rows: readonly Row[], key: MetricKey): Capsule[] {
  * Профиль политики: по каждой метрике доля от лучшей среди политик, 1 — лучшая. Для «меньше — лучше» это
  * лучшее / своё (ноль — всегда лучший), для «больше — лучше» — своё / лучшее.
  */
-export function profile(rows: readonly Row[], policy: string): Record<MetricKey, number> {
+export function profile(rows: readonly Row[], policy: string, res: string): Record<MetricKey, number> {
   const row = rows.find((r) => r.policy === policy);
   const score = (key: MetricKey) => {
     const m = METRICS[key];
-    const values = rows.map(m.get).filter((v): v is number => v !== null);
-    const v = row ? m.get(row) : null;
+    const values = rows.map((r) => m.get(r, res)).filter((v): v is number => v !== null);
+    const v = row ? m.get(row, res) : null;
     if (v === null || values.length === 0) return 0;
     if (m.better === "low") return v === 0 ? 1 : Math.min(...values) / v;
     const top = Math.max(...values);
@@ -92,6 +94,11 @@ const OBJECTIVES: Record<NonNullable<Row["objective"]>, string> = {
   lexicographic: "сначала пропуски дедлайнов от старших классов, затем взвешенное опоздание, затем makespan",
   weighted: "взвешенное опоздание плюс makespan",
 };
+
+/** Ресурсы, по которым у прогонов есть загрузка, — для выбора в загрузке и потерях. */
+export function rowResources(rows: readonly Row[]): string[] {
+  return sortResources(rows.flatMap((r) => Object.keys(r.utilization ?? {})));
+}
 
 /** Сравнение оценок по цели поэлементно: меньше — лучше. */
 export function compareScores(a: readonly number[], b: readonly number[]): number {
@@ -131,17 +138,18 @@ export function objectiveInsight(rows: readonly Row[]): string | null {
 }
 
 /** Одна фраза о том, что показывает метрика: кто лучше и насколько, или что разницы нет. */
-export function insight(rows: readonly Row[], key: MetricKey, unit: string): string {
+export function insight(rows: readonly Row[], key: MetricKey, unit: string, res: string): string {
   const metric = METRICS[key];
-  const known = rows.filter((r) => metric.get(r) !== null);
+  const get = (r: Row) => metric.get(r, res);
+  const known = rows.filter((r) => get(r) !== null);
   if (known.length === 0) return "Ни один прогон не дошёл до расписания — метрик нет.";
   const sorted = [...known].sort((a, b) => {
-    const d = (metric.get(a) ?? 0) - (metric.get(b) ?? 0);
+    const d = (get(a) ?? 0) - (get(b) ?? 0);
     return metric.better === "low" ? d : -d;
   });
   const first = sorted[0] as Row;
   const last = sorted.at(-1) as Row;
-  const fmt = (r: Row) => metric.format(metric.get(r) ?? 0, unit);
+  const fmt = (r: Row) => metric.format(get(r) ?? 0, unit, res);
   if (fmt(first) === fmt(last))
     return `По метрике «${metric.label}» политики не различаются: у всех ${fmt(first)}.`;
   const winners = known.filter((r) => fmt(r) === fmt(first)).map((r) => r.policy);

@@ -1,4 +1,5 @@
 import type { Result } from "../api/types";
+import { resourceLabel, work, workAmount } from "../ui/resources";
 
 type Explain = NonNullable<Result["explain"]>;
 export type Link = Explain["chain"][number];
@@ -84,31 +85,34 @@ export interface Cell {
 /** Простой по узлам и часам: в каждой клетке — причина, державшая больше всего GPU в этот час. */
 export function idleGrid(
   intervals: readonly Idle[],
-  workers: readonly { id: string; gpu: number }[],
+  workers: readonly { id: string; capacity: Readonly<Record<string, number>> }[],
   horizon: number,
+  res: string,
 ): { worker: string; cells: Cell[] }[] {
-  return workers.map(({ id, gpu }) => {
+  return workers.map(({ id, capacity }) => {
     const mine = intervals.filter((i) => i.worker === id);
+    const free = (i: Idle) => i.free[res] ?? 0;
     const cells = Array.from({ length: horizon }, (_, h) => {
-      const free = (i: Idle) => i.free.gpu ?? 0;
       const here = mine
         .filter((i) => i.from <= h && h < i.to && free(i) > 0)
         .sort((a, b) => free(b) - free(a))[0];
-      return here ? { code: here.code, part: free(here) < gpu } : { code: null, part: false };
+      return here
+        ? { code: here.code, part: free(here) < (capacity[res] ?? 0) }
+        : { code: null, part: false };
     });
     return { worker: id, cells };
   });
 }
 
 /** Простой по кодам по убыванию, без нулевых; и одна фраза о главной причине. */
-export function codeSummary(byCode: Readonly<Record<string, number>>, unit: string) {
+export function codeSummary(byCode: Readonly<Record<string, number>>, unit: string, res: string) {
   const rows = Object.entries(byCode)
     .filter(([, v]) => v > 0)
     .sort(([, a], [, b]) => b - a);
   const total = rows.reduce((s, [, v]) => s + v, 0);
   const top = rows[0];
   const insight = top
-    ? `Больше всего простоя — ${top[0]}: ${top[1]} из ${total} GPU·${unit} (${CODES[top[0]]?.hint ?? top[0]}).`
-    : "GPU не простаивали.";
+    ? `Больше всего простоя — ${top[0]}: ${workAmount(res, top[1])} из ${work(res, total, unit)} (${CODES[top[0]]?.hint ?? top[0]}).`
+    : `${resourceLabel(res)} не простаивали.`;
   return { rows, total, insight };
 }

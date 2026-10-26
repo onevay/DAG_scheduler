@@ -55,6 +55,9 @@ group("interventions", () => {
     expect(
       deltaNote({ makespan: -1, lost_work_gpu: -4, mean_wait: -0.0909, utilization_gpu: -0.069 }, "ч"),
     ).toBe("потери −4 GPU·ч, ожидание −0.09 ч, загрузка −6.9 п.п.");
+    expect(
+      deltaNote({ makespan: 0, lost_work_ram_mb: -2048, utilization_cpu: 0.1, utilization_ram_mb: 0 }, "мин"),
+    ).toBe("потери −2 ГБ·мин, загрузка CPU +10 п.п.");
     expect(deltaNote({ makespan: 0, deadline_misses: 0 }, "ч")).toBe("остальные метрики не изменились");
     expect(deltaNote(null, "ч")).toBe("вариант не дошёл до расписания");
   });

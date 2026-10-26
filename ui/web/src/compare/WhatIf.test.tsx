@@ -60,9 +60,9 @@ describe("WhatIf", () => {
     renderWhatIf();
     expect(screen.getAllByRole("button", { name: /^Убрать: / }).map((b) => b.textContent)).toEqual([
       "Без отказов n ×",
-      "Ещё узел node_1 на 2 GPU ×",
+      "Ещё узел node_1: 2 GPU ×",
     ]);
-    await userEvent.click(screen.getByRole("button", { name: "Убрать: Ещё узел node_1 на 2 GPU" }));
+    await userEvent.click(screen.getByRole("button", { name: "Убрать: Ещё узел node_1: 2 GPU" }));
     await userEvent.selectOptions(screen.getByLabelText("Вид вмешательства"), "set_priority");
     await userEvent.type(screen.getByLabelText("приоритет 0–10 (10)"), "7");
     await userEvent.click(screen.getByRole("button", { name: "Добавить" }));

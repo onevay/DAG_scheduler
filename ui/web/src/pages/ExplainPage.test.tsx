@@ -97,7 +97,7 @@ describe("ExplainPage", () => {
       screen.getByText(/^Попытка 2 стартует в 4 на n: прошлую попытку прервал отказ узла/),
     ).toBeInTheDocument();
 
-    const idle = within(screen.getByRole("region", { name: "Почему простаивают GPU" }));
+    const idle = within(screen.getByRole("region", { name: "Почему простаивают узлы" }));
     expect(idle.getByText(/IDLE_DOWN: 8 из 11 GPU·ч/)).toBeInTheDocument();
     const cells = (worker: string) => [
       ...idle.getByRole("img", { name: `${worker}: простой по часам` }).children,

@@ -58,6 +58,27 @@ test("пример → сборка → прогон → объяснения �
   await expect(page.getByText("Makespan").locator("..")).toContainText("21 / 21 ч");
 });
 
+test("ноутбук без GPU: ресурсы, загрузка и простой по ядрам и памяти", async ({ page }) => {
+  await page.goto("/");
+  await page
+    .getByRole("region", { name: /Соберите DAG/ })
+    .getByRole("button", { name: /^laptop/ })
+    .click();
+  await expect(page.getByText("Вход корректен")).toBeVisible();
+  await expect(page.getByRole("group", { name: "train_small, 40 МИН, 6 CPU · 6 ГБ" })).toBeVisible();
+  await expect(page.getByText("395 CPU·мин работы")).toBeVisible();
+  await page.getByRole("button", { name: "Запустить" }).click();
+
+  await expect(page.getByRole("heading", { level: 1, name: "laptop" })).toBeVisible();
+  await expect(page.getByText("Загрузка CPU").locator("..")).toContainText("55");
+  await expect(page.getByText("Загрузка ОЗУ").locator("..")).toContainText("45");
+  await page.getByRole("link", { name: /^Почему 90/ }).click();
+  const idle = page.getByRole("region", { name: "Почему простаивают узлы" });
+  await idle.getByRole("radio", { name: "ОЗУ" }).click();
+  await expect(idle.getByText(/ГБ·мин/)).toBeVisible();
+  await checkScreen(page, "Объяснения: ноутбук");
+});
+
 test("остальные экраны доступны и не шире экрана", async ({ page }) => {
   for (const [path, heading] of [
     ["/", /Планируйте/],

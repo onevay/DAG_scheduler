@@ -55,7 +55,7 @@ describe("Canvas", () => {
     expect(await node("prep")).toHaveAttribute("aria-label", "prep, 2 Ч, 1 GPU");
     expect(await node("urgent")).toHaveAttribute(
       "aria-label",
-      "urgent, 1 Ч, 0 GPU, подаётся во время прогона",
+      "urgent, 1 Ч, без ресурсов, подаётся во время прогона",
     );
     expect(screen.getByText("DAG · 3 ЗАДАЧ")).toBeInTheDocument();
     expect(screen.getByText("8 Ч")).toBeInTheDocument();
