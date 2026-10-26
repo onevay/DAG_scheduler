@@ -38,6 +38,7 @@ def statuses(result):
         ("staggered", "OK"),
         ("invalid_mix", "PARTIAL"),
         ("ml_platform", "OK"),
+        ("priority_preemption", "OK"),
     ],
 )
 @pytest.mark.parametrize("policy", POLICIES)
@@ -89,6 +90,26 @@ def test_priority_preempts_the_nightly_job_to_save_the_demo():
         "demo_model",
     )
     assert [d["code"] for d in out.result["diagnostics"]] == ["E030"]
+
+
+def test_urgent_work_without_deadlines_preempts_the_cheapest_background_job():
+    """Срочным задачам без дедлайна место освобождает только вытеснение по приоритету; жертва — bg_sweep,
+    у которой в 3 как раз прошёл чекпоинт, а не bg_pretrain, которая потеряла бы час на 4 GPU."""
+    waiting = outcome("priority_preemption", preemption="deadline_only")
+    assert {k: waiting.result["tasks"][k]["start"] for k in ("hotfix_eval", "ab_test")} == {
+        "hotfix_eval": 10,
+        "ab_test": 12,
+    }
+    out = outcome("priority_preemption")
+    assert {k: (t["start"], t["finish"]) for k, t in out.result["tasks"].items()} == {
+        "ab_test": (5, 8),
+        "bg_pretrain": (0, 12),
+        "bg_sweep": (0, 15),
+        "hotfix_eval": (3, 5),
+    }
+    (preempted,) = [r for r in out.events if r["type"] == "INTERRUPTED"]
+    assert (preempted["task"], preempted["reason"]["by"], preempted["lost"]) == ("bg_sweep", "hotfix_eval", 0)
+    assert out.result["metrics"]["makespan"] == waiting.result["metrics"]["makespan"] == 15
 
 
 def test_cascade_of_failures():

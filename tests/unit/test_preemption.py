@@ -106,8 +106,64 @@ def test_registry_wraps_the_policy_by_default():
     policy = make_policy(PolicyIn())
     assert isinstance(policy, PreemptivePolicy) and isinstance(policy.base, BackfillPolicy)
     assert (policy.name, policy.max_preemptions, policy.min_runtime) == ("priority_backfill+preempt", 1, 30)
-    with pytest.raises(NotImplementedError, match="preemption 'priority'"):
-        make_policy(PolicyIn(preemption="priority"))
+    by_priority = make_policy(PolicyIn(preemption="priority"))
+    assert isinstance(by_priority, PreemptivePolicy) and by_priority.trigger == "priority"
+    assert by_priority.name == "priority_backfill+preempt_priority"
+    assert not isinstance(make_policy(PolicyIn(preemption="never")), PreemptivePolicy)
+
+
+# ---- вытеснение по приоритету ----
+
+
+def by_priority(problem, **settings):
+    return Simulator(problem, PreemptivePolicy(PriorityPolicy(), trigger="priority", **settings)).run_all()
+
+
+def test_higher_class_preempts_without_a_deadline(urgent):
+    problem = urgent()
+    no_deadline = dataclasses.replace(problem.tasks["U"], deadline=None)
+    problem = dataclasses.replace(problem, tasks={**problem.tasks, "U": no_deadline})
+    assert preempted(run(problem)) == []  # ради дедлайна вытеснять нечего
+    log = by_priority(problem)
+    assert preempted(log) == [(3, "L", "U")]
+    assert finishes(log) == {"U": 5, "L": 13}
+    assert verify(problem, log, max_preemptions=1) == []
+
+
+def test_hopeless_deadline_does_not_stop_priority_preemption(urgent):
+    problem = urgent()
+    hopeless = dataclasses.replace(problem.tasks["U"], deadline=4)
+    problem = dataclasses.replace(problem, tasks={**problem.tasks, "U": hopeless})
+    assert preempted(run(problem)) == [] and preempted(by_priority(problem)) == [(3, "L", "U")]
+
+
+def test_no_preemption_while_another_node_has_room(urgent, make_task, make_problem):
+    tasks = [*urgent().tasks.values()]
+    log = by_priority(make_problem(tasks, gpus=(2, 2)))
+    assert preempted(log) == [] and finishes(log)["U"] == 5
+
+
+@pytest.mark.parametrize(
+    ("low", "settings"),
+    [({"priority": 8}, {}), ({}, {"min_runtime": 4}), ({}, {"max_preemptions": 0})],
+    ids=["same-class", "min-runtime", "limit"],
+)
+def test_victim_rules_hold_for_priority_preemption(urgent, low, settings):
+    assert preempted(by_priority(urgent(**low), **settings)) == []
+
+
+def test_preemption_goes_down_the_classes_and_never_back(make_task, make_problem):
+    """M (high) вытесняет L (low); U (critical) вытесняет M; вытесненные ждут, а не вытесняют обратно."""
+    tasks = [
+        make_task("L", 10, gpu=2, priority=0, preemptible=True),
+        make_task("M", 4, gpu=2, priority=5, preemptible=True, release=2),
+        make_task("U", 2, gpu=2, priority=9, release=4),
+    ]
+    problem = make_problem(tasks, gpus=(2,))
+    log = by_priority(problem, max_preemptions=3)
+    assert preempted(log) == [(2, "L", "M"), (4, "M", "U")]
+    assert finishes(log) == {"U": 6, "M": 10, "L": 20}
+    assert verify(problem, log, max_preemptions=3) == []
 
 
 def _background_and_urgent(seed):
@@ -142,20 +198,21 @@ def _background_and_urgent(seed):
 
 
 BASES = [FifoPolicy(), PriorityPolicy(), BackfillPolicy()]
+TRIGGERS = ["deadline", "priority"]
 
 
+@pytest.mark.parametrize("trigger", TRIGGERS)
 @pytest.mark.parametrize("base", BASES, ids=lambda p: p.name)
 @pytest.mark.parametrize("seed", range(30))
-def test_random_schedules_with_preemption_are_valid(seed, base):
+def test_random_schedules_with_preemption_are_valid(seed, base, trigger):
     problem = _background_and_urgent(seed)
-    log = Simulator(problem, PreemptivePolicy(base)).run_all()
+    log = Simulator(problem, PreemptivePolicy(base, trigger=trigger)).run_all()
     assert verify(problem, log, max_preemptions=1) == []
 
 
+@pytest.mark.parametrize("trigger", TRIGGERS)
 @pytest.mark.parametrize("base", BASES, ids=lambda p: p.name)
-def test_random_schedules_do_preempt(base):
-    total = sum(
-        len(preempted(Simulator(_background_and_urgent(s), PreemptivePolicy(base)).run_all()))
-        for s in range(30)
-    )
+def test_random_schedules_do_preempt(base, trigger):
+    policy = PreemptivePolicy(base, trigger=trigger)
+    total = sum(len(preempted(Simulator(_background_and_urgent(s), policy).run_all())) for s in range(30))
     assert total >= 10  # иначе проверка выше ничего не проверяет

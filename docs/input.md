@@ -81,7 +81,7 @@
 | `name` | `priority_backfill` | `fifo`, `fifo_skip`, `priority`, `priority_backfill`; `cpsat` пока не реализована |
 | `aging` | 360 | для `priority` и `priority_backfill`: класс растёт на 1 за каждые `aging` единиц ожидания; `null` — выключено |
 | `validation_mode` | `lenient` | `strict` — при любой ошибке входа прогон не запускается |
-| `preemption` | `deadline_only` | `never` — не вытеснять; `deadline_only` — [вытеснять ради дедлайна](scheduling.md#вытеснение-ради-дедлайна); `priority` пока не реализован |
+| `preemption` | `deadline_only` | `never` — не вытеснять; `deadline_only` — [вытеснять ради дедлайна](scheduling.md#вытеснение-ради-дедлайна); `priority` — [по приоритету](scheduling.md#вытеснение-по-приоритету) |
 | `max_preemptions_per_task` | 1 | сколько раз можно вытеснить одну задачу |
 | `min_runtime_before_preempt` | 30 | сколько задача должна проработать, прежде чем её можно вытеснить, в единицах `time_unit` |
 | `max_forecast_tasks` | 1000 | [прогноз перепланирования](scheduling.md#перепланирование) строится, если задач (вместе с поданными) не больше; 0 — не строить |

@@ -1,10 +1,11 @@
-"""Вытеснение ради дедлайна: надстройка над любой политикой."""
+"""Вытеснение ради дедлайна или по приоритету: надстройка над любой политикой."""
 
 from __future__ import annotations
 
 import itertools
 from collections.abc import Mapping
 from dataclasses import replace
+from typing import Literal
 
 from expsched.domain.models import Task
 from expsched.domain.resources import Resources
@@ -13,22 +14,30 @@ from expsched.policies.backfill import reservation
 
 MAX_CANDIDATES = 8  # жертвы на узле перебираются полностью: не больше 2^8 - 1 наборов
 
+Trigger = Literal["deadline", "priority"]
+
 
 class PreemptivePolicy:
-    """Сначала решает базовая политика. Затем каждая готовая задача с дедлайном, которая без вытеснения его
-    пропустит, а сразу стартовав — успеет, вытесняет самый дешёвый набор жертв на одном узле.
+    """Сначала решает базовая политика, затем готовые задачи, которые она не запустила, могут вытеснить самый
+    дешёвый набор жертв на одном узле. С `trigger="deadline"` — задача с дедлайном, которая без вытеснения его
+    пропустит, а сразу стартовав — успеет. С `trigger="priority"` — любая задача, которой сейчас нет места
+    ни на одном узле; если место есть, а базовая политика её не запустила, это решение политики, а не нехватка
+    места.
 
     Жертва: вытесняемая, класса строго ниже, вытеснялась меньше `max_preemptions` раз, проработала не меньше
     `min_runtime` и не предок задачи с дедлайном класса не ниже, чем у вытесняющей. Цена — работа, которая
     потеряется после последнего чекпоинта, в GPU·времени. Задачи рассматриваются по убыванию класса, затем
-    по дедлайну.
+    по дедлайну (задачи без дедлайна — после), затем по id.
     """
 
-    def __init__(self, base: Policy, max_preemptions: int = 1, min_runtime: int = 0) -> None:
+    def __init__(
+        self, base: Policy, max_preemptions: int = 1, min_runtime: int = 0, trigger: Trigger = "deadline"
+    ) -> None:
         self.base = base
         self.max_preemptions = max_preemptions
         self.min_runtime = min_runtime
-        self.name = f"{base.name}+preempt"
+        self.trigger = trigger
+        self.name = f"{base.name}+preempt" if trigger == "deadline" else f"{base.name}+preempt_priority"
 
     def decide(self, snapshot: Snapshot) -> list[Decision]:
         decisions = self.base.decide(snapshot)
@@ -44,17 +53,21 @@ class PreemptivePolicy:
         view = snapshot
         done = {key for key, _ in started}
         urgent = sorted(
-            (k for k in snapshot.ready if k not in done and snapshot.tasks[k].deadline is not None),
-            key=lambda k: (-snapshot.tasks[k].cls, snapshot.tasks[k].deadline or 0, k),
+            (k for k in snapshot.ready if k not in done and self._may_ask(snapshot.tasks[k])),
+            key=lambda k: (
+                -snapshot.tasks[k].cls,
+                snapshot.tasks[k].deadline is None,
+                snapshot.tasks[k].deadline or 0,
+                k,
+            ),
         )
         for key in urgent:
             task = snapshot.tasks[key]
-            deadline = task.deadline
-            if deadline is None or view.t + view.rem[key] > deadline:
-                continue  # не успеет даже сейчас: вытеснение ничего не даст
-            on_time = reservation(view, key, free, started)
-            if on_time is not None and on_time.t + view.rem[key] <= deadline:
-                continue  # успевает и так
+            if self.trigger == "priority":
+                if _fits_somewhere(view, key, free):
+                    continue
+            elif not self._misses_deadline(view, key, free, started):
+                continue
             plan = self.victims(view, key, free)
             if plan is None:
                 continue
@@ -72,6 +85,20 @@ class PreemptivePolicy:
         moved = {d.task for d in rescued}
         kept = [d for d in decisions if not (d.action == "RESERVE" and d.task in moved)]
         return preempts + kept + rescued
+
+    def _may_ask(self, task: Task) -> bool:
+        return self.trigger == "priority" or task.deadline is not None
+
+    @staticmethod
+    def _misses_deadline(
+        snapshot: Snapshot, key: str, free: Mapping[str, Resources], started: list[tuple[str, str]]
+    ) -> bool:
+        """Задача успеет, только если стартует сейчас: по окончаниям идущих задач она опоздает."""
+        deadline = snapshot.tasks[key].deadline
+        if deadline is None or snapshot.t + snapshot.rem[key] > deadline:
+            return False  # не успеет даже сейчас: вытеснение ничего не даст
+        on_time = reservation(snapshot, key, free, started)
+        return on_time is None or on_time.t + snapshot.rem[key] > deadline
 
     def victims(
         self, snapshot: Snapshot, key: str, free: Mapping[str, Resources]
@@ -114,6 +141,11 @@ class PreemptivePolicy:
             and snapshot.preempt_count.get(victim, 0) < self.max_preemptions
             and snapshot.t - snapshot.running[victim].start >= self.min_runtime
         )
+
+
+def _fits_somewhere(snapshot: Snapshot, key: str, free: Mapping[str, Resources]) -> bool:
+    need = snapshot.tasks[key].resources
+    return any(snapshot.up[w] and need.fits(free[w]) for w in snapshot.eligible[key])
 
 
 def _lost_work(snapshot: Snapshot, key: str) -> int:
