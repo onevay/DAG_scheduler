@@ -56,7 +56,16 @@ class AgentRegistry:
         self.listeners: dict[str, Listener] = {}
 
     def hello(self, agent_id: str, hello: Hello) -> HelloAck:
+        """Первый hello агента с запуска сервера: нумерация событий и команд — агента (сервер мог
+        перезапуститься, а агент — нет); команды, отданные до него, — после последней записанной агентом."""
         agent = self.agents.setdefault(agent_id, _Agent())
+        if agent.hello is None:
+            agent.next_event = hello.next_event_seq
+            first = hello.acked_command_id + 1
+            agent.commands = [
+                c.model_copy(update={"command_id": first + i}) for i, c in enumerate(agent.commands)
+            ]
+            agent.next_command = first + len(agent.commands)
         agent.hello, agent.last_seen = hello, self.clock()
         return HelloAck(
             agent=agent_id,

@@ -84,7 +84,9 @@ def plan_input(snapshot: Snapshot) -> PlanInput:
     допустимыми узлами и зависимостями, которые сами выполнятся (идут или тоже планируются)."""
     up = {w for w, ok in snapshot.up.items() if ok}
     busy = {
-        k: Busy(run.worker, run.end_pred, snapshot.tasks[k].resources) for k, run in snapshot.running.items()
+        # попытка на агенте, идущая дольше прогноза, закончится не раньше «сейчас»
+        k: Busy(run.worker, max(run.end_pred, snapshot.t), snapshot.tasks[k].resources)
+        for k, run in snapshot.running.items()
     }
     waiting = {
         k

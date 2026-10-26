@@ -39,3 +39,4 @@ export type RunAction =
   | { kind: "worker_down" | "worker_up"; worker: string }
   | { kind: "cancel" };
 export type Replay = S["ReplayOut"];
+export type Shadow = S["ShadowOut"];

@@ -23,7 +23,7 @@ class RunInfo:
     worker: str
     start: int
     attempt: int
-    end_pred: int  # прогнозное окончание: start + остаток работы
+    end_pred: int  # прогнозное окончание: start + остаток работы; у прогона на агентах может быть в прошлом
 
 
 @dataclass(frozen=True)

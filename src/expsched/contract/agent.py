@@ -42,6 +42,9 @@ class Hello(Strict):
     capacity: ResMap
     max_containers: Annotated[int, Field(ge=1, le=64)]
     running: list[AttemptRef] = []
+    # Нумерация агента: планировщик, ещё не знающий агента (например, после своего перезапуска), продолжает её
+    next_event_seq: Annotated[int, Field(ge=0)] = 0  # первое неподтверждённое событие
+    acked_command_id: Annotated[int, Field(ge=0)] = 0  # последняя записанная команда
 
 
 class HelloAck(Strict):

@@ -129,6 +129,9 @@ export const useRunAction = (runId: string) => {
   });
 };
 
+/** Проигрывание сохранённого прогона теми же фактами: те же ли решения принимает политика. */
+export const useReplay = (runId: string) => useMutation({ mutationFn: () => api.replay(runId) });
+
 export const useAddEvent = () =>
   useRunMutation(({ runId, event }: { runId: string; event: InputEvent }) => api.addEvent(runId, event));
 

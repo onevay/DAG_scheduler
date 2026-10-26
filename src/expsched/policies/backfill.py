@@ -67,8 +67,9 @@ def release_profile(
     snapshot: Snapshot, worker: str, started: Sequence[tuple[str, str]]
 ) -> list[tuple[int, Resources]]:
     """Когда и сколько освободится на узле: выполняющиеся задачи и стартовавшие в эту эпоху, по времени."""
+    # Попытка на агенте может идти дольше прогноза: раньше «сейчас» она уже не освободит узел
     profile = [
-        (run.end_pred, snapshot.tasks[k].resources)
+        (max(run.end_pred, snapshot.t), snapshot.tasks[k].resources)
         for k, run in snapshot.running.items()
         if run.worker == worker
     ]

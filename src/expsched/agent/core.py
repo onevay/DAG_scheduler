@@ -93,6 +93,8 @@ class Agent:
             capacity=self.capacity,
             max_containers=self.max_containers,
             running=running,
+            next_event_seq=self.outbox[0].seq if self.outbox else self.next_seq,
+            acked_command_id=self.last_command,
         )
 
     def welcome(self, ack: HelloAck) -> None:

@@ -18,6 +18,7 @@ import {
   withoutAgent,
 } from "../containers/containers";
 import styles from "../containers/Containers.module.css";
+import { PlanVsFact } from "../containers/PlanVsFact";
 import { useDraft } from "../draft/DraftContext";
 import { Button, Segmented } from "../ui/controls";
 import { Section } from "../ui/data";
@@ -84,7 +85,7 @@ function ModePanel() {
       <p className={styles.note}>{MODES[mode].text}</p>
       {mode === "replay" && (
         <p className={styles.note}>
-          Проигрывается сохранённый прогон — кнопка «Проиграть» на странице прогона.
+          Проигрывается сохранённый прогон — кнопка «Проиграть журнал» на странице прогона.
         </p>
       )}
       {onAgents && (
@@ -275,6 +276,8 @@ function LiveRun({ runId, live }: { runId: string; live: Live }) {
           </p>
         </Section>
       )}
+
+      {live.shadow && <PlanVsFact shadow={live.shadow} unit={unit} />}
     </>
   );
 }

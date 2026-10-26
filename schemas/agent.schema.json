@@ -251,6 +251,12 @@
       "additionalProperties": false,
       "description": "Агент представляется: что умеет и сколько ресурсов отдаёт; после своего перезапуска — что уже идёт.",
       "properties": {
+        "acked_command_id": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Acked Command Id",
+          "type": "integer"
+        },
         "agent_version": {
           "maxLength": 64,
           "title": "Agent Version",
@@ -270,6 +276,12 @@
           "maximum": 64,
           "minimum": 1,
           "title": "Max Containers",
+          "type": "integer"
+        },
+        "next_event_seq": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Next Event Seq",
           "type": "integer"
         },
         "protocol": {

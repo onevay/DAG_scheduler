@@ -1,8 +1,9 @@
 import { Link, useParams, useSearchParams } from "react-router";
 
 import { ApiError } from "../api/client";
-import { useRun, useRunEvents, useRunProblem } from "../api/hooks";
+import { useReplay, useRun, useRunEvents, useRunProblem } from "../api/hooks";
 import type { Problem, Result } from "../api/types";
+import { PlanVsFact } from "../containers/PlanVsFact";
 import { replanRows, taskRows } from "../run/results";
 import { Schedule } from "../run/Schedule";
 import { Button, ButtonLink } from "../ui/controls";
@@ -45,6 +46,8 @@ export function RunPage() {
       <Schedule key={runId} runId={runId} result={result} problem={problem.data} unit={unit} />
       <TaskTable result={result} />
       <ReplanTable result={result} unit={unit} />
+      {result.shadow && <PlanVsFact shadow={result.shadow} unit={unit} />}
+      <ReplayCheck runId={runId} unit={unit} />
     </>
   );
 }
@@ -227,6 +230,46 @@ function ReplanTable({ result, unit }: { result: Result; unit: string }) {
           </tbody>
         </table>
       </div>
+    </section>
+  );
+}
+
+/** Решение из журнала: `{t, type, task, worker, attempt}`. */
+function decision(d: Record<string, unknown> | null | undefined, unit: string) {
+  if (!d) return "решения нет";
+  return `${String(d.type)} ${String(d.task)}${d.worker ? ` на ${String(d.worker)}` : ""} в ${String(d.t)} ${unit}`;
+}
+
+/** Проигрывание прогона его же фактами: та же ли получается последовательность решений. */
+function ReplayCheck({ runId, unit }: { runId: string; unit: string }) {
+  const replay = useReplay(runId);
+  const r = replay.data;
+  return (
+    <section aria-labelledby="run-replay" className={styles.section}>
+      <h2 id="run-replay" className={styles.h2}>
+        Проигрывание
+      </h2>
+      <p className={styles.note}>
+        Журнал прогона подаётся политике заново теми же фактами в те же моменты, без контейнеров: совпали
+        решения — прогон воспроизводим.
+      </p>
+      <div className={styles.downloads}>
+        <Button variant="secondary" disabled={replay.isPending} onClick={() => replay.mutate()}>
+          {replay.isPending ? "Проигрываю…" : "Проиграть журнал"}
+        </Button>
+      </div>
+      {replay.isError && (
+        <p role="alert" className={styles.note}>
+          {replay.error.message}
+        </p>
+      )}
+      {r && (
+        <p role="status">
+          {r.same
+            ? `Решения совпали: ${r.decisions} из ${r.decisions}${r.same_journal ? ", журнал совпал целиком" : ", факты журнала отличаются"}.`
+            : `Расхождение на решении № ${(r.divergence?.index ?? 0) + 1} из ${r.decisions}: в прогоне — ${decision(r.divergence?.expected, unit)}, при проигрывании — ${decision(r.divergence?.got, unit)}.`}
+        </p>
+      )}
     </section>
   );
 }

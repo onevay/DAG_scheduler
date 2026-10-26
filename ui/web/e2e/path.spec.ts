@@ -1,3 +1,8 @@
+import { type ChildProcess, spawn } from "node:child_process";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 
@@ -90,4 +95,67 @@ test("остальные экраны доступны и не шире экра
     await expect(page.getByRole("heading", { level: 1 })).toContainText(heading);
     await checkScreen(page, path);
   }
+});
+
+test.describe("на агенте fake", () => {
+  let agent: ChildProcess | undefined;
+
+  test.beforeAll(() => {
+    // Агент без контейнеров: работа идёт по часам стены в масштабе прогона
+    const root = resolve("../..");
+    const python = join(root, ".venv", process.platform === "win32" ? "Scripts/python.exe" : "bin/python");
+    const state = mkdtempSync(join(tmpdir(), "expsched-agent-"));
+    agent = spawn(
+      python,
+      [
+        "-m",
+        "expsched.agent",
+        "--scheduler",
+        String(test.info().project.use.baseURL),
+        "--id",
+        "laptop",
+      ].concat(["--runtime", "fake", "--cpu", "8", "--ram-mb", "16384", "--state", state]),
+      {
+        cwd: root,
+        env: { ...process.env, EXPSCHED_AGENT_TOKEN: "e2e-token" },
+        stdio: ["ignore", "ignore", "inherit"],
+      },
+    );
+  });
+
+  test.afterAll(() => {
+    agent?.kill();
+  });
+
+  test("shadow: контейнеры, план рядом с фактом, проигрывание журнала", async ({ page }) => {
+    await page.goto("/");
+    await page
+      .getByRole("region", { name: /Соберите DAG/ })
+      .getByRole("button", { name: /^laptop/ })
+      .click();
+    await expect(page.getByText("Вход корректен")).toBeVisible();
+    await page.goto("/containers");
+
+    await page.getByRole("radio", { name: "Shadow" }).click();
+    await page.getByRole("radio", { name: "100 мс" }).click();
+    await page.getByRole("button", { name: "Назначить узлам" }).click();
+    await page.getByRole("button", { name: "Запустить на агентах" }).click();
+
+    await expect(page).toHaveURL(/\/containers\/[0-9a-f]{16}$/);
+    await expect(page.getByText(/^закончен · момент модели \d+$/)).toBeVisible({ timeout: 60_000 });
+    await expect(
+      page.getByRole("button", { name: /^report, попытка 1 на laptop: завершён, 100%$/ }),
+    ).toBeVisible();
+    const plan = page.getByRole("region", { name: "План и факт", exact: true });
+    await expect(plan.getByText(/^Makespan: план 90 мин · факт \d+ мин/)).toBeVisible();
+    await checkScreen(page, "Контейнеры: прогон");
+    await page.getByRole("link", { name: "Открыть прогон" }).click();
+
+    await expect(page.getByRole("heading", { level: 1, name: "laptop" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "План и факт", exact: true })).toBeVisible();
+    const replay = page.getByRole("region", { name: "Проигрывание" });
+    await replay.getByRole("button", { name: "Проиграть журнал" }).click();
+    await expect(replay.getByRole("status")).toContainText("Решения совпали");
+    await checkScreen(page, "Прогон на агентах");
+  });
 });

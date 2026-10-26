@@ -14,7 +14,8 @@ make web-dev       # интерфейс на http://127.0.0.1:5173; запрос
 make web-lint      # ESLint, Prettier, tsc
 make web-test      # Vitest
 make web-build     # сборка в ui/web/dist
-make web-e2e       # Playwright в Chromium: путь пример → сборка → прогон → объяснения → сравнение → what-if
+make web-e2e       # Playwright в Chromium: путь пример → сборка → прогон → объяснения → сравнение → what-if,
+                   # прогон shadow на агенте fake → план рядом с фактом → проигрывание журнала
 ```
 
 Типы API генерируются из `schemas/openapi.json`: после изменения моделей API — `make schema`, затем
@@ -56,7 +57,7 @@ Playwright проходит путь пользователя в Chromium: пр�
 ```bash
 uv sync --extra api   # API для проверок: fastapi и uvicorn
 make web-install      # зависимости клиента
-make web-e2e          # при первом запуске сам скачает Chromium (~150 МБ), затем ~1 мин проверок
+make web-e2e          # при первом запуске сам скачает Chromium (~150 МБ), затем ~2 мин проверок
 ```
 
 Сервер проверки поднимают сами, как `make run`: сборка клиента и API на :8010 с пустым временным каталогом

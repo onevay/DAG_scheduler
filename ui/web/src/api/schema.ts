@@ -732,6 +732,11 @@ export interface components {
      * @description Агент представляется: что умеет и сколько ресурсов отдаёт; после своего перезапуска — что уже идёт.
      */
     Hello: {
+      /**
+       * Acked Command Id
+       * @default 0
+       */
+      acked_command_id?: number;
       /** Agent Version */
       agent_version: string;
       /** Capacity */
@@ -740,6 +745,11 @@ export interface components {
       };
       /** Max Containers */
       max_containers: number;
+      /**
+       * Next Event Seq
+       * @default 0
+       */
+      next_event_seq?: number;
       /**
        * Protocol
        * @constant

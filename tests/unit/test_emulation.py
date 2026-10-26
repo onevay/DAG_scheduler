@@ -28,12 +28,12 @@ def laptop(**changes):
 class Loop:
     """Планировщик и агент по очереди, часы общие: шаг — STEP_MS мс стены."""
 
-    def __init__(self, tmp_path, problem):
+    def __init__(self, tmp_path, problem, run_id=RUN):
         self.now = 0.0
         self.registry = AgentRegistry(clock=lambda: self.now, heartbeat_s=1)
         self.runtime = FakeRuntime()
         self.agent = Agent("laptop", self.runtime, tmp_path, {"cpu": 8, "ram_mb": 16384}, now=lambda: "T")
-        self.emulation = Emulation(RUN, problem, problem.policy, self.registry, clock=lambda: self.now)
+        self.emulation = Emulation(run_id, problem, problem.policy, self.registry, clock=lambda: self.now)
         self.online = True
         self.registry.hello("laptop", self.agent.hello())
 
@@ -69,6 +69,33 @@ def test_laptop_runs_on_its_agent_to_the_end(tmp_path):
     assert (
         result["tasks"]["train_small"]["start"] >= 35
     )  # по-прежнему ждёт памяти, которую держит embed_index
+
+
+def test_restarted_scheduler_continues_the_numbering_of_its_agent(tmp_path):
+    assert Loop(tmp_path, laptop()).run().status == "done"
+    # Сервер перезапустился (новый реестр), агент поднимается со своим журналом: номера событий и команд
+    # у него уже не с нуля — реестр продолжает их, а не ждёт события 0 и не шлёт команду 1 повторно
+    loop = Loop(tmp_path, laptop(), run_id="fedcba9876543210")
+    assert (
+        loop.agent.last_command > 0 and loop.registry.agents["laptop"].next_event == loop.agent.next_seq > 0
+    )
+    assert loop.run().status == "done"
+
+
+@pytest.mark.parametrize("policy", ["priority_backfill", "cpsat"])
+def test_containers_slower_than_predicted_keep_the_run_going(tmp_path, policy):
+    if policy == "cpsat":
+        pytest.importorskip("ortools")
+    problem = laptop()
+    loop = Loop(
+        tmp_path, problem.model_copy(update={"policy": problem.policy.model_copy(update={"name": policy})})
+    )
+    advance = loop.runtime.advance
+    loop.runtime.advance = lambda ms: advance(ms // 2)  # контейнеры идут вдвое дольше прогноза
+    emulation = loop.run(5000)
+    # прогноз окончания идущих попыток — в прошлом: резерв политики не раньше «сейчас», а не отказ прогона
+    assert emulation.status == "done" and emulation.result is not None
+    assert emulation.result.result["metrics"]["makespan"] >= 180
 
 
 def test_container_out_of_memory_is_retried(tmp_path):
