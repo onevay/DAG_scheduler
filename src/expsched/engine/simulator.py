@@ -126,7 +126,9 @@ class Simulator:
         sim.queue.drop_external()
         if not isinstance(self.executor, Simulated):  # окончания идущих попыток — по прогнозу
             sim.executor = Simulated()
-            for key, run in sorted(sim.state.run.items()):
+            for key, run in list(
+                sim.state.run.items()
+            ):  # в порядке стартов, как их окончания встали бы в очередь
                 sim.queue.push(max(run.end_pred, sim.t), Finish(key, run.attempt))
         for payload in pending:
             if not isinstance(payload, Event):

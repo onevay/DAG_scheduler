@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import Field
 
@@ -148,6 +148,21 @@ class ErrorOut(Strict):
 
 
 # ---- прогон на агентах ----
+
+
+class Divergence(Strict):
+    """Первое решение, в котором проигрывание разошлось с прогоном: `{t, type, task, worker, attempt}`."""
+
+    index: int
+    expected: dict[str, Any] | None  # решение в журнале прогона; None — проигрывание приняло лишнее
+    got: dict[str, Any] | None  # решение проигрывания; None — проигрывание приняло меньше решений
+
+
+class ReplayOut(Strict):
+    same: bool  # решения политики совпали
+    same_journal: bool  # совпал весь журнал (у прогона на агентах — обычно тоже)
+    decisions: int  # сколько решений в журнале прогона
+    divergence: Divergence | None
 
 
 class LiveStarted(Strict):

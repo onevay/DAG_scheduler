@@ -681,6 +681,47 @@
         "title": "DiagnosticRecord",
         "type": "object"
       },
+      "Divergence": {
+        "additionalProperties": false,
+        "description": "Первое решение, в котором проигрывание разошлось с прогоном: `{t, type, task, worker, attempt}`.",
+        "properties": {
+          "expected": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected"
+          },
+          "got": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Got"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "index",
+          "expected",
+          "got"
+        ],
+        "title": "Divergence",
+        "type": "object"
+      },
       "ErrorInfo": {
         "additionalProperties": false,
         "properties": {
@@ -1933,6 +1974,41 @@
           "dropped"
         ],
         "title": "ReplanRecord",
+        "type": "object"
+      },
+      "ReplayOut": {
+        "additionalProperties": false,
+        "properties": {
+          "decisions": {
+            "title": "Decisions",
+            "type": "integer"
+          },
+          "divergence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Divergence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "same": {
+            "title": "Same",
+            "type": "boolean"
+          },
+          "same_journal": {
+            "title": "Same Journal",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "same",
+          "same_journal",
+          "decisions",
+          "divergence"
+        ],
+        "title": "ReplayOut",
         "type": "object"
       },
       "ReserveRecord": {
@@ -4798,6 +4874,127 @@
           }
         },
         "summary": "Get Problem"
+      }
+    },
+    "/v1/runs/{run_id}/replay": {
+      "post": {
+        "description": "Проиграть журнал сохранённого прогона его же фактами, без контейнеров: те же ли решения у политики.",
+        "operationId": "replay_run_v1_runs__run_id__replay_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{16}$",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "504": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Gateway Timeout"
+          }
+        },
+        "summary": "Replay Run"
       }
     },
     "/v1/scenarios": {

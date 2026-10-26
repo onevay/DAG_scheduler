@@ -39,6 +39,7 @@ from expsched.api.models import (
     ExplainView,
     LiveStarted,
     PoliciesOut,
+    ReplayOut,
     RunOut,
     RunRequest,
     RunsOut,
@@ -55,6 +56,7 @@ from expsched.contract.io_models import PolicyIn, ProblemIn, load
 from expsched.contract.limits import MAX_BODY_BYTES, InputTooLarge
 from expsched.contract.whatif import apply, deltas
 from expsched.emulate.agents import AgentRegistry
+from expsched.emulate.replay import replay
 from expsched.pipeline import input_hash
 from expsched.policies.registry import implemented_policies
 from expsched.validation import Code, has_errors, validate
@@ -155,7 +157,9 @@ async def create_run(request: Request) -> Any:
         return error_response(422, "SCHEMA_INVALID", "request does not match the schema", found)
     problem, policy = run_request.problem, run_request.policy or run_request.problem.policy
     if problem.mode == "replay":
-        return error_response(400, "INVALID_REQUEST", "mode 'replay' is not supported yet")
+        return error_response(
+            400, "INVALID_REQUEST", "replay a stored run with POST /v1/runs/{run_id}/replay"
+        )
     if problem.mode in ("emulate", "shadow"):
         return _start_emulation(request, problem, policy)
     return await _run_and_store(request, problem, policy)
@@ -247,6 +251,22 @@ def get_run(request: Request, run_id: RunId) -> Any:
     if live is not None and live.emulation.status == "running":
         return error_response(409, "RUN_IN_PROGRESS", f"run {run_id} is still going on agents")
     return {"run_id": run_id, "result": _store(request).result(run_id)}
+
+
+@router.post("/runs/{run_id}/replay", response_model=ReplayOut, responses=ERRORS)
+async def replay_run(request: Request, run_id: RunId) -> Any:
+    """Проиграть журнал сохранённого прогона его же фактами, без контейнеров: те же ли решения у политики."""
+    live = request.app.state.emulations.live.get(run_id)
+    if live is not None and live.emulation.status == "running":
+        return error_response(409, "RUN_IN_PROGRESS", f"run {run_id} is still going on agents")
+    store = _store(request)
+
+    def load_and_replay() -> dict[str, Any]:
+        problem = ProblemIn.model_validate(store.problem(run_id))
+        events, _ = store.events(run_id, 0, 10**9)
+        return replay(problem, events)
+
+    return await asyncio.to_thread(load_and_replay)
 
 
 @router.get("/runs/{run_id}/problem", response_model=ProblemIn, responses=ERRORS)

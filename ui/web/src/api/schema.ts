@@ -228,6 +228,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/runs/{run_id}/replay": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Replay Run
+     * @description Проиграть журнал сохранённого прогона его же фактами, без контейнеров: те же ли решения у политики.
+     */
+    post: operations["replay_run_v1_runs__run_id__replay_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/scenarios": {
     parameters: {
       query?: never;
@@ -565,6 +585,22 @@ export interface components {
        * @enum {string}
        */
       type: "DIAGNOSTIC";
+    };
+    /**
+     * Divergence
+     * @description Первое решение, в котором проигрывание разошлось с прогоном: `{t, type, task, worker, attempt}`.
+     */
+    Divergence: {
+      /** Expected */
+      expected: {
+        [key: string]: unknown;
+      } | null;
+      /** Got */
+      got: {
+        [key: string]: unknown;
+      } | null;
+      /** Index */
+      index: number;
     };
     /** ErrorInfo */
     ErrorInfo: {
@@ -1061,6 +1097,16 @@ export interface components {
        * @enum {string}
        */
       type: "REPLAN";
+    };
+    /** ReplayOut */
+    ReplayOut: {
+      /** Decisions */
+      decisions: number;
+      divergence: components["schemas"]["Divergence"] | null;
+      /** Same */
+      same: boolean;
+      /** Same Journal */
+      same_journal: boolean;
     };
     /** ReserveRecord */
     ReserveRecord: {
@@ -2506,6 +2552,109 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ProblemIn"];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Request Entity Too Large */
+      413: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Gateway Timeout */
+      504: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+    };
+  };
+  replay_run_v1_runs__run_id__replay_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        run_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ReplayOut"];
         };
       };
       /** @description Bad Request */
