@@ -24,17 +24,18 @@ def implemented_policies() -> list[str]:
 
 
 def make_policy(config: PolicyIn) -> Policy:
-    """Политика по имени `config.name`; с `preemption="deadline_only"` — в надстройке вытеснения.
+    """Политика по имени `config.name`; с вытеснением `deadline_only` или `priority` — в его надстройке.
 
-    Для ещё не реализованных имён и режимов — NotImplementedError.
+    Для ещё не реализованных имён — NotImplementedError.
     """
     factory = _FACTORIES.get(config.name)
     if factory is None:
         raise NotImplementedError(f"policy {config.name!r} is not implemented yet")
     if config.preemption == "never":
         return factory(config)
-    if config.preemption != "deadline_only":
-        raise NotImplementedError(f"preemption {config.preemption!r} is not implemented yet")
     return PreemptivePolicy(
-        factory(config), config.max_preemptions_per_task, config.min_runtime_before_preempt
+        factory(config),
+        config.max_preemptions_per_task,
+        config.min_runtime_before_preempt,
+        "priority" if config.preemption == "priority" else "deadline",
     )

@@ -20,7 +20,8 @@ def verify(
     I3 загрузка узла не больше ёмкости; I4 попытка не идёт, пока узел недоступен; I5 старт не раньше release
     и подачи; I6 узел допустим для задачи; I7 после успешной попытки других нет; I11 попытка продолжает
     ровно с сохранённой работы; I12 попытки одной задачи не пересекаются; C9 вытеснена только вытесняемая
-    задача; C10 вытеснений задачи не больше `max_preemptions` (None — не проверять).
+    задача; C10 вытеснений задачи не больше `max_preemptions` (None — не проверять); C11 вытесняет только
+    задача класса строго выше.
     """
     tasks = problem.all_tasks()
     submitted = {r["task"]: r["t"] for r in log if r["type"] == "SUBMIT"}
@@ -36,6 +37,7 @@ def verify(
         violations += _check_outages(a, outages.get(a.worker, []))
     violations += _check_sequences(attempts)
     violations += _check_preemptions(attempts, tasks, max_preemptions)
+    violations += _check_preemptors(log, tasks)
     for worker in sorted(problem.workers):
         violations += _check_capacity(worker, problem.workers[worker].capacity, attempts, tasks)
     return violations
@@ -102,6 +104,17 @@ def _check_preemptions(
             out.append(f"C9 {a.task}#{a.attempt}: preempted, but the task is not preemptible")
     if limit is not None:
         out += [f"C10 {k}: {n} preemptions, limit is {limit}" for k, n in sorted(count.items()) if n > limit]
+    return out
+
+
+def _check_preemptors(log: Sequence[Mapping[str, Any]], tasks: Mapping[str, Task]) -> list[str]:
+    out = []
+    for r in log:
+        if r["type"] != "INTERRUPTED" or r["cause"] != "PREEMPT":
+            continue
+        by, victim = r.get("reason", {}).get("by"), tasks.get(r["task"])
+        if by in tasks and victim is not None and victim.cls >= tasks[by].cls:
+            out.append(f"C11 {r['task']}#{r['attempt']}: preempted by {by}, whose class is not higher")
     return out
 
 

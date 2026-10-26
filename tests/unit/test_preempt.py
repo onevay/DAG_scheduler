@@ -54,8 +54,8 @@ def records(log, kind):
 def urgent(make_task, make_problem):
     """low занимает весь узел с 0; в t = 3 появляется urgent и вытесняет её."""
     tasks = [
-        make_task("low", 6, gpu=4, preemptible=True, ckpt=2, max_retries=0),
-        make_task("urgent", 2, gpu=4, release=3),
+        make_task("low", 6, gpu=4, priority=0, preemptible=True, ckpt=2, max_retries=0),
+        make_task("urgent", 2, gpu=4, priority=9, release=3),
     ]
     return make_problem(tasks, gpus=(4,))
 
@@ -110,6 +110,10 @@ def test_preempted_attempt_is_checked_and_counted_as_lost_work(urgent):
         urgent, tasks={**urgent.tasks, "low": dataclasses.replace(urgent.tasks["low"], preemptible=False)}
     )
     assert verify(not_preemptible, log) == ["C9 low#1: preempted, but the task is not preemptible"]
+    same_class = dataclasses.replace(
+        urgent, tasks={**urgent.tasks, "urgent": dataclasses.replace(urgent.tasks["urgent"], priority=0)}
+    )
+    assert verify(same_class, log) == ["C11 low#1: preempted by urgent, whose class is not higher"]
 
 
 @pytest.mark.parametrize(
