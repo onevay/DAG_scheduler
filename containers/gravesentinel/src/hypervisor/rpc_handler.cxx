@@ -522,7 +522,9 @@ nlohmann::json RpcHandler::operator()(const nlohmann::json &request) const {
       nlohmann::json exit_code = nullptr;
       if (status->exit_code.has_value())
         exit_code = *status->exit_code;
-      return {{"state", state}, {"exit_code", std::move(exit_code)}};
+      return {{"state", state},
+              {"exit_code", std::move(exit_code)},
+              {"oom_killed", status->oom_killed}};
     }
 
     if (method == "Register") {

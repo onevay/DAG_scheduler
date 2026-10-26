@@ -216,6 +216,10 @@ validate_options(std::string_view path, const OperationStoreOptions &options) {
     return std::unexpected(
         make_error(StoreErrorCode::invalid_argument,
                    "max_journal_entries must be greater than max_records"));
+  if (options.eviction_batch > options.max_records)
+    return std::unexpected(
+        make_error(StoreErrorCode::invalid_argument,
+                   "eviction_batch must not exceed max_records"));
   return {};
 }
 
@@ -878,6 +882,7 @@ std::expected<void, StoreError> OperationStore::recover() {
       !closed)
     return closed;
 
+  std::vector<std::string> recovered;
   std::size_t line_start = 0;
   while (line_start < contents.size()) {
     if (journal_entries_ >= options_.max_journal_entries)
@@ -915,6 +920,7 @@ std::expected<void, StoreError> OperationStore::recover() {
                             Record{parsed->view, parsed->digest});
       request_to_operation_.emplace(parsed->view.request_id,
                                     parsed->view.operation_id);
+      recovered.push_back(parsed->view.operation_id);
     } else {
       const ParsedRecord previous{operation->second.view,
                                   operation->second.digest};
@@ -944,6 +950,35 @@ std::expected<void, StoreError> OperationStore::recover() {
       record.view.indeterminate = true;
     }
   }
+  for (const auto &operation_id : recovered)
+    retire_locked(operation_id);
+  return compact_locked();
+}
+
+bool OperationStore::has_room_locked() const {
+  return by_operation_.size() < options_.max_records ||
+         (options_.eviction_batch > 0 && !retired_.empty());
+}
+
+void OperationStore::retire_locked(const std::string &operation_id) {
+  const auto state = by_operation_.at(operation_id).view.state;
+  if (state == OperationState::succeeded || state == OperationState::failed)
+    retired_.push_back(operation_id);
+}
+
+std::expected<void, StoreError> OperationStore::evict_locked() {
+  for (std::size_t evicted = 0;
+       evicted < options_.eviction_batch && !retired_.empty(); ++evicted) {
+    const auto operation = by_operation_.find(retired_.front());
+    retired_.pop_front();
+    if (operation == by_operation_.end())
+      return std::unexpected(
+          make_error(StoreErrorCode::internal,
+                     "eviction queue names a missing operation"));
+    request_to_operation_.erase(operation->second.view.request_id);
+    by_operation_.erase(operation);
+  }
+  // The journal must forget them too, or recovery would bring them back
   return compact_locked();
 }
 
@@ -1155,7 +1190,7 @@ OperationStore::submit(std::string request_id, std::string method,
                                       "operation store is shutting down"));
   if (journal_error_)
     return std::unexpected(*journal_error_);
-  if (by_operation_.size() >= options_.max_records)
+  if (!has_room_locked())
     return std::unexpected(
         make_error(StoreErrorCode::resource_exhausted,
                    "operation registry has reached its record limit"));
@@ -1169,6 +1204,12 @@ OperationStore::submit(std::string request_id, std::string method,
     return std::unexpected(
         make_error(StoreErrorCode::conflict,
                    "deterministic operation ID collides with another request"));
+  if (by_operation_.size() >= options_.max_records) {
+    if (auto evicted = evict_locked(); !evicted) {
+      poison_journal_locked(evicted.error());
+      return std::unexpected(evicted.error());
+    }
+  }
   Record record{OperationView{.operation_id = operation_id,
                               .request_id = request_id,
                               .method = method,
@@ -1208,8 +1249,7 @@ std::optional<StoreError> OperationStore::startup_error() const {
 bool OperationStore::accepting_submissions() const {
   std::lock_guard lock(mutex_);
   return !stopping_ && !startup_error_ && !journal_error_ &&
-         by_operation_.size() < options_.max_records &&
-         in_flight_ < options_.max_in_flight;
+         has_room_locked() && in_flight_ < options_.max_in_flight;
 }
 
 void OperationStore::worker() {
@@ -1234,6 +1274,7 @@ void OperationStore::worker() {
         record.view.result = "journal_failed_before_execution";
         record.view.error_code = persisted.error().code;
         record.view.indeterminate = false;
+        retire_locked(operation_id);
         --in_flight_;
         continue;
       }
@@ -1296,6 +1337,7 @@ void OperationStore::worker() {
       record.view.error_code = persisted.error().code;
       record.view.indeterminate = true;
     }
+    retire_locked(operation_id);
     --in_flight_;
   }
 }

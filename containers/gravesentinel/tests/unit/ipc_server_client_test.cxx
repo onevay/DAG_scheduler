@@ -314,9 +314,10 @@ TEST_F(IpcServerClientTest, HandshakeAndHealthUseOnePersistentConnection) {
 
 TEST_F(IpcServerClientTest, ParsesEveryRuntimeStatusState) {
   const std::vector<nlohmann::json> responses{
-      {{"state", "absent"}, {"exit_code", nullptr}},
-      {{"state", "running"}, {"exit_code", nullptr}},
-      {{"state", "exited"}, {"exit_code", 17}},
+      {{"state", "absent"}, {"exit_code", nullptr}, {"oom_killed", false}},
+      {{"state", "running"}, {"exit_code", nullptr}, {"oom_killed", false}},
+      {{"state", "exited"}, {"exit_code", 17}, {"oom_killed", false}},
+      {{"state", "exited"}, {"exit_code", 137}, {"oom_killed", true}},
   };
   start_raw_server([responses](const int peer) {
     if (!serve_handshake(peer))
@@ -352,16 +353,25 @@ TEST_F(IpcServerClientTest, ParsesEveryRuntimeStatusState) {
   EXPECT_EQ(exited->state, gravesentinel::ccm::RuntimeState::exited);
   ASSERT_TRUE(exited->exit_code);
   EXPECT_EQ(*exited->exit_code, 17);
+  EXPECT_FALSE(exited->oom_killed);
+
+  const auto oom = client.get_runtime_status(container);
+  ASSERT_TRUE(oom) << oom.error().message;
+  EXPECT_EQ(oom->state, gravesentinel::ccm::RuntimeState::exited);
+  EXPECT_TRUE(oom->oom_killed);
   stop_server();
 }
 
 TEST_F(IpcServerClientTest,
        RejectsMalformedRuntimeStatusStateAndExitCodeCombinations) {
   const std::vector<nlohmann::json> responses{
-      {{"state", "unknown"}, {"exit_code", nullptr}},
-      {{"state", "absent"}, {"exit_code", 0}},
-      {{"state", "running"}, {"exit_code", -1}},
-      {{"state", "exited"}, {"exit_code", nullptr}},
+      {{"state", "unknown"}, {"exit_code", nullptr}, {"oom_killed", false}},
+      {{"state", "absent"}, {"exit_code", 0}, {"oom_killed", false}},
+      {{"state", "running"}, {"exit_code", -1}, {"oom_killed", false}},
+      {{"state", "exited"}, {"exit_code", nullptr}, {"oom_killed", false}},
+      {{"state", "running"}, {"exit_code", nullptr}, {"oom_killed", true}},
+      {{"state", "exited"}, {"exit_code", 1}, {"oom_killed", "no"}},
+      {{"state", "exited"}, {"exit_code", 1}},
   };
   start_raw_server([responses](const int peer) {
     if (!serve_handshake(peer))

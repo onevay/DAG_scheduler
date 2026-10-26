@@ -434,6 +434,8 @@ int run_hypervisor(const int argc, char **const argv,
 
   gravesentinel::ipc::OperationStoreOptions store_options;
   store_options.worker_count = 4;
+  // A long-running scheduler would otherwise exhaust max_records for good
+  store_options.eviction_batch = 512;
   auto operation_store_result = gravesentinel::ipc::OperationStore::create(
       (storage_root / "operations.jsonl").string(),
       gravesentinel::hypervisor::make_operation_executor(service),

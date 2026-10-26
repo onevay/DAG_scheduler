@@ -201,10 +201,11 @@ publication was an orphan chunk rather than a manifest. Scheduler/operator
 reconciliation must inspect committed manifests and relevant runtime state before a
 new destructive request.
 
-The operation registry is bounded and has no eviction policy. When its record limit is
-reached, new unique create/restore submissions are rejected even if retained records
-are terminal; known duplicate submissions and status polling continue to work.
-Operation-history pruning remains unimplemented. Checkpoint retention, garbage
+The operation registry is bounded. When its record limit is reached, the hypervisor
+evicts a batch of the oldest `succeeded` or `failed` operations (see
+[`architecture.md`](architecture.md)); only when no such record exists are new unique
+submissions rejected. Known duplicate submissions and status polling of retained
+operations continue to work. Checkpoint retention, garbage
 collection, and startup stale-staging cleanup are implemented as internal work and do
 not add public operation-journal records.
 

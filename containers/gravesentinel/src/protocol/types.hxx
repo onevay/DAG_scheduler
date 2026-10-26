@@ -185,6 +185,8 @@ enum class RuntimeState : std::uint8_t { absent, running, exited };
 struct RuntimeStatus {
   RuntimeState state;
   std::optional<int> exit_code;
+  // Exited because the kernel OOM killer stopped it (memory limit exceeded)
+  bool oom_killed{false};
 
   bool operator==(const RuntimeStatus &) const = default;
 };

@@ -77,6 +77,10 @@ struct SubmitResult {
 struct OperationStoreOptions {
   std::size_t max_in_flight{64};
   std::size_t max_records{4096};
+  // At the record limit, forget up to this many of the oldest succeeded or
+  // failed operations and compact once; 0 keeps every record (no eviction).
+  // Indeterminate records are never evicted: they require reconciliation.
+  std::size_t eviction_batch{0};
   std::size_t worker_count{4};
   std::size_t max_journal_entries{8192};
   std::size_t max_journal_bytes{64U * 1024U * 1024U};
@@ -130,6 +134,9 @@ private:
   [[nodiscard]] std::expected<void, StoreError>
   persist_locked(const Record &record, bool registered);
   [[nodiscard]] std::expected<void, StoreError> compact_locked();
+  [[nodiscard]] bool has_room_locked() const;
+  [[nodiscard]] std::expected<void, StoreError> evict_locked();
+  void retire_locked(const std::string &operation_id);
   void poison_journal_locked(const StoreError &error);
   void worker();
 
@@ -145,6 +152,8 @@ private:
   std::unordered_map<std::string, Record> by_operation_;
   std::unordered_map<std::string, std::string> request_to_operation_;
   std::deque<std::string> queue_;
+  // Succeeded or failed operations, oldest first: candidates for eviction.
+  std::deque<std::string> retired_;
   std::size_t in_flight_{0};
   std::size_t journal_entries_{0};
   std::size_t journal_bytes_{0};

@@ -180,11 +180,14 @@ resubmit the exact operation with the same `RequestId`.
 `get_runtime_status()` is a read-only RPC for a registered logical container. Its
 strict result is one of:
 
-| State | `exit_code` | Meaning |
-| --- | --- | --- |
-| `absent` | absent | Neither the normal nor external Podman namespace contains the configured runtime name. |
-| `running` | absent | The owned runtime incarnation is present and running. |
-| `exited` | integer | The owned runtime incarnation is present but its process exited with this code. |
+| State | `exit_code` | `oom_killed` | Meaning |
+| --- | --- | --- | --- |
+| `absent` | absent | `false` | Neither the normal nor external Podman namespace contains the configured runtime name. |
+| `running` | absent | `false` | The owned runtime incarnation is present and running. |
+| `exited` | integer | boolean | The owned runtime incarnation is present but its process exited with this code; `oom_killed` is Podman's `State.OOMKilled` (the memory limit was exceeded). |
+
+`oom_killed` is always present in the wire result; `true` with any state other than
+`exited` is a protocol error.
 
 A present result is returned only after the hypervisor validates GraveSentinel
 ownership labels, the registered container cpuset, and the immutable Podman runtime

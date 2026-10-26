@@ -378,6 +378,7 @@ struct ContainerInspection {
   std::string image_identity;
   bool running;
   int exit_code;
+  bool oom_killed;
   std::string cpuset;
   std::string managed;
   std::string logical_id;
@@ -565,6 +566,8 @@ public:
                           inspection->running
                               ? std::nullopt
                               : std::optional<int>{inspection->exit_code},
+                      .oom_killed =
+                          !inspection->running && inspection->oom_killed,
                   },
               .incarnation =
                   RuntimeIncarnation{
@@ -1668,6 +1671,9 @@ private:
         state == nullptr ? std::nullopt : bool_member(*state, "Running");
     const auto exit_code =
         state == nullptr ? std::nullopt : int_member(*state, "ExitCode");
+    // Older inspect documents may omit it: absent means not OOM-killed
+    const auto oom_killed =
+        state == nullptr ? std::nullopt : bool_member(*state, "OOMKilled");
     const auto cpuset = host_config == nullptr
                             ? std::nullopt
                             : string_member(*host_config, "CpusetCpus");
@@ -1689,6 +1695,7 @@ private:
         .image_identity = *canonical_image,
         .running = *running,
         .exit_code = *exit_code,
+        .oom_killed = oom_killed.value_or(false),
         .cpuset = *cpuset,
         .managed = *managed,
         .logical_id = *logical_id,

@@ -389,9 +389,26 @@ TEST_F(HypervisorRpcHandlerTest, ReturnsExactRuntimeStatusJson) {
 
   const auto status = handler(request("GetRuntimeStatus", "status-request",
                                       {{"container_id", "container-1"}}));
-  EXPECT_EQ(status, nlohmann::json({{"state", "exited"}, {"exit_code", 137}}));
+  EXPECT_EQ(status, nlohmann::json({{"state", "exited"},
+                                    {"exit_code", 137},
+                                    {"oom_killed", false}}));
   EXPECT_EQ(service_.status_container(), "container-1");
   EXPECT_EQ(service_.status_request(), "status-request");
+}
+
+TEST_F(HypervisorRpcHandlerTest, ReportsOomKilledContainer) {
+  service_.set_runtime_status_result(ccm::RuntimeStatus{
+      .state = ccm::RuntimeState::exited,
+      .exit_code = 137,
+      .oom_killed = true,
+  });
+  RpcHandler handler(service_, *store_);
+
+  const auto status = handler(request("GetRuntimeStatus", "status-oom",
+                                      {{"container_id", "container-1"}}));
+  EXPECT_EQ(status, nlohmann::json({{"state", "exited"},
+                                    {"exit_code", 137},
+                                    {"oom_killed", true}}));
 }
 
 TEST_F(HypervisorRpcHandlerTest,

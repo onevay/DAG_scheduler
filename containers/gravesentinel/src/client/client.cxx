@@ -591,8 +591,9 @@ parse_health(const nlohmann::json &result) {
 
 [[nodiscard]] std::expected<RuntimeStatus, RpcFailure>
 parse_runtime_status(const nlohmann::json &result) {
-  if (!has_exact_keys(result, {"state", "exit_code"}) ||
+  if (!has_exact_keys(result, {"state", "exit_code", "oom_killed"}) ||
       !result.at("state").is_string() ||
+      !result.at("oom_killed").is_boolean() ||
       (!result.at("exit_code").is_null() &&
        !result.at("exit_code").is_number_integer())) {
     return std::unexpected(failure(RpcFailureCode::protocol_error,
@@ -625,7 +626,14 @@ parse_runtime_status(const nlohmann::json &result) {
         failure(RpcFailureCode::protocol_error,
                 "runtime status has an inconsistent exit code"));
   }
-  return RuntimeStatus{.state = state, .exit_code = exit_code};
+  const auto oom_killed = result.at("oom_killed").get<bool>();
+  if (oom_killed && state != RuntimeState::exited) {
+    return std::unexpected(
+        failure(RpcFailureCode::protocol_error,
+                "only an exited container can be OOM-killed"));
+  }
+  return RuntimeStatus{
+      .state = state, .exit_code = exit_code, .oom_killed = oom_killed};
 }
 
 [[nodiscard]] RpcFailure moved_client_failure() {

@@ -612,13 +612,18 @@ On journal recovery, a `queued` record is durably changed to `failed` with the
 restart. A `running` record is durably changed to `indeterminate` and requires
 reconciliation. Terminal operations are not rerun.
 
-The registry is intentionally bounded and currently has no eviction or operation
-history retention policy. Background retention, GC, and startup recovery are not
-public operations and create no records in this journal. Once `max_records` is reached,
-new unique operations are
-rejected even if all existing records are terminal; known duplicates and
-`GetOperation` remain available. Journal compaction bounds transition history but does
-not forget deduplication history. Local IPC is therefore authenticated and validated,
+The registry is intentionally bounded. Background retention, GC, and startup recovery
+are not public operations and create no records in this journal. With
+`eviction_batch` set (the hypervisor uses 512 of `max_records` 4096), a submission
+that finds the registry full first forgets up to that many of the oldest `succeeded`
+or `failed` operations and compacts the journal once, so recovery cannot revive them.
+`GetOperation` for an evicted operation returns `not_found`, and resubmitting its
+`request_id` creates a new operation: deduplication covers the retained window only.
+`queued`, `running`, and `indeterminate` records are never evicted; when nothing is
+evictable, or with `eviction_batch` 0, new unique operations are rejected while known
+duplicates and `GetOperation` remain available. Eviction order follows completion
+within one daemon run; after a restart, recovered terminal records are evicted in
+compacted-journal order (by operation ID), not by age. Local IPC is therefore authenticated and validated,
 not implicitly trusted.
 
 ## Remaining Lifecycle Limitations

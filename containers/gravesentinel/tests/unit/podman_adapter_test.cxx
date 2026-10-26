@@ -309,11 +309,15 @@ adapter_config(const std::filesystem::path &staging_root) {
 [[nodiscard]] std::string
 inspect_json(std::string_view runtime_id, bool running,
              std::string_view cpuset = "0", std::string_view managed = "true",
-             std::string_view logical_id = "logical-1", int exit_code = 0) {
+             std::string_view logical_id = "logical-1", int exit_code = 0,
+             std::optional<bool> oom_killed = std::nullopt) {
   return "[{\"Id\":\"" + std::string(runtime_id) + "\",\"Image\":\"" +
          std::string(kImageDigest) +
          "\",\"State\":{\"Running\":" + (running ? "true" : "false") +
          ",\"ExitCode\":" + std::to_string(exit_code) +
+         (oom_killed ? std::string(",\"OOMKilled\":") +
+                           (*oom_killed ? "true" : "false")
+                     : std::string()) +
          "},\"Config\":{\"Labels\":{\"" +
          std::string(PodmanAdapter::managed_label) + "\":\"" +
          std::string(managed) + "\",\"" +
@@ -886,8 +890,31 @@ TEST(PodmanAdapterTest, InspectRuntimeReportsExitedContainerAndExitCode) {
   EXPECT_EQ(observed->status.state, RuntimeState::exited);
   ASSERT_TRUE(observed->status.exit_code.has_value());
   EXPECT_EQ(*observed->status.exit_code, 7);
+  EXPECT_FALSE(observed->status.oom_killed);
   ASSERT_TRUE(observed->incarnation.has_value());
   EXPECT_EQ(*observed->incarnation, runtime_incarnation());
+  EXPECT_TRUE(runner.empty());
+}
+
+TEST(PodmanAdapterTest, InspectRuntimeReportsOomKilledContainer) {
+  TemporaryDirectory temporary;
+  const auto config = adapter_config(temporary.path());
+  ScriptedProcessRunner runner;
+  FakeAffinityController affinity;
+  RecordingLogger logger;
+  push_exists(runner, config, "runtime-1", 0);
+  push_container_inspect(
+      runner, config, "runtime-1",
+      inspect_json(kSourceId, false, "0", "true", "logical-1", 137, true));
+  PodmanAdapter adapter(runner, affinity, logger, config);
+
+  const auto observed =
+      adapter.inspect_runtime(container_id(), runtime_ref(), kCpuAssignment);
+
+  ASSERT_TRUE(observed) << observed.error().diagnostic;
+  EXPECT_EQ(observed->status.state, RuntimeState::exited);
+  EXPECT_EQ(observed->status.exit_code, 137);
+  EXPECT_TRUE(observed->status.oom_killed);
   EXPECT_TRUE(runner.empty());
 }
 

@@ -429,6 +429,100 @@ TEST(OperationStoreTest, BoundsRegistryWithoutForgettingDedupHistory) {
   remove_path(path);
 }
 
+TEST(OperationStoreTest, EvictsOldestFinishedOperationsAtTheRecordLimit) {
+  const auto path = temp_path();
+  remove_path(path);
+  OperationStoreOptions options;
+  options.max_records = 3;
+  options.eviction_batch = 2;
+  options.max_journal_entries = 8;
+  options.worker_count = 1;
+
+  std::vector<std::string> ids;
+  {
+    OperationStore store(path, successful_executor(), options);
+    for (int index = 0; index < 3; ++index) {
+      auto submitted = store.submit("req-evict-" + std::to_string(index),
+                                    "SubmitCreateCheckpoint", "container",
+                                    "payload-" + std::to_string(index));
+      ASSERT_TRUE(submitted);
+      ASSERT_TRUE(wait_for_terminal(store, submitted->operation_id));
+      ids.push_back(submitted->operation_id);
+    }
+    EXPECT_TRUE(store.accepting_submissions());
+
+    auto fourth = store.submit("req-evict-3", "SubmitCreateCheckpoint",
+                               "container", "payload-3");
+    ASSERT_TRUE(fourth) << fourth.error().message;
+    ASSERT_TRUE(wait_for_terminal(store, fourth->operation_id));
+    EXPECT_EQ(store.get(ids[0]).error_or(StoreError{}).code,
+              StoreErrorCode::not_found);
+    EXPECT_EQ(store.get(ids[1]).error_or(StoreError{}).code,
+              StoreErrorCode::not_found);
+    EXPECT_TRUE(store.get(ids[2]));
+
+    // An evicted request ID is no longer deduplicated: it is a new operation
+    auto again = store.submit("req-evict-0", "SubmitCreateCheckpoint",
+                              "container", "payload-0");
+    ASSERT_TRUE(again);
+    EXPECT_FALSE(again->duplicate);
+    ASSERT_TRUE(wait_for_terminal(store, again->operation_id));
+  }
+
+  // Evicted records are gone from the journal too: recovery does not revive
+  // them
+  auto reopened = OperationStore::create(path, successful_executor(), options);
+  ASSERT_TRUE(reopened) << reopened.error().message;
+  EXPECT_EQ((*reopened)->get(ids[0]).error_or(StoreError{}).code,
+            StoreErrorCode::not_found);
+  EXPECT_TRUE((*reopened)->get(ids[2]));
+  reopened->reset();
+  EXPECT_EQ(line_count(read_text(path)), 3U);
+  remove_path(path);
+}
+
+TEST(OperationStoreTest, NeverEvictsIndeterminateOperations) {
+  const auto path = temp_path();
+  remove_path(path);
+  OperationStoreOptions options;
+  options.max_records = 1;
+  options.eviction_batch = 1;
+  options.max_journal_entries = 4;
+  options.worker_count = 1;
+
+  OperationStore store(
+      path,
+      [](const OperationView &) -> std::expected<std::string, StoreError> {
+        return std::unexpected(StoreError(
+            StoreErrorCode::execution_indeterminate, "lost track", true));
+      },
+      options);
+  auto first = store.submit("req-unknown", "SubmitStopContainer", "container",
+                            "payload");
+  ASSERT_TRUE(first);
+  auto terminal = wait_for_terminal(store, first->operation_id);
+  ASSERT_TRUE(terminal);
+  EXPECT_EQ(terminal->state, OperationState::indeterminate);
+
+  EXPECT_FALSE(store.accepting_submissions());
+  auto rejected =
+      store.submit("req-next", "SubmitStopContainer", "container", "other");
+  ASSERT_FALSE(rejected);
+  EXPECT_EQ(rejected.error().code, StoreErrorCode::resource_exhausted);
+  EXPECT_TRUE(store.get(first->operation_id));
+  remove_path(path);
+}
+
+TEST(OperationStoreTest, RejectsEvictionBatchLargerThanTheRecordLimit) {
+  OperationStoreOptions options;
+  options.max_records = 2;
+  options.eviction_batch = 3;
+  auto store =
+      OperationStore::create(temp_path(), successful_executor(), options);
+  ASSERT_FALSE(store);
+  EXPECT_EQ(store.error().code, StoreErrorCode::invalid_argument);
+}
+
 TEST(OperationStoreTest, InFlightLimitIncludesRunningOperations) {
   const auto path = temp_path();
   remove_path(path);
