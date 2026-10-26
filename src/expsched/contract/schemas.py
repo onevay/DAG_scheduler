@@ -1,4 +1,4 @@
-"""JSON Schema входа, результата и записи журнала. `make schema` пересобирает их в schemas/."""
+"""JSON Schema входа, результата, журнала и протокола агента; `make schema` пересобирает их в schemas/."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
+from expsched.contract.agent import dump_agent_schema
 from expsched.contract.io_models import dump_schema
 from expsched.contract.output_models import dump_event_schema, dump_result_schema
 
@@ -13,6 +14,7 @@ SCHEMAS: dict[str, Callable[[], str]] = {
     "problem.schema.json": dump_schema,
     "result.schema.json": dump_result_schema,
     "event.schema.json": dump_event_schema,
+    "agent.schema.json": dump_agent_schema,
 }
 
 

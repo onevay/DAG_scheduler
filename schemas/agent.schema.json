@@ -1,0 +1,548 @@
+{
+  "$defs": {
+    "AgentEvent": {
+      "additionalProperties": false,
+      "description": "Что случилось с попыткой. accepted/rejected — ответ на команду start; started — контейнер запущен;\ncheckpoint — сохранено `progress` единиц работы; exited — контейнер завершился с `exit_code`; oom — убит\nза превышение памяти; killed — остановлен командой stop; lost — агент потерял контейнер (`detail`).",
+      "properties": {
+        "at": {
+          "maxLength": 40,
+          "title": "At",
+          "type": "string"
+        },
+        "attempt": {
+          "minimum": 1,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "container_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Container Id"
+        },
+        "detail": {
+          "anyOf": [
+            {
+              "maxLength": 1024,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Detail"
+        },
+        "exit_code": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exit Code"
+        },
+        "progress": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Progress"
+        },
+        "run_id": {
+          "pattern": "^[0-9a-f]{16}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "task": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+          "title": "Task",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "accepted",
+            "rejected",
+            "started",
+            "checkpoint",
+            "exited",
+            "oom",
+            "killed",
+            "lost"
+          ],
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "task",
+        "attempt",
+        "seq",
+        "at",
+        "type"
+      ],
+      "title": "AgentEvent",
+      "type": "object"
+    },
+    "AttemptRef": {
+      "additionalProperties": false,
+      "description": "Попытка задачи в прогоне — то, чем управляет агент; `key` — метка её контейнера.",
+      "properties": {
+        "attempt": {
+          "minimum": 1,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "run_id": {
+          "pattern": "^[0-9a-f]{16}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "task": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+          "title": "Task",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "task",
+        "attempt"
+      ],
+      "title": "AttemptRef",
+      "type": "object"
+    },
+    "CheckpointCommand": {
+      "additionalProperties": false,
+      "description": "Сохранить чекпоинт сейчас, не дожидаясь интервала.",
+      "properties": {
+        "attempt": {
+          "minimum": 1,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "command_id": {
+          "minimum": 1,
+          "title": "Command Id",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "checkpoint",
+          "title": "Kind",
+          "type": "string"
+        },
+        "run_id": {
+          "pattern": "^[0-9a-f]{16}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "task": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+          "title": "Task",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "task",
+        "attempt",
+        "kind",
+        "command_id"
+      ],
+      "title": "CheckpointCommand",
+      "type": "object"
+    },
+    "ContainerSpec": {
+      "additionalProperties": false,
+      "description": "Что агент запускает для попытки задачи; ресурсы задачи становятся лимитами контейнера.",
+      "properties": {
+        "command": {
+          "default": [],
+          "items": {
+            "maxLength": 4096,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "title": "Command",
+          "type": "array"
+        },
+        "env": {
+          "default": {},
+          "maxProperties": 64,
+          "patternProperties": {
+            "^[A-Z_][A-Z0-9_]{0,63}$": {
+              "maxLength": 4096,
+              "type": "string"
+            }
+          },
+          "title": "Env",
+          "type": "object"
+        },
+        "image": {
+          "pattern": "^[a-z0-9][a-z0-9._/:@-]{0,255}$",
+          "title": "Image",
+          "type": "string"
+        }
+      },
+      "required": [
+        "image"
+      ],
+      "title": "ContainerSpec",
+      "type": "object"
+    },
+    "EventsAck": {
+      "additionalProperties": false,
+      "properties": {
+        "next_event_seq": {
+          "minimum": 0,
+          "title": "Next Event Seq",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "next_event_seq"
+      ],
+      "title": "EventsAck",
+      "type": "object"
+    },
+    "EventsBatch": {
+      "additionalProperties": false,
+      "description": "События подряд по номерам; повтор уже принятых безопасен, пропуск номера — ошибка.",
+      "properties": {
+        "events": {
+          "items": {
+            "$ref": "#/$defs/AgentEvent"
+          },
+          "maxItems": 1000,
+          "minItems": 1,
+          "title": "Events",
+          "type": "array"
+        }
+      },
+      "required": [
+        "events"
+      ],
+      "title": "EventsBatch",
+      "type": "object"
+    },
+    "Hello": {
+      "additionalProperties": false,
+      "description": "Агент представляется: что умеет и сколько ресурсов отдаёт; после своего перезапуска — что уже идёт.",
+      "properties": {
+        "agent_version": {
+          "maxLength": 64,
+          "title": "Agent Version",
+          "type": "string"
+        },
+        "capacity": {
+          "patternProperties": {
+            "^[a-z][a-z0-9_]{0,31}$": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "title": "Capacity",
+          "type": "object"
+        },
+        "max_containers": {
+          "maximum": 64,
+          "minimum": 1,
+          "title": "Max Containers",
+          "type": "integer"
+        },
+        "protocol": {
+          "const": 1,
+          "title": "Protocol",
+          "type": "integer"
+        },
+        "running": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/AttemptRef"
+          },
+          "title": "Running",
+          "type": "array"
+        },
+        "runtime": {
+          "enum": [
+            "docker",
+            "podman",
+            "fake"
+          ],
+          "title": "Runtime",
+          "type": "string"
+        }
+      },
+      "required": [
+        "protocol",
+        "agent_version",
+        "runtime",
+        "capacity",
+        "max_containers"
+      ],
+      "title": "Hello",
+      "type": "object"
+    },
+    "HelloAck": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+          "title": "Agent",
+          "type": "string"
+        },
+        "heartbeat_timeout_s": {
+          "minimum": 1,
+          "title": "Heartbeat Timeout S",
+          "type": "integer"
+        },
+        "next_event_seq": {
+          "minimum": 0,
+          "title": "Next Event Seq",
+          "type": "integer"
+        },
+        "poll_timeout_s": {
+          "minimum": 1,
+          "title": "Poll Timeout S",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "agent",
+        "poll_timeout_s",
+        "heartbeat_timeout_s",
+        "next_event_seq"
+      ],
+      "title": "HelloAck",
+      "type": "object"
+    },
+    "Poll": {
+      "additionalProperties": false,
+      "properties": {
+        "acked_command_id": {
+          "minimum": 0,
+          "title": "Acked Command Id",
+          "type": "integer"
+        },
+        "wait_s": {
+          "default": 25,
+          "maximum": 30,
+          "minimum": 0,
+          "title": "Wait S",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "acked_command_id"
+      ],
+      "title": "Poll",
+      "type": "object"
+    },
+    "PollReply": {
+      "additionalProperties": false,
+      "properties": {
+        "commands": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "checkpoint": "#/$defs/CheckpointCommand",
+                "start": "#/$defs/StartCommand",
+                "stop": "#/$defs/StopCommand"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/StartCommand"
+              },
+              {
+                "$ref": "#/$defs/StopCommand"
+              },
+              {
+                "$ref": "#/$defs/CheckpointCommand"
+              }
+            ]
+          },
+          "title": "Commands",
+          "type": "array"
+        }
+      },
+      "required": [
+        "commands"
+      ],
+      "title": "PollReply",
+      "type": "object"
+    },
+    "StartCommand": {
+      "additionalProperties": false,
+      "description": "Запустить попытку на узле `worker`. Без `container` — встроенная нагрузка: `work` единиц времени\nмодели по `time_scale_ms` миллисекунд, с чекпоинтами каждые `checkpoint_interval` единиц.",
+      "properties": {
+        "attempt": {
+          "minimum": 1,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "checkpoint_interval": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Checkpoint Interval"
+        },
+        "command_id": {
+          "minimum": 1,
+          "title": "Command Id",
+          "type": "integer"
+        },
+        "container": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ContainerSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "kind": {
+          "const": "start",
+          "title": "Kind",
+          "type": "string"
+        },
+        "limits": {
+          "patternProperties": {
+            "^[a-z][a-z0-9_]{0,31}$": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "title": "Limits",
+          "type": "object"
+        },
+        "resume_from": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Resume From",
+          "type": "integer"
+        },
+        "run_id": {
+          "pattern": "^[0-9a-f]{16}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "task": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+          "title": "Task",
+          "type": "string"
+        },
+        "time_scale_ms": {
+          "minimum": 1,
+          "title": "Time Scale Ms",
+          "type": "integer"
+        },
+        "work": {
+          "minimum": 1,
+          "title": "Work",
+          "type": "integer"
+        },
+        "worker": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+          "title": "Worker",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "task",
+        "attempt",
+        "kind",
+        "command_id",
+        "worker",
+        "limits",
+        "work",
+        "time_scale_ms"
+      ],
+      "title": "StartCommand",
+      "type": "object"
+    },
+    "StopCommand": {
+      "additionalProperties": false,
+      "properties": {
+        "attempt": {
+          "minimum": 1,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "command_id": {
+          "minimum": 1,
+          "title": "Command Id",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "stop",
+          "title": "Kind",
+          "type": "string"
+        },
+        "reason": {
+          "enum": [
+            "preempt",
+            "worker_down",
+            "cancel"
+          ],
+          "title": "Reason",
+          "type": "string"
+        },
+        "run_id": {
+          "pattern": "^[0-9a-f]{16}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "task": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+          "title": "Task",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "task",
+        "attempt",
+        "kind",
+        "command_id",
+        "reason"
+      ],
+      "title": "StopCommand",
+      "type": "object"
+    }
+  },
+  "title": "AgentProtocol"
+}

@@ -224,6 +224,44 @@
         "title": "ClusterIn",
         "type": "object"
       },
+      "ContainerSpec": {
+        "additionalProperties": false,
+        "description": "Что агент запускает для попытки задачи; ресурсы задачи становятся лимитами контейнера.",
+        "properties": {
+          "command": {
+            "default": [],
+            "items": {
+              "maxLength": 4096,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Command",
+            "type": "array"
+          },
+          "env": {
+            "default": {},
+            "maxProperties": 64,
+            "patternProperties": {
+              "^[A-Z_][A-Z0-9_]{0,63}$": {
+                "maxLength": 4096,
+                "type": "string"
+              }
+            },
+            "title": "Env",
+            "type": "object"
+          },
+          "image": {
+            "pattern": "^[a-z0-9][a-z0-9._/:@-]{0,255}$",
+            "title": "Image",
+            "type": "string"
+          }
+        },
+        "required": [
+          "image"
+        ],
+        "title": "ContainerSpec",
+        "type": "object"
+      },
       "DeadlineMisses": {
         "additionalProperties": false,
         "properties": {
@@ -2082,6 +2120,16 @@
             "title": "Constraints",
             "type": "object"
           },
+          "container": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContainerSpec"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "deadline": {
             "anyOf": [
               {
@@ -2630,6 +2678,18 @@
       "WorkerIn": {
         "additionalProperties": false,
         "properties": {
+          "agent": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent"
+          },
           "id": {
             "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
             "title": "Id",

@@ -293,6 +293,26 @@ export interface components {
       /** Workers */
       workers: components["schemas"]["WorkerIn"][];
     };
+    /**
+     * ContainerSpec
+     * @description Что агент запускает для попытки задачи; ресурсы задачи становятся лимитами контейнера.
+     */
+    ContainerSpec: {
+      /**
+       * Command
+       * @default []
+       */
+      command?: string[];
+      /**
+       * Env
+       * @default {}
+       */
+      env?: {
+        [key: string]: string;
+      };
+      /** Image */
+      image: string;
+    };
     /** DeadlineMisses */
     DeadlineMisses: {
       /** Critical */
@@ -1004,6 +1024,7 @@ export interface components {
       constraints?: {
         [key: string]: string;
       };
+      container?: components["schemas"]["ContainerSpec"] | null;
       /** Deadline */
       deadline?: number | null;
       /**
@@ -1196,6 +1217,8 @@ export interface components {
     };
     /** WorkerIn */
     WorkerIn: {
+      /** Agent */
+      agent?: string | null;
       /** Id */
       id: string;
       /**

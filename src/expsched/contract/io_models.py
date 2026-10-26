@@ -23,6 +23,19 @@ class Strict(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
+class ContainerSpec(Strict):
+    """Что агент запускает для попытки задачи; ресурсы задачи становятся лимитами контейнера."""
+
+    image: Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9._/:@-]{0,255}$")]
+    command: Annotated[list[Annotated[str, Field(max_length=4096)]], Field(max_length=64)] = []
+    env: Annotated[
+        dict[
+            Annotated[str, Field(pattern=r"^[A-Z_][A-Z0-9_]{0,63}$")], Annotated[str, Field(max_length=4096)]
+        ],
+        Field(max_length=64),
+    ] = {}
+
+
 class TaskIn(Strict):
     id: Id
     kind: Literal["data", "train", "eval", "infer", "other"] = "other"
@@ -36,12 +49,14 @@ class TaskIn(Strict):
     checkpoint_interval: Annotated[int, Field(ge=1)] | None = None
     max_retries: Annotated[int, Field(ge=0, le=20)] = 2
     constraints: dict[str, str] = {}
+    container: ContainerSpec | None = None  # для прогона на агентах; без него — встроенная нагрузка-эмуляция
 
 
 class WorkerIn(Strict):
     id: Id
     resources: ResMap
     labels: dict[str, str] = {}
+    agent: Id | None = None  # агент, который запускает задачи этого узла при прогоне на агентах
 
 
 class EventIn(Strict):

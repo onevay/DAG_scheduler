@@ -95,6 +95,7 @@ curl -s localhost:8000/v1/runs -H 'content-type: application/json' \
 - [Как строится расписание](docs/scheduling.md) — симуляция, политики, отказы, причины ожидания, проверка
   и метрики.
 - [REST API](docs/api.md)
+- [Протокол агента](docs/agent.md) — как агент запускает задачи в контейнерах и сообщает о них.
 - [Архитектура](docs/architecture.md) — пакеты, слои и правила зависимостей.
 - [Интерфейс](ui/README.md) и [JS-клиент](ui/web/README.md) — экраны, разработка, сквозные проверки.
 - [Разработка](CONTRIBUTING.md)
