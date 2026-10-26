@@ -90,8 +90,11 @@ export function idleGrid(
   return workers.map(({ id, gpu }) => {
     const mine = intervals.filter((i) => i.worker === id);
     const cells = Array.from({ length: horizon }, (_, h) => {
-      const here = mine.filter((i) => i.from <= h && h < i.to).sort((a, b) => b.gpu - a.gpu)[0];
-      return here ? { code: here.code, part: here.gpu < gpu } : { code: null, part: false };
+      const free = (i: Idle) => i.free.gpu ?? 0;
+      const here = mine
+        .filter((i) => i.from <= h && h < i.to && free(i) > 0)
+        .sort((a, b) => free(b) - free(a))[0];
+      return here ? { code: here.code, part: free(here) < gpu } : { code: null, part: false };
     });
     return { worker: id, cells };
   });

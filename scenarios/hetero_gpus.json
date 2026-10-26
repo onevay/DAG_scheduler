@@ -2,17 +2,17 @@
   "time_unit": "hour",
   "cluster": {
     "workers": [
-      {"id": "a100-1", "resources": {"gpu": 8, "cpu": 64, "ram_gb": 512}, "labels": {"gpu_type": "a100", "zone": "eu"}},
-      {"id": "v100-eu", "resources": {"gpu": 4, "cpu": 32, "ram_gb": 256}, "labels": {"gpu_type": "v100", "zone": "eu"}},
-      {"id": "v100-us", "resources": {"gpu": 4, "cpu": 32, "ram_gb": 256}, "labels": {"gpu_type": "v100", "zone": "us"}},
-      {"id": "cpu-1", "resources": {"cpu": 96, "ram_gb": 768}, "labels": {"gpu_type": "none", "zone": "eu"}}
+      {"id": "a100-1", "resources": {"gpu": 8, "cpu": 64, "ram_mb": 524288}, "labels": {"gpu_type": "a100", "zone": "eu"}},
+      {"id": "v100-eu", "resources": {"gpu": 4, "cpu": 32, "ram_mb": 262144}, "labels": {"gpu_type": "v100", "zone": "eu"}},
+      {"id": "v100-us", "resources": {"gpu": 4, "cpu": 32, "ram_mb": 262144}, "labels": {"gpu_type": "v100", "zone": "us"}},
+      {"id": "cpu-1", "resources": {"cpu": 96, "ram_mb": 786432}, "labels": {"gpu_type": "none", "zone": "eu"}}
     ]
   },
   "tasks": [
-    {"id": "ingest", "kind": "data", "duration": 3, "resources": {"cpu": 80, "ram_gb": 600}, "priority": 4},
-    {"id": "tokenize", "kind": "data", "duration": 2, "resources": {"cpu": 64, "ram_gb": 256},
+    {"id": "ingest", "kind": "data", "duration": 3, "resources": {"cpu": 80, "ram_mb": 614400}, "priority": 4},
+    {"id": "tokenize", "kind": "data", "duration": 2, "resources": {"cpu": 64, "ram_mb": 262144},
      "dependencies": ["ingest"], "constraints": {"zone": "eu"}, "priority": 4},
-    {"id": "pretrain_llm", "kind": "train", "duration": 10, "resources": {"gpu": 8, "cpu": 32, "ram_gb": 400},
+    {"id": "pretrain_llm", "kind": "train", "duration": 10, "resources": {"gpu": 8, "cpu": 32, "ram_mb": 409600},
      "dependencies": ["tokenize"], "constraints": {"gpu_type": "a100"}, "checkpoint_interval": 2, "priority": 6},
     {"id": "finetune_chat", "kind": "train", "duration": 4, "resources": {"gpu": 4, "cpu": 16},
      "dependencies": ["pretrain_llm"], "constraints": {"zone": "eu"}, "priority": 5},
@@ -22,11 +22,11 @@
      "dependencies": ["pretrain_llm"], "constraints": {"gpu_type": "v100"}, "priority": 3},
     {"id": "eval_chat", "kind": "eval", "duration": 1, "resources": {"gpu": 1}, "dependencies": ["finetune_chat"]},
     {"id": "eval_code", "kind": "eval", "duration": 1, "resources": {"gpu": 1}, "dependencies": ["finetune_code"]},
-    {"id": "quantize", "kind": "infer", "duration": 1, "resources": {"cpu": 16, "ram_gb": 64},
+    {"id": "quantize", "kind": "infer", "duration": 1, "resources": {"cpu": 16, "ram_mb": 65536},
      "dependencies": ["distill_small"]},
     {"id": "serve_bench", "kind": "infer", "duration": 2, "resources": {"gpu": 1},
      "dependencies": ["quantize", "eval_chat", "eval_code"], "constraints": {"gpu_type": "v100"}, "priority": 7},
-    {"id": "metrics_export", "kind": "other", "duration": 14, "resources": {"cpu": 8, "ram_gb": 16}, "priority": 0}
+    {"id": "metrics_export", "kind": "other", "duration": 14, "resources": {"cpu": 8, "ram_mb": 16384}, "priority": 0}
   ],
   "policy": {"name": "priority_backfill"}
 }

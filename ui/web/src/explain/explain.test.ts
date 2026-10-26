@@ -34,9 +34,9 @@ describe("explain", () => {
   it("puts the widest idle reason into every hour and marks partial idle", () => {
     const grid = idleGrid(
       [
-        { worker: "a", from: 0, to: 2, code: "IDLE_NO_READY", gpu: 4, detail: {} },
-        { worker: "a", from: 1, to: 3, code: "IDLE_DOWN", gpu: 2, detail: {} },
-        { worker: "b", from: 2, to: 3, code: "IDLE_RESERVED", gpu: 1, detail: {} },
+        { worker: "a", from: 0, to: 2, code: "IDLE_NO_READY", free: { gpu: 4 }, detail: {} },
+        { worker: "a", from: 1, to: 3, code: "IDLE_DOWN", free: { gpu: 2 }, detail: {} },
+        { worker: "b", from: 2, to: 3, code: "IDLE_RESERVED", free: { gpu: 1 }, detail: {} },
       ],
       [
         { id: "a", gpu: 4 },

@@ -2,7 +2,15 @@ import { useState } from "react";
 
 import { usePolicies, usePolicyRuns } from "../api/hooks";
 import type { PolicyName, Problem, Result } from "../api/types";
-import { capsules, insight, METRICS, type MetricKey, profile } from "../compare/compare";
+import {
+  capsules,
+  insight,
+  METRICS,
+  type MetricKey,
+  objectiveInsight,
+  profile,
+  ranking,
+} from "../compare/compare";
 import styles from "../compare/Compare.module.css";
 import { Flower } from "../compare/Flower";
 import { WhatIf } from "../compare/WhatIf";
@@ -36,7 +44,9 @@ export function ComparePage() {
   );
   const failed = runs.flatMap((r, i) => (r.error ? [`${names[i]}: ${r.error.message}`] : []));
   const pending = runs.some((r) => r.isFetching);
-  const selected = picked ?? rows[0]?.policy ?? null;
+  // По умолчанию открыт профиль лучшей по цели политики
+  const selected = picked ?? ranking(rows)[0]?.policy ?? rows[0]?.policy ?? null;
+  const byObjective = objectiveInsight(rows);
   const runOf = new Map(done.map(([name, run]) => [name, run.run_id]));
   const unit = UNITS[problem?.time_unit ?? "hour"];
   const stale = problem !== undefined && problem !== draft;
@@ -110,6 +120,7 @@ export function ComparePage() {
               </p>
             ))}
             {rows.length > 0 && <p className={styles.insight}>{insight(rows, metric, unit)}</p>}
+            {byObjective && <p className={styles.insight}>{byObjective}</p>}
           </section>
 
           {selected && (

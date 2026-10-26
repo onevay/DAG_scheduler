@@ -184,21 +184,21 @@ lenient событие отброшено); неизвестный `run_id` — 
                "delta": {"makespan": -1, "lost_work_gpu": -4, "utilization_gpu": 0.0265, "...": "..."}}]}
 ```
 
-`delta` — вариант минус исходный по `makespan`, сумме `deadline_misses`, `weighted_tardiness`,
-`utilization_gpu`, `lost_work_gpu`, `mean_wait`; `null`, если один из прогонов не симулировался. Каждый вариант —
+`delta` — вариант минус исходный по `makespan`, сумме `deadline_misses`, `weighted_tardiness`, `mean_wait` и по
+каждому ресурсу — `utilization_<ресурс>`, `lost_work_<ресурс>`; `null`, если один из прогонов не симулировался. Каждый вариант —
 сохранённый прогон: по `run_id` открываются его расписание и объяснения. Ссылка на неизвестные задачу или узел,
 повтор id узла — 422 `INVALID_REQUEST`.
 
 ## `GET /v1/runs/{run_id}/explain?task=&worker=&t=`
 
 Почему прогон такой: [критическая цепочка](scheduling.md#почему-makespan-такой), попытки, ожидания задач и
-[простой узлов](scheduling.md#почему-простаивают-gpu). Каждый фильтр сужает все списки сразу: `task` — эта
+[простой узлов](scheduling.md#почему-простаивают-узлы). Каждый фильтр сужает все списки сразу: `task` — эта
 задача, `worker` — этот узел, `t` — то, что идёт в этот момент.
 
 ```json
 {"chain": [...], "decomposition": {"dep": 21, "res": 0, "lost": 1, "release": 0, "wait": 0},
  "attempts": [...], "waits": [{"task": "urgent_eval", "code": "WAIT_DEPS", "from": 9, "to": 10, "detail": {}}],
- "idle": [{"worker": "node-C", "from": 13, "to": 15, "code": "IDLE_NO_READY", "gpu": 2, "detail": {}}]}
+ "idle": [{"worker": "node-C", "from": 13, "to": 15, "code": "IDLE_NO_READY", "free": {"gpu": 2}, "detail": {}}]}
 ```
 
 Ожидание — свойство задачи, простой — узла: с `worker` ожиданий в ответе нет, с `task` нет простоя. Неизвестные
@@ -213,7 +213,7 @@ lenient событие отброшено); неизвестный `run_id` — 
 
 | Поле | |
 |---|---|
-| `schema_version` | `"1.0"` |
+| `schema_version` | `"1.1"`; прогон, сохранённый прежней версией, при повторе входа пересчитывается, по `run_id` — 404 |
 | `input_hash` | хеш канонического JSON входа вместе с действующей политикой |
 | `result_hash` | хеш журнала; совпадает у повторных прогонов того же входа |
 | `policy` | имя политики |
@@ -221,7 +221,7 @@ lenient событие отброшено); неизвестный `run_id` — 
 | `attempts` | попытки: `task`, `attempt`, `worker`, `start`, `end`, `resume_from`, `outcome` (`DONE`, `INT`, `PRE`), `saved` |
 | `tasks` | по id: `status`, `start` (первой попытки), `finish`, `deadline`, `tardiness`, `waits` |
 | `metrics` | [метрики](scheduling.md#метрики); `null` при INFEASIBLE |
-| `explain` | критическая цепочка, разложение makespan ([поля](scheduling.md#почему-makespan-такой)) и простой узлов (`idle`, [коды](scheduling.md#почему-простаивают-gpu)); `null` при INFEASIBLE |
+| `explain` | критическая цепочка, разложение makespan ([поля](scheduling.md#почему-makespan-такой)) и простой узлов (`idle`, [коды](scheduling.md#почему-простаивают-узлы)); `null` при INFEASIBLE |
 | `replans` | записи `REPLAN` журнала: как внешние события сдвинули план ([формат](scheduling.md#перепланирование)); `null`, если задач больше `max_forecast_tasks` |
 | `diagnostics` | ошибки и предупреждения входа |
 | `violations` | нарушения, найденные проверкой расписания; пустой список — расписание допустимо |

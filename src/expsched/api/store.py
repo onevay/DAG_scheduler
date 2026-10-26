@@ -5,7 +5,8 @@
 Прогон пишется во временный каталог и переименовывается целиком: читатель не увидит наполовину записанный.
 Когда прогонов больше `max_runs` или они вместе занимают больше `max_bytes`, удаляются самые старые.
 summary.json — строка списка прогонов, чтобы список не читал result.json целиком. Прогон может исчезнуть между
-проверкой и чтением (его вытеснил параллельный запрос) — чтение тогда бросает RunNotFound.
+проверкой и чтением (его вытеснил параллельный запрос) — чтение тогда бросает RunNotFound. Прогон, посчитанный
+прежней версией формата результата, устарел: чтение бросает RunOutdated, в списке его нет.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from expsched.contract.hashing import canonical_json
-from expsched.pipeline import RunResult
+from expsched.pipeline import SCHEMA_VERSION, RunResult
 
 RUN_ID_PATTERN = r"^[0-9a-f]{16}$"
 
@@ -30,6 +31,10 @@ class RunNotFound(LookupError):
     def __init__(self, run_id: str) -> None:
         super().__init__(run_id)
         self.run_id = run_id
+
+
+class RunOutdated(RunNotFound):
+    """Прогон посчитан прежней версией формата результата: его нужно посчитать заново."""
 
 
 def run_id_of(input_hash: str) -> str:
@@ -52,7 +57,14 @@ class RunStore:
         self._evict(keep=run_id)
 
     def result(self, run_id: str) -> dict[str, Any]:
-        return dict(json.loads(self._read(run_id, "result.json")))
+        result = dict(json.loads(self._read(run_id, "result.json")))
+        if result.get("schema_version") != SCHEMA_VERSION:
+            raise RunOutdated(run_id)
+        return result
+
+    def discard(self, run_id: str) -> None:
+        """Удаляет прогон, например устаревший перед пересчётом."""
+        shutil.rmtree(self.root / run_id, ignore_errors=True)
 
     def problem(self, run_id: str) -> dict[str, Any]:
         return dict(json.loads(self._read(run_id, "problem.json")))
@@ -63,9 +75,11 @@ class RunStore:
         for path in self.root.iterdir() if self.root.is_dir() else []:
             if path.is_dir() and not path.name.startswith("."):
                 try:
-                    summaries.append(json.loads((path / "summary.json").read_text(encoding="utf-8")))
+                    summary = json.loads((path / "summary.json").read_text(encoding="utf-8"))
                 except FileNotFoundError:
                     continue  # вытеснен, пока шёл список
+                if summary.pop("schema_version", None) == SCHEMA_VERSION:
+                    summaries.append(summary)
         summaries.sort(key=lambda s: (s["created_at"], s["run_id"]), reverse=True)
         return summaries[:limit]
 
@@ -131,4 +145,5 @@ def _summary(run_id: str, problem: dict[str, Any], result: dict[str, Any]) -> di
         "tasks": len(result["tasks"]),
         "makespan": metrics.get("makespan"),
         "created_at": datetime.now(UTC).isoformat(timespec="milliseconds"),
+        "schema_version": result.get("schema_version"),
     }

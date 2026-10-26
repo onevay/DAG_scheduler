@@ -44,7 +44,7 @@ from expsched.api.models import (
     WhatIfRequest,
 )
 from expsched.api.runner import ProcessRunner, RunFailed, RunQueueFull, RunTimeout
-from expsched.api.store import RUN_ID_PATTERN, RunNotFound, RunStore, run_id_of
+from expsched.api.store import RUN_ID_PATTERN, RunNotFound, RunOutdated, RunStore, run_id_of
 from expsched.api.views import explain_view, input_analysis
 from expsched.api.web import add_security_headers, mount_web
 from expsched.contract.io_models import PolicyIn, ProblemIn, load
@@ -347,12 +347,15 @@ async def _stored_run(
 ) -> tuple[str, dict[str, Any]]:
     """Сохранённый прогон входа с политикой или новый: в рабочем процессе, с таймаутом, затем в хранилище.
 
-    Прогон, вытесненный между проверкой и чтением, считается заново. `reserved` — место в очереди уже взято.
+    Прогон, вытесненный между проверкой и чтением, считается заново, устаревший — тоже, на его месте.
+    `reserved` — место в очереди уже взято.
     """
     store = _store(request)
     run_id = await asyncio.to_thread(lambda: run_id_of(input_hash(problem, config)))
     try:
         return run_id, await asyncio.to_thread(store.result, run_id)
+    except RunOutdated:
+        await asyncio.to_thread(store.discard, run_id)
     except RunNotFound:
         pass
     runner: ProcessRunner = request.app.state.runner
@@ -387,6 +390,9 @@ def _no_run(run_id: str) -> JSONResponse:
 
 
 async def _run_not_found(request: Request, error: Exception) -> JSONResponse:
+    if isinstance(error, RunOutdated):
+        message = f"run {error.run_id} was made by an older version of the service: run the input again"
+        return error_response(404, "NOT_FOUND", message)
     return _no_run(error.run_id if isinstance(error, RunNotFound) else "")
 
 

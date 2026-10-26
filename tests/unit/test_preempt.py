@@ -104,7 +104,7 @@ def test_preempted_attempt_is_checked_and_counted_as_lost_work(urgent):
         (2, "DONE", 0),
     ]
     assert verify(urgent, log, max_preemptions=1) == []
-    assert metrics(urgent, log, None)["lost_work_gpu"] == 4  # час работы на 4 GPU после чекпоинта
+    assert metrics(urgent, log, None)["lost_work"] == {"gpu": 4}  # час работы на 4 GPU после чекпоинта
     assert verify(urgent, log, max_preemptions=0) == ["C10 low: 1 preemptions, limit is 0"]
     not_preemptible = dataclasses.replace(
         urgent, tasks={**urgent.tasks, "low": dataclasses.replace(urgent.tasks["low"], preemptible=False)}

@@ -1,0 +1,23 @@
+{
+  "name": "laptop",
+  "time_unit": "minute",
+  "cluster": {
+    "workers": [
+      {"id": "laptop", "resources": {"cpu": 8, "ram_mb": 16384}}
+    ]
+  },
+  "tasks": [
+    {"id": "load_data", "kind": "data", "duration": 10, "resources": {"cpu": 2, "ram_mb": 2048}},
+    {"id": "tokenize", "kind": "data", "duration": 15, "resources": {"cpu": 4, "ram_mb": 4096},
+     "dependencies": ["load_data"]},
+    {"id": "train_small", "kind": "train", "duration": 40, "resources": {"cpu": 6, "ram_mb": 6144},
+     "dependencies": ["tokenize"], "checkpoint_interval": 10},
+    {"id": "embed_index", "kind": "infer", "duration": 25, "resources": {"cpu": 2, "ram_mb": 12288},
+     "dependencies": ["load_data"]},
+    {"id": "eval_small", "kind": "eval", "duration": 10, "resources": {"cpu": 2, "ram_mb": 2048},
+     "dependencies": ["train_small"]},
+    {"id": "report", "kind": "other", "duration": 5, "resources": {"cpu": 1, "ram_mb": 512}, "priority": 8,
+     "deadline": 100, "dependencies": ["eval_small", "embed_index"]}
+  ],
+  "policy": {"name": "priority_backfill"}
+}

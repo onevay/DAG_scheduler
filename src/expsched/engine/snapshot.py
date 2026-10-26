@@ -27,6 +27,7 @@ def build_snapshot(state: SimState, now: int) -> Snapshot:
         running=MappingProxyType(state.run),
         rem=MappingProxyType(state.rem),
         free=MappingProxyType(state.free),
+        capacity=MappingProxyType({k: w.capacity for k, w in state.problem.workers.items()}),
         up=MappingProxyType(state.up),
         eligible=MappingProxyType(state.eligible),
         analysis=state.analysis,

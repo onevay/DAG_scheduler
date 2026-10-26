@@ -1,4 +1,4 @@
-"""Нижние границы makespan: по критическому пути, по загрузке ресурсов и по крупным GPU-задачам.
+"""Нижние границы makespan: по критическому пути, по загрузке ресурсов и по крупным задачам.
 
 По ним оценивают расписание, когда оптимум неизвестен: gap = (makespan - LB) / LB. Отказы узлов не учтены.
 """
@@ -8,8 +8,6 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 
 from expsched.domain.models import Task, Worker
-
-THRESHOLD_RESOURCE = "gpu"
 
 
 def path_bound(eft: Mapping[str, int], now: int) -> int:
@@ -35,20 +33,22 @@ def energy_bounds(
 def threshold_bound(
     tasks: Mapping[str, Task], remaining: Mapping[str, int], workers: Iterable[Worker], now: int
 ) -> int:
-    """Задачи, которым нужно не меньше θ GPU, конкурируют только за узлы, где GPU не меньше θ."""
+    """Задачи, которым нужно не меньше θ единиц ресурса, конкурируют только за узлы, где его не меньше θ.
+
+    Считается по каждому ресурсу задач, берётся наибольшая граница.
+    """
     workers = list(workers)
     bound = now
-    for theta in sorted({t.resources.get(THRESHOLD_RESOURCE) for t in tasks.values()} - {0}):
-        pool = sum(
-            w.capacity.get(THRESHOLD_RESOURCE) for w in workers if w.capacity.get(THRESHOLD_RESOURCE) >= theta
-        )
-        work = sum(
-            remaining[k] * t.resources.get(THRESHOLD_RESOURCE)
-            for k, t in tasks.items()
-            if t.resources.get(THRESHOLD_RESOURCE) >= theta
-        )
-        if pool:
-            bound = max(bound, now + _ceil_div(work, pool))
+    for resource in sorted({r for t in tasks.values() for r in t.resources}):
+        for theta in sorted({t.resources.get(resource) for t in tasks.values()} - {0}):
+            pool = sum(w.capacity.get(resource) for w in workers if w.capacity.get(resource) >= theta)
+            work = sum(
+                remaining[k] * t.resources.get(resource)
+                for k, t in tasks.items()
+                if t.resources.get(resource) >= theta
+            )
+            if pool:
+                bound = max(bound, now + _ceil_div(work, pool))
     return bound
 
 

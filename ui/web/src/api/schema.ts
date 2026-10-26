@@ -474,7 +474,7 @@ export interface components {
     };
     /**
      * IdleInterval
-     * @description На узле свободны `gpu` GPU с `from` до `to` по причине `code`.
+     * @description На узле свободны ресурсы `free` с `from` до `to` по причине `code`.
      */
     IdleInterval: {
       /**
@@ -486,10 +486,12 @@ export interface components {
       detail: {
         [key: string]: unknown;
       };
+      /** Free */
+      free: {
+        [key: string]: number;
+      };
       /** From */
       from: number;
-      /** Gpu */
-      gpu: number;
       /** To */
       to: number;
       /** Worker */
@@ -499,7 +501,9 @@ export interface components {
     IdleOut: {
       /** By Code */
       by_code: {
-        [key: string]: number;
+        [key: string]: {
+          [key: string]: number;
+        };
       };
       /** Intervals */
       intervals: components["schemas"]["IdleInterval"][];
@@ -549,16 +553,21 @@ export interface components {
       deadline_misses: components["schemas"]["DeadlineMisses"];
       /** Gap To Lb */
       gap_to_lb: number | null;
-      /** Lost Work Gpu */
-      lost_work_gpu: number;
+      /** Lost Work */
+      lost_work: {
+        [key: string]: number;
+      };
       /** Lower Bound */
       lower_bound: number | null;
       /** Makespan */
       makespan: number;
       /** Mean Wait */
       mean_wait: number;
-      /** Utilization Gpu */
-      utilization_gpu: number | null;
+      score: components["schemas"]["Score"];
+      /** Utilization */
+      utilization: {
+        [key: string]: number | null;
+      };
       /** Weighted Tardiness */
       weighted_tardiness: number;
     };
@@ -774,7 +783,7 @@ export interface components {
        * Schema Version
        * @constant
        */
-      schema_version: "1.0";
+      schema_version: "1.1";
       /**
        * Status
        * @enum {string}
@@ -860,6 +869,19 @@ export interface components {
     ScenariosOut: {
       /** Scenarios */
       scenarios: components["schemas"]["ScenarioInfo"][];
+    };
+    /**
+     * Score
+     * @description Оценка по цели политики: `key` сравнивается поэлементно, меньше — лучше.
+     */
+    Score: {
+      /** Key */
+      key: number[];
+      /**
+       * Objective
+       * @enum {string}
+       */
+      objective: "lexicographic" | "weighted";
     };
     /** SetCheckpoint */
     SetCheckpoint: {

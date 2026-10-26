@@ -29,8 +29,8 @@ const result = (makespan: number) => ({
   metrics: {
     makespan,
     lower_bound: 4,
-    utilization_gpu: 0.5,
-    lost_work_gpu: 1,
+    utilization: { gpu: 0.5 },
+    lost_work: { gpu: 1 },
     mean_wait: 0,
     deadline_misses: { critical: 0, high: 0, normal: 1, low: 0 },
   },
@@ -41,7 +41,7 @@ const result = (makespan: number) => ({
   explain: {
     idle: {
       by_code: {},
-      intervals: [{ worker: "n", from: 2, to: 4, code: "IDLE_DOWN", gpu: 2, detail: {} }],
+      intervals: [{ worker: "n", from: 2, to: 4, code: "IDLE_DOWN", free: { gpu: 2 }, detail: {} }],
     },
   },
 });

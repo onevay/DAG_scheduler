@@ -38,6 +38,7 @@ class Snapshot:
     running: Mapping[str, RunInfo]
     rem: Mapping[str, int]  # остаток работы по задаче
     free: Mapping[str, Resources]  # свободные ресурсы узла (у недоступного узла пусто)
+    capacity: Mapping[str, Resources]  # ёмкость узла
     up: Mapping[str, bool]
     eligible: Mapping[str, tuple[str, ...]]  # допустимые узлы задачи
     analysis: Analysis  # ранние сроки и границы — на момент последнего пересчёта

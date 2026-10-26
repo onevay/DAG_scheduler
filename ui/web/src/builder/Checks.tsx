@@ -102,6 +102,11 @@ const VALIDATION: readonly Option<NonNullable<Policy["validation_mode"]>>[] = [
   { value: "strict", label: "строгая" },
 ];
 
+const OBJECTIVE: readonly Option<NonNullable<Policy["objective"]>>[] = [
+  { value: "lexicographic", label: "сначала дедлайны" },
+  { value: "weighted", label: "взвешенная" },
+];
+
 const UNITS = { hour: "ч", minute: "мин", second: "с" } as const;
 
 const PREEMPTION: readonly Option<NonNullable<Policy["preemption"]>>[] = [
@@ -183,6 +188,18 @@ export function PolicySettings() {
             onChange={(validation_mode) => set({ validation_mode })}
           />
           <span className={styles.detail}>строгая — при любой ошибке входа прогон не запускается</span>
+        </div>
+        <div className={styles.labelled}>
+          <span className={styles.detail}>Цель</span>
+          <Segmented
+            label="Цель"
+            options={OBJECTIVE}
+            value={policy.objective ?? "lexicographic"}
+            onChange={(objective) => set({ objective })}
+          />
+          <span className={styles.detail}>
+            по ней сравниваются политики; сначала дедлайны — пропуски по классам, затем опоздание и makespan
+          </span>
         </div>
       </div>
     </Section>

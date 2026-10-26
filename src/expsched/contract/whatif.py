@@ -51,15 +51,10 @@ Intervention = Annotated[
     Field(discriminator="kind"),
 ]
 
-# Метрики, по которым считается разница; меньше — лучше, кроме utilization_gpu.
-COMPARED = (
-    "makespan",
-    "deadline_misses",
-    "weighted_tardiness",
-    "utilization_gpu",
-    "lost_work_gpu",
-    "mean_wait",
-)
+# Метрики, по которым считается разница; меньше — лучше, кроме загрузки. Загрузка и потери — по ресурсам:
+# в разнице они получают ключи utilization_<ресурс> и lost_work_<ресурс>.
+COMPARED = ("makespan", "deadline_misses", "weighted_tardiness", "mean_wait")
+PER_RESOURCE = ("utilization", "lost_work")
 
 
 def apply(problem: ProblemIn, change: Intervention) -> ProblemIn:
@@ -94,9 +89,12 @@ def deltas(
     """Разница метрик варианта и исходного прогона; None, если один из них не симулировался."""
     if base is None or variant is None:
         return None
+    pairs = [(key, _value(base, key), _value(variant, key)) for key in COMPARED]
+    for metric in PER_RESOURCE:
+        for resource in sorted(base.get(metric, {}).keys() & variant.get(metric, {}).keys()):
+            pairs.append((f"{metric}_{resource}", base[metric][resource], variant[metric][resource]))
     out: dict[str, int | float] = {}
-    for key in COMPARED:
-        a, b = _value(base, key), _value(variant, key)
+    for key, a, b in pairs:
         if a is not None and b is not None:
             out[key] = round(b - a, 4) if isinstance(a, float) or isinstance(b, float) else b - a
     return out

@@ -108,11 +108,11 @@ function Metrics({ result, unit }: { result: Result; unit: string }) {
     },
     {
       label: "Загрузка GPU",
-      value: m.utilization_gpu != null ? Math.round(m.utilization_gpu * 100) : "—",
+      value: m.utilization.gpu != null ? Math.round(m.utilization.gpu * 100) : "—",
       unit: "%",
       accent: true,
     },
-    { label: "Потеряно", value: m.lost_work_gpu, unit: `GPU·${unit}` },
+    { label: "Потеряно", value: m.lost_work.gpu ?? "—", unit: `GPU·${unit}` },
     { label: "Дедлайны", value: misses, unit: "пропущено" },
     { label: "Среднее ожидание", value: Number(m.mean_wait.toFixed(2)), unit },
   ];

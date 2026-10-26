@@ -31,9 +31,10 @@ const RESULT = {
     gap_to_lb: 0.05,
     deadline_misses: { critical: 0, high: 1, normal: 0, low: 0 },
     weighted_tardiness: 0,
-    utilization_gpu: 0.476,
-    lost_work_gpu: 4,
+    utilization: { gpu: 0.476 },
+    lost_work: { gpu: 4 },
     mean_wait: 0.0909,
+    score: { objective: "lexicographic", key: [0, 1, 0, 0, 0, 22] },
   },
   attempts: [
     { task: "a", attempt: 1, worker: "n", start: 0, end: 2, resume_from: 0, saved: 0, outcome: "INT" },

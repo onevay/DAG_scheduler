@@ -54,7 +54,7 @@ out = run(problem, PolicyIn(name="priority"))
 
 assert out.result["status"] == "OK"
 assert out.result["metrics"]["makespan"] == 22
-assert out.result["metrics"]["lost_work_gpu"] == 4  # час работы на 4 GPU после последнего чекпоинта
+assert out.result["metrics"]["lost_work"]["gpu"] == 4  # час работы на 4 GPU после последнего чекпоинта
 assert out.result["violations"] == []
 ```
 
@@ -85,6 +85,7 @@ curl -s localhost:8000/v1/runs -H 'content-type: application/json' \
 | `scenarios/staggered.json` | данные приходят позже: ожидание видно в объяснениях |
 | `scenarios/invalid_mix.json` | lenient: ошибочные части пропущены, остальное планируется |
 | `scenarios/priority_preemption.json` | срочные задачи без дедлайна вытесняют фоновую, у которой меньше теряется |
+| `scenarios/laptop.json` | один ноутбук без GPU (8 ядер, 16 ГБ): задача ждёт памяти, хотя ядра свободны |
 | `scenarios/ml_platform.json` | 39 задач на 5 узлах: отказ a100-2 стоит демо руководству 6 ч опоздания |
 
 ## Документация
@@ -100,7 +101,6 @@ curl -s localhost:8000/v1/runs -H 'content-type: application/json' \
 ## Ограничения
 
 - Политика `cpsat` пока не реализована.
-- Поле `objective` пока не поддерживается.
 - Поддерживается только режим `simulate`; раздел «Контейнеры» — заглушка.
 - На широких DAG (10⁴ задач, тысячи готовых одновременно) прогон занимает до 20 с: очередь политики
   пересчитывается каждую эпоху.

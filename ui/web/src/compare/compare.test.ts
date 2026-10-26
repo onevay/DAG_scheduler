@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { capsules, insight, profile, type Row } from "./compare";
+import { capsules, compareScores, insight, objectiveInsight, profile, ranking, type Row } from "./compare";
 
 const row = (
   policy: string,
@@ -18,6 +18,8 @@ const row = (
   utilizationGpu: util,
   lostWorkGpu: lost,
   meanWait: wait,
+  objective: makespan === null ? null : "lexicographic",
+  score: makespan === null ? null : [0, 0, 0, 0, lost, makespan],
   violations: 0,
 });
 
@@ -53,6 +55,28 @@ describe("profile", () => {
       lost: 0,
     });
     expect(profile(ROWS, "fifo")).toEqual({ makespan: 1, util: 1, wait: 1, lost: 1 });
+  });
+});
+
+describe("objective", () => {
+  it("compares scores element by element", () => {
+    expect(compareScores([1, 0, 9], [0, 5, 0])).toBeGreaterThan(0);
+    expect(compareScores([0, 2], [0, 2])).toBe(0);
+    expect(compareScores([3], [5])).toBeLessThan(0);
+  });
+
+  it("ranks by score, ties share a place, runs without metrics get none", () => {
+    const rows = [row("cpsat", null, null, 0, 0), ...ROWS];
+    expect(ranking(rows)).toEqual([
+      { policy: "fifo", place: 1 },
+      { policy: "fifo_skip", place: 1 },
+      { policy: "priority_backfill", place: 3 },
+    ]);
+    expect(objectiveInsight(rows)).toBe(
+      "По цели (сначала пропуски дедлайнов от старших классов, затем взвешенное опоздание, затем makespan): " +
+        "1 — fifo, fifo_skip; 3 — priority_backfill.",
+    );
+    expect(objectiveInsight([row("cpsat", null, null, 0, 0)])).toBeNull();
   });
 });
 

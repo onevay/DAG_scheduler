@@ -354,3 +354,21 @@ def test_event_for_an_evicted_run_is_404(tmp_path):
     shutil.rmtree(tmp_path / run_id)
     event = {"event": {"time": 1, "type": "worker_down", "worker": "node-A"}}
     assert client.post(f"/v1/runs/{run_id}/events", json=event).status_code == 404
+
+
+def test_run_made_by_an_older_version_is_recomputed_in_place(tmp_path):
+    runner = InlineRunner()
+    client = TestClient(create_app(store=RunStore(tmp_path), runner=runner))
+    run_id = client.post("/v1/runs", json={"problem": DEMO}).json()["run_id"]
+    stored = tmp_path / run_id / "result.json"
+    stored.write_text(json.dumps({**json.loads(stored.read_text()), "schema_version": "1.0"}))
+    summary = tmp_path / run_id / "summary.json"  # сводки прежней версии были без schema_version
+    summary.write_text(
+        json.dumps({k: v for k, v in json.loads(summary.read_text()).items() if k != "schema_version"})
+    )
+    response = client.get(f"/v1/runs/{run_id}")
+    assert response.status_code == 404 and "older version" in response.json()["error"]["message"]
+    assert client.get("/v1/runs").json()["runs"] == []
+    again = client.post("/v1/runs", json={"problem": DEMO})
+    assert again.json()["run_id"] == run_id and runner.calls == 2
+    assert client.get(f"/v1/runs/{run_id}").json()["result"]["schema_version"] == "1.1"

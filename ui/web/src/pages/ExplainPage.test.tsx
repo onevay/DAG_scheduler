@@ -42,10 +42,10 @@ const RESULT = {
     ],
     decomposition: { dep: 5, res: 0, lost: 1, release: 0, wait: 0 },
     idle: {
-      by_code: { IDLE_DOWN: 8, IDLE_NO_READY: 3, IDLE_POLICY: 0 },
+      by_code: { gpu: { IDLE_DOWN: 8, IDLE_NO_READY: 3, IDLE_POLICY: 0 } },
       intervals: [
-        { worker: "n", from: 0, to: 2, code: "IDLE_NO_READY", gpu: 1, detail: {} },
-        { worker: "m", from: 2, to: 6, code: "IDLE_DOWN", gpu: 2, detail: {} },
+        { worker: "n", from: 0, to: 2, code: "IDLE_NO_READY", free: { gpu: 1 }, detail: {} },
+        { worker: "m", from: 2, to: 6, code: "IDLE_DOWN", free: { gpu: 2 }, detail: {} },
       ],
     },
   },

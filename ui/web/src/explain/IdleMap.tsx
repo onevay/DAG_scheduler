@@ -19,7 +19,7 @@ export function IdleMap({
 }) {
   const [filter, setFilter] = useState<string | null>(null);
   const grid = idleGrid(idle.intervals, workers, horizon);
-  const { rows, total, insight } = codeSummary(idle.by_code, unit);
+  const { rows, total, insight } = codeSummary(idle.by_code.gpu ?? {}, unit);
 
   return (
     <div className={styles.idleRow}>

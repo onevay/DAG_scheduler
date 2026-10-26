@@ -88,6 +88,48 @@ export function profile(rows: readonly Row[], policy: string): Record<MetricKey,
   return { makespan: score("makespan"), util: score("util"), wait: score("wait"), lost: score("lost") };
 }
 
+const OBJECTIVES: Record<NonNullable<Row["objective"]>, string> = {
+  lexicographic: "сначала пропуски дедлайнов от старших классов, затем взвешенное опоздание, затем makespan",
+  weighted: "взвешенное опоздание плюс makespan",
+};
+
+/** Сравнение оценок по цели поэлементно: меньше — лучше. */
+export function compareScores(a: readonly number[], b: readonly number[]): number {
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const d = (a[i] ?? 0) - (b[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
+export interface Place {
+  policy: string;
+  /** Место по цели: равные оценки делят место, следующее идёт через них (1, 1, 3). */
+  place: number;
+}
+
+/** Места политик по цели политики; прогоны без метрик мест не получают. */
+export function ranking(rows: readonly Row[]): Place[] {
+  const scored = rows
+    .flatMap((r) => (r.score ? [{ policy: r.policy, score: r.score }] : []))
+    .sort((a, b) => compareScores(a.score, b.score) || a.policy.localeCompare(b.policy));
+  return scored.map((r) => ({
+    policy: r.policy,
+    place: 1 + scored.findIndex((o) => compareScores(o.score, r.score) === 0),
+  }));
+}
+
+/** Фраза о местах по цели: что считается лучшим и кто где. */
+export function objectiveInsight(rows: readonly Row[]): string | null {
+  const places = ranking(rows);
+  const objective = rows.find((r) => r.objective)?.objective;
+  if (places.length === 0 || !objective) return null;
+  const groups = new Map<number, string[]>();
+  for (const p of places) groups.set(p.place, [...(groups.get(p.place) ?? []), p.policy]);
+  const list = [...groups].map(([place, names]) => `${place} — ${names.join(", ")}`).join("; ");
+  return `По цели (${OBJECTIVES[objective]}): ${list}.`;
+}
+
 /** Одна фраза о том, что показывает метрика: кто лучше и насколько, или что разницы нет. */
 export function insight(rows: readonly Row[], key: MetricKey, unit: string): string {
   const metric = METRICS[key];

@@ -16,6 +16,7 @@ def empty_snapshot(demo_problem) -> Snapshot:
         running={},
         rem={k: t.duration for k, t in demo_problem.tasks.items()},
         free={w: demo_problem.workers[w].capacity for w in demo_problem.workers},
+        capacity={w: demo_problem.workers[w].capacity for w in demo_problem.workers},
         up={w: True for w in demo_problem.workers},
         eligible={k: demo_problem.eligible(t) for k, t in demo_problem.tasks.items()},
         analysis=analyze(demo_problem),

@@ -209,16 +209,17 @@ describe("tables", () => {
       gap_to_lb: 0,
       deadline_misses: { critical: 1, high: 0, normal: 2, low: 0 },
       weighted_tardiness: 3,
-      utilization_gpu: 0.5,
-      lost_work_gpu: 0,
+      utilization: { gpu: 0.5 },
+      lost_work: { gpu: 0 },
       mean_wait: 0.1,
+      score: { objective: "weighted", key: [24] },
     };
     const run = (status: string, m: typeof metrics | null) =>
       ({ status, metrics: m, violations: m ? [] : ["x"] }) as unknown as Result;
     const rows = comparisonRows({ fifo: run("OK", metrics), priority: run("INFEASIBLE", null) });
-    expect(rows.map((r) => [r.policy, r.makespan, r.deadlineMisses, r.violations])).toEqual([
-      ["fifo", 21, 3, 0],
-      ["priority", null, null, 1],
+    expect(rows.map((r) => [r.policy, r.makespan, r.deadlineMisses, r.score, r.violations])).toEqual([
+      ["fifo", 21, 3, [24], 0],
+      ["priority", null, null, null, 1],
     ]);
   });
 });

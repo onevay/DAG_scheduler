@@ -3,12 +3,19 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from expsched.api.store import RunNotFound, RunStore
-from expsched.pipeline import RunResult
+from expsched.api.store import RunNotFound, RunOutdated, RunStore
+from expsched.pipeline import SCHEMA_VERSION, RunResult
 
 
 def outcome(n):
-    result = {"n": n, "policy": "fifo", "status": "OK", "tasks": {}, "metrics": {"makespan": n}}
+    result = {
+        "schema_version": SCHEMA_VERSION,
+        "n": n,
+        "policy": "fifo",
+        "status": "OK",
+        "tasks": {},
+        "metrics": {"makespan": n},
+    }
     return RunResult(result, [{"seq": i, "t": i, "type": "READY"} for i in range(n)])
 
 
@@ -78,6 +85,17 @@ def test_the_run_just_saved_is_kept_even_if_alone_it_is_too_big(tmp_path):
     store = RunStore(tmp_path, max_bytes=1)
     _saved(store, "a" * 16)
     assert [p.name for p in tmp_path.iterdir()] == ["a" * 16]
+
+
+def test_run_of_an_older_result_version_is_outdated(tmp_path):
+    store = RunStore(tmp_path)
+    store.save("a" * 16, {}, RunResult({**outcome(1).result, "schema_version": "1.0"}, []))
+    store.save("b" * 16, {}, outcome(2))
+    with pytest.raises(RunOutdated):
+        store.result("a" * 16)
+    assert [s["run_id"] for s in store.recent(10)] == ["b" * 16]
+    store.discard("a" * 16)
+    assert store.find("a" * 16) is None
 
 
 def _saved(store, run_id):

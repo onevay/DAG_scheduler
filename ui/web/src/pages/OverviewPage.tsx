@@ -107,7 +107,7 @@ function RunOverview({ runId, result, problem }: { runId: string; result: Result
       </p>
     );
   const gap = gapLabel(m.makespan, m.lower_bound);
-  const util = m.utilization_gpu ?? 0;
+  const util = m.utilization.gpu ?? 0;
   const misses = Object.values(m.deadline_misses).reduce((s, v) => s + v, 0);
 
   return (
@@ -123,7 +123,7 @@ function RunOverview({ runId, result, problem }: { runId: string; result: Result
         </MetricCard>
         <MetricCard label="Загрузка GPU" value={Math.round(util * 100)} unit="%" tone="accent">
           <span className={styles.gap}>
-            пропущено дедлайнов {misses} · потеряно {m.lost_work_gpu} GPU·{unit}
+            пропущено дедлайнов {misses} · потеряно {m.lost_work.gpu ?? 0} GPU·{unit}
           </span>
           <PillMeter share={util} tone="accent" />
         </MetricCard>

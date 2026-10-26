@@ -21,7 +21,7 @@ from expsched.validation import quarantine, validate_problem
 from expsched.verify.attempts import attempts_from_log
 from expsched.verify.invariants import verify
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
 
 
 @dataclass(frozen=True)
@@ -74,7 +74,7 @@ def run(problem: ProblemIn, policy: PolicyIn | None = None) -> RunResult:
     status = {**plan.excluded, **sim.state.status}
     planned = {k: t for k, t in sim.state.tasks.items() if status[k] is not TaskStatus.INFEASIBLE}
     lower_bound = analyze(replace(plan.problem, tasks=planned)).lb if planned else None
-    scores = metrics(plan.problem, log, lower_bound)
+    scores = metrics(plan.problem, log, lower_bound, config.objective)
     result = {
         **base,
         "status": "OK" if set(status.values()) <= {TaskStatus.SUCCEEDED} else "PARTIAL",
@@ -98,7 +98,10 @@ def _explain(
     return {
         "chain": chain,
         "decomposition": decompose(chain),
-        "idle": {"by_code": idle_by_code(idle), "intervals": idle},
+        "idle": {
+            "by_code": idle_by_code(idle, {r for w in problem.workers.values() for r in w.capacity}),
+            "intervals": idle,
+        },
     }
 
 

@@ -183,15 +183,23 @@ class DeadlineMisses(Strict):
     low: int
 
 
+class Score(Strict):
+    """Оценка по цели политики: `key` сравнивается поэлементно, меньше — лучше."""
+
+    objective: Literal["lexicographic", "weighted"]
+    key: list[int] = Field(min_length=1)
+
+
 class MetricsOut(Strict):
     makespan: Time
     lower_bound: Time | None
     gap_to_lb: float | None
     deadline_misses: DeadlineMisses
     weighted_tardiness: int
-    utilization_gpu: float | None
-    lost_work_gpu: int
+    utilization: dict[str, float | None]  # по ресурсам кластера
+    lost_work: dict[str, int]  # по ресурсам кластера, единицы ресурса × время
     mean_wait: float
+    score: Score
 
 
 class ChainLink(Strict):
@@ -222,18 +230,18 @@ IdleCode = Literal["IDLE_DOWN", "IDLE_NO_READY", "IDLE_FRAGMENTATION", "IDLE_RES
 
 
 class IdleInterval(Strict):
-    """На узле свободны `gpu` GPU с `from` до `to` по причине `code`."""
+    """На узле свободны ресурсы `free` с `from` до `to` по причине `code`."""
 
     worker: str
     from_: Time = Field(alias="from")
     to: Time
     code: IdleCode
-    gpu: Annotated[int, Field(ge=1)]
+    free: Annotated[dict[str, Annotated[int, Field(ge=1)]], Field(min_length=1)]
     detail: Detail  # для IDLE_RESERVED: head, t_res
 
 
 class IdleOut(Strict):
-    by_code: dict[IdleCode, int]  # GPU · время простоя по причинам
+    by_code: dict[str, dict[IdleCode, int]]  # по ресурсам: единицы ресурса × время простоя по причинам
     intervals: list[IdleInterval]
 
 
@@ -251,7 +259,7 @@ class DiagnosticOut(Strict):
 
 
 class ResultOut(Strict):
-    schema_version: Literal["1.0"]
+    schema_version: Literal["1.1"]
     input_hash: Hash  # вход вместе с действующей политикой
     result_hash: Hash | None  # хеш журнала; None, если симуляции не было
     policy: PolicyName
