@@ -1,5 +1,6 @@
 """Агент: `python -m expsched.agent --scheduler http://127.0.0.1:8000 --id laptop`.
 
+Среда по умолчанию — Docker (`--runtime podman` для Podman, `fake` — без контейнеров, для проверок).
 Ёмкость по умолчанию — машина целиком за вычетом запаса для неё самой: ядра минус одно, ОЗУ минус 2 ГиБ,
 GPU — по `nvidia-smi`, если он есть. Токен — из EXPSCHED_AGENT_TOKEN.
 """
@@ -23,6 +24,7 @@ from typing import TypeVar
 from pydantic import BaseModel
 
 from expsched.agent.core import Agent
+from expsched.agent.docker import WORKLOAD_IMAGE, DockerRuntime
 from expsched.agent.runtime import FakeRuntime, Runtime
 from expsched.contract.agent import EventsAck, HelloAck, PollReply
 
@@ -109,7 +111,8 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="python -m expsched.agent", description="Агент expsched")
     parser.add_argument("--scheduler", default="http://127.0.0.1:8000")
     parser.add_argument("--id", required=True, help="id агента, как в поле agent узлов")
-    parser.add_argument("--runtime", choices=["fake"], default="fake")
+    parser.add_argument("--runtime", choices=["docker", "podman", "fake"], default="docker")
+    parser.add_argument("--workload-image", default=WORKLOAD_IMAGE, help="образ встроенной нагрузки")
     parser.add_argument("--state", type=Path, default=Path(".expsched-agent"), help="журнал и чекпоинты")
     parser.add_argument("--cpu", type=int, help="ядер под задачи (по умолчанию — машина минус одно)")
     parser.add_argument("--ram-mb", type=int, help="ОЗУ под задачи, МиБ (по умолчанию — машина минус 2 ГиБ)")
@@ -123,7 +126,9 @@ def main(argv: list[str] | None = None) -> None:
     for name, value in (("cpu", args.cpu), ("ram_mb", args.ram_mb), ("gpu", args.gpu)):
         if value is not None:
             capacity[name] = value
-    runtime: Runtime = FakeRuntime()
+    runtime: Runtime = (
+        FakeRuntime() if args.runtime == "fake" else DockerRuntime(args.id, args.runtime, args.workload_image)
+    )
     agent = Agent(args.id, runtime, args.state, capacity, args.max_containers, args.allow_image)
     log.info("agent %s: runtime %s, capacity %s", args.id, runtime.name, capacity)
     serve(agent, Scheduler(args.scheduler, args.id, os.environ.get("EXPSCHED_AGENT_TOKEN")))

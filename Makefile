@@ -2,7 +2,7 @@
 RUN := uv run
 WEB := npm --prefix ui/web
 
-.PHONY: setup lint types test perf test-all schema run docker api web-install web-dev web-lint web-test web-build web-e2e audit audit-py audit-web
+.PHONY: setup lint types test perf workload-image test-docker test-all schema run docker api web-install web-dev web-lint web-test web-build web-e2e audit audit-py audit-web
 
 setup:
 	uv sync --all-extras
@@ -22,6 +22,13 @@ test:
 # Замеры по времени: на нагруженной машине могут не уложиться в границы, поэтому отдельно от test.
 perf:
 	$(RUN) pytest -m slow
+
+# Образ встроенной нагрузки агента и тесты с настоящим Docker (контейнеры, лимиты, OOM)
+workload-image:
+	docker build -f containers/workload/Containerfile -t expsched-workload:local .
+
+test-docker: workload-image
+	$(RUN) pytest -m docker
 
 test-all:
 	$(RUN) pytest

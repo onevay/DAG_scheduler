@@ -141,7 +141,7 @@ class Agent:
                 self._start(attempt)
 
     def watch(self) -> None:
-        """Чекпоинты и окончания контейнеров — в события."""
+        """Чекпоинты и окончания контейнеров — в события; законченный контейнер убирается из среды."""
         for key, attempt in sorted(self.attempts.items()):
             if attempt.done or attempt.container_id is None:
                 continue
@@ -156,8 +156,10 @@ class Agent:
                     else attempt.progress
                 )
                 self._emit(attempt, "exited", exit_code=state.exit_code, progress=work)
+                self.runtime.stop(key)
             elif state.status == "oom":
                 self._emit(attempt, "oom", progress=attempt.progress)
+                self.runtime.stop(key)
             elif state.status == "missing":
                 self._emit(attempt, "lost", progress=attempt.progress, detail="container disappeared")
 
