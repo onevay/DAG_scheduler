@@ -75,11 +75,11 @@ class InterruptedRecord(Record):
     task: str
     attempt: Annotated[int, Field(ge=1)]
     worker: str
-    cause: Literal["WORKER_DOWN", "PREEMPT"]
+    cause: Literal["WORKER_DOWN", "PREEMPT", "FAILED", "OOM"]  # FAILED, OOM — сбой попытки на агенте
     saved: Time  # работа до последнего чекпоинта
     lost: Time
     remaining: Time
-    reason: Detail | None = None  # причина вытеснения от политики
+    reason: Detail | None = None  # причина вытеснения от политики или подробности сбоя
 
 
 class BlockedRecord(Record):

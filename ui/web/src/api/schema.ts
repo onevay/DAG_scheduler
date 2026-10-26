@@ -543,7 +543,7 @@ export interface components {
        * Cause
        * @enum {string}
        */
-      cause: "WORKER_DOWN" | "PREEMPT";
+      cause: "WORKER_DOWN" | "PREEMPT" | "FAILED" | "OOM";
       /** Lost */
       lost: number;
       /** Reason */

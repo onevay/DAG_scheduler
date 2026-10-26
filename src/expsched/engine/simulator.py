@@ -12,6 +12,10 @@
 в счётчик вытеснений, а не в max_retries. RESERVE — обещание начать задачу на узле не позже t_res: ресурсы
 резерв не занимает, политика пересчитывает его каждую эпоху, а запись пишется, когда резерв меняется.
 
+Когда попытка закончится и сколько работы сохранит при прерывании, решает исполнитель (`executor`): в
+симуляции это известно заранее, при прогоне на агентах окончания и сбои подаются извне — `inject` в момент
+часов модели, а `advance` проводит эпохи всех событий, чей момент наступил.
+
 С `forecast=True` на каждой эпохе с внешними событиями (подача задачи, отказ или возврат узла) пишется REPLAN:
 как изменились прогнозные старты задач по сравнению с прогнозом, где этих событий не было. Прогноз — прогон
 копии симулятора до конца той же политикой без будущих внешних событий; он стоит как весь остаток прогона.
@@ -29,7 +33,8 @@ from expsched.domain.resources import Resources
 from expsched.domain.snapshot import Decision, Policy, RunInfo
 from expsched.domain.states import FINAL_STATUSES, TaskStatus
 from expsched.engine.errors import InvalidDecision
-from expsched.engine.events import EventQueue, Finish, Payload, Release
+from expsched.engine.events import Crash, EventQueue, Finish, Payload, Release
+from expsched.engine.executor import Executor, Simulated
 from expsched.engine.journal import Journal
 from expsched.engine.snapshot import build_snapshot
 from expsched.engine.state import SimState
@@ -49,8 +54,11 @@ class Simulator:
     получают диагностику STUCK.
     """
 
-    def __init__(self, problem: Problem, policy: Policy, forecast: bool = False) -> None:
+    def __init__(
+        self, problem: Problem, policy: Policy, forecast: bool = False, executor: Executor | None = None
+    ) -> None:
         self.policy = policy
+        self.executor = executor or Simulated()
         self.replans = forecast
         self.state = SimState.from_problem(problem)
         self.journal = Journal()
@@ -84,6 +92,23 @@ class Simulator:
         first, self._reported = self._reported, len(self.journal)
         return list(self.journal.records[first:])
 
+    def inject(self, t: int, payload: Payload) -> None:
+        """Факт извне (окончание, сбой, отказ узла, подача задачи) в момент `t` часов модели."""
+        if t < self.t:
+            raise ValueError(f"fact at {t} is earlier than the model clock {self.t}")
+        self.queue.push(t, payload)
+
+    def next_time(self) -> int | None:
+        """Момент ближайшего события в очереди; None — событий нет."""
+        return self.queue.peek()
+
+    def advance(self, until: int) -> list[dict[str, Any]]:
+        """Часы модели дошли до `until`: эпохи всех событий не позже него; новые записи журнала."""
+        out: list[dict[str, Any]] = []
+        while (t := self.queue.peek()) is not None and t <= until:
+            out += self.step() or []
+        return out
+
     def run_all(self) -> list[dict[str, Any]]:
         while self.step() is not None:
             pass
@@ -99,6 +124,10 @@ class Simulator:
         sim = copy.deepcopy(self, {id(self.journal): Journal()})  # журнал прогнозу не нужен
         sim.replans = False
         sim.queue.drop_external()
+        if not isinstance(self.executor, Simulated):  # окончания идущих попыток — по прогнозу
+            sim.executor = Simulated()
+            for key, run in sorted(sim.state.run.items()):
+                sim.queue.push(max(run.end_pred, sim.t), Finish(key, run.attempt))
         for payload in pending:
             if not isinstance(payload, Event):
                 sim.queue.push(self.t, payload)
@@ -140,6 +169,11 @@ class Simulator:
     def _handle(self, payload: Payload) -> None:
         if isinstance(payload, Finish):
             self._finish(payload)
+        elif isinstance(payload, Crash):
+            run = self.state.run.get(payload.task)
+            if run is not None and run.attempt == payload.attempt:
+                reason = {"detail": payload.detail} if payload.detail else None
+                self._interrupt(payload.task, cause=payload.cause, reason=reason)
         elif isinstance(payload, Release):
             self._try_ready(payload.task)
         else:
@@ -180,12 +214,13 @@ class Simulator:
     def _interrupt(self, key: str, cause: str, reason: dict[str, Any] | None = None) -> None:
         """Прерывает попытку: работа до последнего чекпоинта сохраняется, остальное теряется.
 
-        Вытеснение (`cause="PREEMPT"`, `reason` — причина от политики) не расходует ретраи.
+        Вытеснение (`cause="PREEMPT"`, `reason` — причина от политики) не расходует ретраи; отказ узла и сбой
+        попытки (FAILED, OOM) — расходуют.
         """
         s = self.state
         task, run = s.tasks[key], s.run.pop(key)
         elapsed = self.t - run.start
-        saved = task.ckpt * (elapsed // task.ckpt) if task.ckpt else 0
+        saved = self.executor.saved(task, key, run, self.t)
         s.rem[key] -= saved
         s.free[run.worker] = s.free[run.worker] + task.resources
         s.analysis = None  # остатки работы изменились
@@ -197,7 +232,7 @@ class Simulator:
             worker=run.worker,
             cause=cause,
             saved=saved,
-            lost=elapsed - saved,
+            lost=max(0, elapsed - saved),
             remaining=s.rem[key],
             **({"reason": dict(reason)} if reason is not None else {}),
         )
@@ -379,7 +414,9 @@ class Simulator:
         s.attempt[key] += 1
         end = self.t + s.rem[key]
         s.run[key] = RunInfo(worker, self.t, s.attempt[key], end)
-        self.queue.push(end, Finish(key, s.attempt[key]))
+        finish = self.executor.finish_at(task, s.run[key])
+        if finish is not None:
+            self.queue.push(finish, Finish(key, s.attempt[key]))
         self.journal.append(
             "START",
             self.t,
