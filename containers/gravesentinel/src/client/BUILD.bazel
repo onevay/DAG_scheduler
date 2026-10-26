@@ -1,0 +1,29 @@
+load("//build_defs:cc.bzl", "gravesentinel_cc_library")
+
+package(default_visibility = ["//visibility:private"])
+
+gravesentinel_cc_library(
+    name = "scheduler_client",
+    srcs = ["client.cxx"],
+    hdrs = ["scheduler_client.hxx"],
+    implementation_deps = [
+        "//src/ipc:ipc_codec",
+        "@nlohmann_json//:json",
+    ],
+    deps = ["//src/protocol:protocol"],
+    visibility = [
+        "//:__pkg__",
+        "//src/scheduler_client:__pkg__",
+        "//tests/integration:__pkg__",
+        "//tests/unit:__pkg__",
+    ],
+)
+
+filegroup(
+    name = "format_sources",
+    srcs = [
+        "client.cxx",
+        "scheduler_client.hxx",
+    ],
+    visibility = ["//scripts:__pkg__"],
+)

@@ -1,0 +1,110 @@
+package(default_visibility = ["//visibility:private"])
+
+filegroup(
+    name = "index",
+    srcs = ["README.md"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "architecture",
+    srcs = ["architecture.md"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "manifest_v1",
+    srcs = ["manifest-v1.md"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "chunking",
+    srcs = ["chunking.md"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "checkpoint_create",
+    srcs = ["checkpoint-create.md"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "checkpoint_restore",
+    srcs = ["checkpoint-restore.md"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "filesystem_storage",
+    srcs = ["filesystem-storage.md"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "maintenance",
+    srcs = ["maintenance.md"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "service_core",
+    srcs = ["service-core.md"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "scheduler_client",
+    srcs = ["scheduler-client.md"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "operations",
+    srcs = ["operations.md"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "release_gate",
+    srcs = ["release-gate.md"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "requirements_traceability",
+    srcs = ["requirements-traceability.md"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "testbed",
+    srcs = [
+        "adr/0001-podman-criu-runtime-profile.md",
+        "testbed.md",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "all_docs",
+    srcs = [
+        "README.md",
+        "adr/0001-podman-criu-runtime-profile.md",
+        "architecture.md",
+        "checkpoint-create.md",
+        "checkpoint-restore.md",
+        "chunking.md",
+        "filesystem-storage.md",
+        "maintenance.md",
+        "manifest-v1.md",
+        "operations.md",
+        "release-gate.md",
+        "requirements-traceability.md",
+        "scheduler-client.md",
+        "service-core.md",
+        "testbed.md",
+    ],
+    visibility = ["//visibility:public"],
+)

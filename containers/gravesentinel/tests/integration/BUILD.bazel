@@ -1,0 +1,321 @@
+load(
+    "//build_defs:cc.bzl",
+    "gravesentinel_cc_binary",
+    "gravesentinel_cc_test",
+)
+
+package(default_visibility = ["//visibility:private"])
+
+gravesentinel_cc_binary(
+    name = "podman_adapter_smoke_driver",
+    srcs = ["podman_adapter_smoke_driver.cxx"],
+    deps = [
+        "//src/hypervisor:linux_runtime",
+        "//src/hypervisor:podman_adapter",
+        "@nlohmann_json//:json",
+    ],
+)
+
+gravesentinel_cc_binary(
+    name = "hypervisor_e2e_driver",
+    srcs = ["hypervisor_e2e_driver.cxx"],
+    deps = [
+        "//src/client:scheduler_client",
+        "//src/manifest:manifest",
+    ],
+)
+
+gravesentinel_cc_binary(
+    name = "fault_hypervisor",
+    srcs = [
+        "fault_hypervisor_main.cxx",
+        "fault_injecting_file_operations.cxx",
+        "fault_injecting_file_operations.hxx",
+    ],
+    deps = [
+        "//src/hypervisor:application",
+        "//src/storage:filesystem_storage",
+    ],
+)
+
+gravesentinel_cc_binary(
+    name = "hypervisor_crash_recovery_driver",
+    srcs = ["hypervisor_crash_recovery_driver.cxx"],
+    deps = [
+        "//src/client:scheduler_client",
+        "//src/manifest:manifest",
+    ],
+)
+
+gravesentinel_cc_binary(
+    name = "hypervisor_four_cpu_driver",
+    srcs = ["hypervisor_four_cpu_driver.cxx"],
+    deps = ["//src/client:scheduler_client"],
+)
+
+gravesentinel_cc_test(
+    name = "hypervisor_lifecycle_test",
+    srcs = ["hypervisor_lifecycle_test.cxx"],
+    args = [
+        "--hypervisor",
+        "$(location //src/hypervisor:gravesentinel_hypervisor)",
+    ],
+    data = ["//src/hypervisor:gravesentinel_hypervisor"],
+    deps = [
+        "//src/client:scheduler_client",
+        "@nlohmann_json//:json",
+    ],
+    local = True,
+    size = "small",
+    tags = [
+        "exclusive",
+        "local",
+    ],
+    timeout = "short",
+)
+
+sh_test(
+    name = "testbed_check",
+    srcs = ["run_testbed_check.sh"],
+    args = ["$(location //scripts:check_testbed)"],
+    data = ["//scripts:check_testbed"],
+    env_inherit = [
+        "DBUS_SESSION_BUS_ADDRESS",
+        "HOME",
+        "PATH",
+        "XDG_RUNTIME_DIR",
+    ],
+    local = True,
+    size = "small",
+    tags = [
+        "exclusive",
+        "local",
+        "manual",
+        "requires-podman",
+    ],
+)
+
+sh_test(
+    name = "podman_checkpoint_smoke",
+    srcs = ["podman_checkpoint_smoke.sh"],
+    args = [
+        "--fixture-binary",
+        "$(location //tests/integration/fixture:counter_fixture)",
+        "--containerfile",
+        "$(location //tests/integration/fixture:Containerfile)",
+        "--check-script",
+        "$(location //scripts:check_testbed)",
+    ],
+    data = [
+        "//scripts:check_testbed",
+        "//tests/integration/fixture:Containerfile",
+        "//tests/integration/fixture:counter_fixture",
+    ],
+    env_inherit = [
+        "DBUS_SESSION_BUS_ADDRESS",
+        "HOME",
+        "PATH",
+        "XDG_RUNTIME_DIR",
+    ],
+    local = True,
+    size = "large",
+    tags = [
+        "exclusive",
+        "local",
+        "manual",
+        "requires-podman",
+    ],
+    timeout = "long",
+)
+
+sh_test(
+    name = "podman_adapter_smoke",
+    srcs = ["podman_checkpoint_smoke.sh"],
+    args = [
+        "--fixture-binary",
+        "$(location //tests/integration/fixture:counter_fixture)",
+        "--containerfile",
+        "$(location //tests/integration/fixture:Containerfile)",
+        "--check-script",
+        "$(location //scripts:check_testbed)",
+        "--adapter-helper",
+        "$(location :podman_adapter_smoke_driver)",
+    ],
+    data = [
+        ":podman_adapter_smoke_driver",
+        "//scripts:check_testbed",
+        "//tests/integration/fixture:Containerfile",
+        "//tests/integration/fixture:counter_fixture",
+    ],
+    env_inherit = [
+        "DBUS_SESSION_BUS_ADDRESS",
+        "HOME",
+        "PATH",
+        "XDG_RUNTIME_DIR",
+    ],
+    local = True,
+    size = "large",
+    tags = [
+        "exclusive",
+        "local",
+        "manual",
+        "requires-podman",
+    ],
+    timeout = "long",
+)
+
+sh_test(
+    name = "hypervisor_scheduler_e2e",
+    srcs = ["hypervisor_scheduler_e2e.sh"],
+    args = [
+        "--hypervisor",
+        "$(location //src/hypervisor:gravesentinel_hypervisor)",
+        "--driver",
+        "$(location :hypervisor_e2e_driver)",
+        "--fixture-binary",
+        "$(location //tests/integration/fixture:counter_fixture)",
+        "--containerfile",
+        "$(location //tests/integration/fixture:Containerfile)",
+        "--check-script",
+        "$(location //scripts:check_testbed)",
+    ],
+    data = [
+        ":hypervisor_e2e_driver",
+        "//scripts:check_testbed",
+        "//src/hypervisor:gravesentinel_hypervisor",
+        "//tests/integration/fixture:Containerfile",
+        "//tests/integration/fixture:counter_fixture",
+    ],
+    env_inherit = [
+        "DBUS_SESSION_BUS_ADDRESS",
+        "HOME",
+        "PATH",
+        "XDG_RUNTIME_DIR",
+    ],
+    local = True,
+    size = "enormous",
+    tags = [
+        "exclusive",
+        "local",
+        "manual",
+        "requires-podman",
+    ],
+    timeout = "eternal",
+)
+
+sh_test(
+    name = "hypervisor_four_cpu_e2e",
+    srcs = ["hypervisor_four_cpu_e2e.sh"],
+    args = [
+        "--hypervisor",
+        "$(location //src/hypervisor:gravesentinel_hypervisor)",
+        "--driver",
+        "$(location :hypervisor_four_cpu_driver)",
+        "--fixture-binary",
+        "$(location //tests/integration/fixture:counter_fixture)",
+        "--containerfile",
+        "$(location //tests/integration/fixture:Containerfile)",
+        "--check-script",
+        "$(location //scripts:check_testbed)",
+        "--gate-script",
+        "$(location :hypervisor_four_cpu_podman_gate.sh)",
+    ],
+    data = [
+        ":hypervisor_four_cpu_driver",
+        ":hypervisor_four_cpu_podman_gate.sh",
+        "//scripts:check_testbed",
+        "//src/hypervisor:gravesentinel_hypervisor",
+        "//tests/integration/fixture:Containerfile",
+        "//tests/integration/fixture:counter_fixture",
+    ],
+    env_inherit = [
+        "DBUS_SESSION_BUS_ADDRESS",
+        "HOME",
+        "PATH",
+        "XDG_RUNTIME_DIR",
+    ],
+    local = True,
+    size = "enormous",
+    tags = [
+        "exclusive",
+        "local",
+        "manual",
+        "requires-podman",
+    ],
+    timeout = "eternal",
+)
+
+sh_test(
+    name = "hypervisor_crash_recovery_e2e",
+    srcs = ["hypervisor_crash_recovery_e2e.sh"],
+    args = [
+        "--hypervisor",
+        "$(location //src/hypervisor:gravesentinel_hypervisor)",
+        "--fault-hypervisor",
+        "$(location :fault_hypervisor)",
+        "--driver",
+        "$(location :hypervisor_crash_recovery_driver)",
+        "--fixture-binary",
+        "$(location //tests/integration/fixture:counter_fixture)",
+        "--containerfile",
+        "$(location //tests/integration/fixture:Containerfile)",
+        "--check-script",
+        "$(location //scripts:check_testbed)",
+        "--gate-script",
+        "$(location :hypervisor_crash_recovery_podman_gate.sh)",
+    ],
+    data = [
+        ":fault_hypervisor",
+        ":hypervisor_crash_recovery_driver",
+        ":hypervisor_crash_recovery_podman_gate.sh",
+        "//scripts:check_testbed",
+        "//src/hypervisor:gravesentinel_hypervisor",
+        "//tests/integration/fixture:Containerfile",
+        "//tests/integration/fixture:counter_fixture",
+    ],
+    env_inherit = [
+        "DBUS_SESSION_BUS_ADDRESS",
+        "HOME",
+        "PATH",
+        "XDG_RUNTIME_DIR",
+    ],
+    local = True,
+    size = "enormous",
+    tags = [
+        "exclusive",
+        "local",
+        "manual",
+        "requires-podman",
+    ],
+    timeout = "eternal",
+)
+
+test_suite(
+    name = "stage13_acceptance",
+    tests = [
+        ":hypervisor_crash_recovery_e2e",
+        ":hypervisor_four_cpu_e2e",
+        ":hypervisor_scheduler_e2e",
+    ],
+    tags = ["manual"],
+)
+
+filegroup(
+    name = "format_sources",
+    srcs = [
+        "fault_hypervisor_main.cxx",
+        "fault_injecting_file_operations.cxx",
+        "fault_injecting_file_operations.hxx",
+        "hypervisor_crash_recovery_driver.cxx",
+        "hypervisor_e2e_driver.cxx",
+        "hypervisor_four_cpu_driver.cxx",
+        "hypervisor_lifecycle_test.cxx",
+        "podman_adapter_smoke_driver.cxx",
+    ],
+    visibility = ["//scripts:__pkg__"],
+)
+
+filegroup(
+    name = "integration_test_documentation",
+    srcs = ["README.md"],
+)
