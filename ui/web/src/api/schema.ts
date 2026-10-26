@@ -618,6 +618,11 @@ export interface components {
        */
       preemption?: "never" | "deadline_only" | "priority";
       /**
+       * Time Limit
+       * @default 10
+       */
+      time_limit?: number;
+      /**
        * Validation Mode
        * @default lenient
        * @enum {string}
@@ -649,6 +654,7 @@ export interface components {
        *       "name": "priority_backfill",
        *       "objective": "lexicographic",
        *       "preemption": "deadline_only",
+       *       "time_limit": 10,
        *       "validation_mode": "lenient"
        *     }
        */

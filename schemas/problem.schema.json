@@ -132,6 +132,13 @@
           "title": "Preemption",
           "type": "string"
         },
+        "time_limit": {
+          "default": 10.0,
+          "exclusiveMinimum": 0,
+          "maximum": 300,
+          "title": "Time Limit",
+          "type": "number"
+        },
         "validation_mode": {
           "default": "lenient",
           "enum": [
@@ -340,6 +347,7 @@
         "name": "priority_backfill",
         "objective": "lexicographic",
         "preemption": "deadline_only",
+        "time_limit": 10.0,
         "validation_mode": "lenient"
       }
     },
