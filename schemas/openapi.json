@@ -1356,6 +1356,16 @@
             "title": "Run Id",
             "type": "string"
           },
+          "shadow": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShadowOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "status": {
             "enum": [
               "running",
@@ -2052,6 +2062,16 @@
             "title": "Schema Version",
             "type": "string"
           },
+          "shadow": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShadowOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "status": {
             "enum": [
               "OK",
@@ -2468,6 +2488,131 @@
           "priority"
         ],
         "title": "SetPriority",
+        "type": "object"
+      },
+      "ShadowOut": {
+        "additionalProperties": false,
+        "description": "План (симуляция того же входа) рядом с фактом прогона на агентах.",
+        "properties": {
+          "causes": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Causes",
+            "type": "object"
+          },
+          "fact_makespan": {
+            "minimum": 0.0,
+            "title": "Fact Makespan",
+            "type": "integer"
+          },
+          "plan_makespan": {
+            "minimum": 0.0,
+            "title": "Plan Makespan",
+            "type": "integer"
+          },
+          "tasks": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ShadowTask"
+            },
+            "title": "Tasks",
+            "type": "object"
+          }
+        },
+        "required": [
+          "plan_makespan",
+          "fact_makespan",
+          "causes",
+          "tasks"
+        ],
+        "title": "ShadowOut",
+        "type": "object"
+      },
+      "ShadowTask": {
+        "additionalProperties": false,
+        "properties": {
+          "cause": {
+            "enum": [
+              "manual",
+              "failure",
+              "duration",
+              "upstream",
+              "decision",
+              "same",
+              "waiting"
+            ],
+            "title": "Cause",
+            "type": "string"
+          },
+          "fact_finish": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fact Finish"
+          },
+          "fact_start": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fact Start"
+          },
+          "finish_delta": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Delta"
+          },
+          "plan_finish": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Finish"
+          },
+          "plan_start": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Start"
+          }
+        },
+        "required": [
+          "plan_start",
+          "plan_finish",
+          "fact_start",
+          "fact_finish",
+          "finish_delta",
+          "cause"
+        ],
+        "title": "ShadowTask",
         "type": "object"
       },
       "StartCommand": {
@@ -3724,7 +3869,7 @@
         "summary": "Runs"
       },
       "post": {
-        "description": "Прогон {problem, policy?}. Тот же вход с той же политикой не пересчитывается: отдаётся сохранённый.\n\nС `problem.mode = \"emulate\"` — прогон на агентах: 202 `{run_id, status}`, идёт в фоне, его состояние —\n`GET /v1/runs/{run_id}/containers`, результат появится по окончании.",
+        "description": "Прогон {problem, policy?}. Тот же вход с той же политикой не пересчитывается: отдаётся сохранённый.\n\nС `problem.mode` `emulate` или `shadow` (план рядом) — прогон на агентах: 202 `{run_id, status}`, идёт\nв фоне, его состояние — `GET /v1/runs/{run_id}/containers`, результат появится по окончании.",
         "operationId": "create_run_v1_runs_post",
         "requestBody": {
           "content": {

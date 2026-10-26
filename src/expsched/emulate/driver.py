@@ -3,7 +3,8 @@
 Часы модели — часы стены в масштабе `time_scale_ms` мс на единицу времени модели. Движок с внешним
 исполнителем: окончание попытки приходит событием агента `exited`, сбой — `exited` с ненулевым кодом,
 `oom`, `lost` или `rejected`, сохранённая работа — по событиям `checkpoint`. Агент, переставший выходить на
-связь, — отказ всех его узлов; вернувшийся — их возврат.
+связь, — отказ всех его узлов; вернувшийся — их возврат. В режиме shadow рядом считается план — симуляция
+того же входа, — и по каждой задаче видно, где факт разошёлся с планом и почему (`emulate/shadow.py`).
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from expsched.contract.io_models import ContainerSpec, PolicyIn, ProblemIn
 from expsched.domain.models import Event, EvType
 from expsched.domain.states import FINAL_STATUSES
 from expsched.emulate.agents import AgentRegistry
+from expsched.emulate.shadow import compare
 from expsched.engine.events import Crash, Finish
 from expsched.engine.executor import External
 from expsched.pipeline import RunResult, conclude, prepare
@@ -61,6 +63,8 @@ class Emulation:
         self.specs: dict[str, ContainerSpec | None] = {t.id: t.container for t in tasks}
         self.containers: dict[tuple[str, int], Container] = {}
         self.dropped: set[str] = set()  # узлы, уроненные вручную: не поднимаются, пока их не вернут
+        self.dropped_at: list[tuple[str, int]] = []  # ручные отказы (узел, момент) — для причин shadow
+        self.plan: RunResult | None = None
         self.result: RunResult | None = None
         self.status: Status = "running"
         self.started = clock()
@@ -71,6 +75,10 @@ class Emulation:
         self.prepared = prepared
         self.executor = External()
         self.sim = prepared.simulator(self.executor)
+        if problem.mode == "shadow":
+            plan = prepared.simulator()
+            plan.run_all()
+            self.plan = conclude(prepared, plan)
         registry.listeners[run_id] = self.on_event
 
     def now(self) -> int:
@@ -94,6 +102,8 @@ class Emulation:
                 self._stop(r["task"], r["attempt"], "preempt" if r["cause"] == "PREEMPT" else "worker_down")
         if self._finished():
             self.result, self.status = conclude(self.prepared, self.sim, exact=False), "done"
+            if self.plan is not None:
+                self.result.result["shadow"] = self.shadow()
             self.registry.listeners.pop(self.run_id, None)
         return records
 
@@ -136,7 +146,22 @@ class Emulation:
     def drop(self, worker: str) -> None:
         """Уронить узел вручную: его попытки прерываются, контейнеры останавливаются."""
         self.dropped.add(worker)
+        self.dropped_at.append((worker, max(self.now(), self.sim.t)))
         self.tick()
+
+    def shadow(self) -> dict[str, Any] | None:
+        """План рядом с фактом по задачам; None — прогон не в режиме shadow."""
+        if self.plan is None:
+            return None
+        tasks = self.sim.state.tasks
+        return compare(
+            self.plan.result["tasks"],
+            self.plan.events,
+            self.sim.journal.records,
+            {k: t.deps for k, t in tasks.items()},
+            {k: t.duration for k, t in tasks.items()},
+            self.dropped_at,
+        )
 
     def restore(self, worker: str) -> None:
         """Вернуть уроненный вручную узел; поднимется, если его агент на связи."""

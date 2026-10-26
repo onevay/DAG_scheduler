@@ -114,8 +114,8 @@ def test_runs_on_agents_are_refused_when_they_cannot_go(client, monkeypatch):
     first = client.post("/v1/runs", json={"problem": laptop()})
     assert first.status_code == 202
     assert client.post("/v1/runs", json={"problem": laptop()}).json()["error"]["code"] == "RUN_QUEUE_FULL"
-    shadow = {**laptop(), "mode": "shadow"}
-    assert client.post("/v1/runs", json={"problem": shadow}).status_code == 400
+    replay = {**laptop(), "mode": "replay"}
+    assert client.post("/v1/runs", json={"problem": replay}).status_code == 400
     assert client.get("/v1/runs/0123456789abcdef/containers").status_code == 404
     monkeypatch.delenv("EXPSCHED_AGENT_TOKEN")
     assert client.post("/v1/runs", json={"problem": laptop()}).json()["error"]["code"] == "FORBIDDEN"
@@ -158,3 +158,12 @@ def test_real_agent_process_runs_a_laptop_over_http(tmp_path):
     finally:
         agent.kill()
         server.kill()
+
+
+def test_shadow_run_shows_its_plan_from_the_start(client):
+    problem = {**laptop(), "mode": "shadow"}
+    run_id = client.post("/v1/runs", json={"problem": problem}).json()["run_id"]
+    shadow = live(client, run_id)["shadow"]
+    assert shadow["plan_makespan"] == 90 and shadow["causes"]["waiting"] == 6
+    assert shadow["tasks"]["train_small"]["plan_start"] == 35
+    client.post(f"/v1/runs/{run_id}/actions", json={"kind": "cancel"})

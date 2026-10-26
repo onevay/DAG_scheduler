@@ -16,6 +16,7 @@ from expsched.contract.output_models import (
     IdleInterval,
     MetricsOut,
     ResultOut,
+    ShadowOut,
     WaitInterval,
 )
 from expsched.contract.whatif import Intervention
@@ -181,6 +182,7 @@ class LiveOut(Strict):
     time_scale_ms: int
     workers: dict[str, WorkerLive]
     containers: list[ContainerOut]
+    shadow: ShadowOut | None = None  # режим shadow: план рядом с фактом на сейчас
 
 
 class CheckpointAction(Strict):

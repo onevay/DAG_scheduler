@@ -258,6 +258,24 @@ class DiagnosticOut(Strict):
     hint: str
 
 
+class ShadowTask(Strict):
+    plan_start: Time | None
+    plan_finish: Time | None
+    fact_start: Time | None
+    fact_finish: Time | None
+    finish_delta: int | None  # факт минус план
+    cause: Literal["manual", "failure", "duration", "upstream", "decision", "same", "waiting"]
+
+
+class ShadowOut(Strict):
+    """План (симуляция того же входа) рядом с фактом прогона на агентах."""
+
+    plan_makespan: Time
+    fact_makespan: Time
+    causes: dict[str, int]
+    tasks: dict[str, ShadowTask]
+
+
 class ResultOut(Strict):
     schema_version: Literal["1.1"]
     input_hash: Hash  # вход вместе с действующей политикой
@@ -271,6 +289,7 @@ class ResultOut(Strict):
     diagnostics: list[DiagnosticOut]  # ошибки и предупреждения входа
     violations: list[str]  # нарушения, найденные проверкой расписания
     replans: list[ReplanRecord] | None  # None — прогноз не строился (вход больше max_forecast_tasks)
+    shadow: ShadowOut | None = None  # только у прогона в режиме shadow
 
 
 def dump_result_schema() -> str:

@@ -95,8 +95,8 @@ export interface paths {
      * Create Run
      * @description Прогон {problem, policy?}. Тот же вход с той же политикой не пересчитывается: отдаётся сохранённый.
      *
-     *     С `problem.mode = "emulate"` — прогон на агентах: 202 `{run_id, status}`, идёт в фоне, его состояние —
-     *     `GET /v1/runs/{run_id}/containers`, результат появится по окончании.
+     *     С `problem.mode` `emulate` или `shadow` (план рядом) — прогон на агентах: 202 `{run_id, status}`, идёт
+     *     в фоне, его состояние — `GET /v1/runs/{run_id}/containers`, результат появится по окончании.
      */
     post: operations["create_run_v1_runs_post"];
     delete?: never;
@@ -815,6 +815,7 @@ export interface components {
       now: number;
       /** Run Id */
       run_id: string;
+      shadow?: components["schemas"]["ShadowOut"] | null;
       /**
        * Status
        * @enum {string}
@@ -1103,6 +1104,7 @@ export interface components {
        * @constant
        */
       schema_version: "1.1";
+      shadow?: components["schemas"]["ShadowOut"] | null;
       /**
        * Status
        * @enum {string}
@@ -1252,6 +1254,42 @@ export interface components {
       priority: number;
       /** Task */
       task: string;
+    };
+    /**
+     * ShadowOut
+     * @description План (симуляция того же входа) рядом с фактом прогона на агентах.
+     */
+    ShadowOut: {
+      /** Causes */
+      causes: {
+        [key: string]: number;
+      };
+      /** Fact Makespan */
+      fact_makespan: number;
+      /** Plan Makespan */
+      plan_makespan: number;
+      /** Tasks */
+      tasks: {
+        [key: string]: components["schemas"]["ShadowTask"];
+      };
+    };
+    /** ShadowTask */
+    ShadowTask: {
+      /**
+       * Cause
+       * @enum {string}
+       */
+      cause: "manual" | "failure" | "duration" | "upstream" | "decision" | "same" | "waiting";
+      /** Fact Finish */
+      fact_finish: number | null;
+      /** Fact Start */
+      fact_start: number | null;
+      /** Finish Delta */
+      finish_delta: number | null;
+      /** Plan Finish */
+      plan_finish: number | null;
+      /** Plan Start */
+      plan_start: number | null;
     };
     /**
      * StartCommand

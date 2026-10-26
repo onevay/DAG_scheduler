@@ -143,8 +143,8 @@ def runs(request: Request, limit: Annotated[int, Query(ge=1, le=500)] = 50) -> A
 async def create_run(request: Request) -> Any:
     """Прогон {problem, policy?}. Тот же вход с той же политикой не пересчитывается: отдаётся сохранённый.
 
-    С `problem.mode = "emulate"` — прогон на агентах: 202 `{run_id, status}`, идёт в фоне, его состояние —
-    `GET /v1/runs/{run_id}/containers`, результат появится по окончании.
+    С `problem.mode` `emulate` или `shadow` (план рядом) — прогон на агентах: 202 `{run_id, status}`, идёт
+    в фоне, его состояние — `GET /v1/runs/{run_id}/containers`, результат появится по окончании.
     """
     try:
         run_request = await asyncio.to_thread(RunRequest.model_validate_json, await _read_body(request))
@@ -154,9 +154,9 @@ async def create_run(request: Request) -> Any:
         found = [d.to_dict() for d in schema_diagnostics(error)]
         return error_response(422, "SCHEMA_INVALID", "request does not match the schema", found)
     problem, policy = run_request.problem, run_request.policy or run_request.problem.policy
-    if problem.mode in ("shadow", "replay"):
-        return error_response(400, "INVALID_REQUEST", f"mode {problem.mode!r} is not supported yet")
-    if problem.mode == "emulate":
+    if problem.mode == "replay":
+        return error_response(400, "INVALID_REQUEST", "mode 'replay' is not supported yet")
+    if problem.mode in ("emulate", "shadow"):
         return _start_emulation(request, problem, policy)
     return await _run_and_store(request, problem, policy)
 
