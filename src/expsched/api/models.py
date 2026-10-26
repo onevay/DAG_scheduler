@@ -6,7 +6,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field
 
-from expsched.contract.io_models import EventIn, PolicyIn, PolicyName, ProblemIn, Strict
+from expsched.contract.io_models import EventIn, Id, PolicyIn, PolicyName, ProblemIn, Strict
 from expsched.contract.output_models import (
     AttemptOut,
     ChainLink,
@@ -30,6 +30,9 @@ ErrorCode = Literal[
     "RUN_FAILED",  # прогон упал в рабочем процессе; подробности только в журнале сервера
     "NOT_FOUND",
     "METHOD_NOT_ALLOWED",
+    "FORBIDDEN",  # агентский API выключен или токен неверный
+    "EVENT_GAP",  # агент пропустил номер события; дослать с указанного
+    "RUN_IN_PROGRESS",  # прогон на агентах ещё идёт: результата пока нет
     "INTERNAL",  # ошибка сервера; подробности только в его журнале
 ]
 
@@ -141,3 +144,57 @@ class ErrorInfo(Strict):
 class ErrorOut(Strict):
     error: ErrorInfo
     diagnostics: list[DiagnosticOut] | None = None
+
+
+# ---- прогон на агентах ----
+
+
+class LiveStarted(Strict):
+    run_id: str
+    status: Literal["running", "done", "cancelled"]
+
+
+class ContainerOut(Strict):
+    """Попытка задачи на агенте: где идёт, что с ней и сколько работы сохранено."""
+
+    task: str
+    attempt: int
+    worker: str
+    agent: str
+    state: str  # sent, accepted, started или тип последнего события агента
+    container_id: str | None
+    resume_from: int
+    progress: int  # сохранено по последнему чекпоинту, в единицах модели
+    detail: str | None
+
+
+class WorkerLive(Strict):
+    agent: str
+    up: bool
+    dropped: bool  # уронен вручную
+
+
+class LiveOut(Strict):
+    run_id: str
+    status: Literal["running", "done", "cancelled"]
+    now: int  # часы модели
+    time_scale_ms: int
+    workers: dict[str, WorkerLive]
+    containers: list[ContainerOut]
+
+
+class CheckpointAction(Strict):
+    kind: Literal["checkpoint"]
+    task: Id
+
+
+class WorkerAction(Strict):
+    kind: Literal["worker_down", "worker_up"]
+    worker: Id
+
+
+class CancelAction(Strict):
+    kind: Literal["cancel"]
+
+
+Action = Annotated[CheckpointAction | WorkerAction | CancelAction, Field(discriminator="kind")]

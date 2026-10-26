@@ -20,6 +20,108 @@
         "title": "AddWorker",
         "type": "object"
       },
+      "AgentEvent": {
+        "additionalProperties": false,
+        "description": "Что случилось с попыткой. accepted/rejected — ответ на команду start; started — контейнер запущен;\ncheckpoint — сохранено `progress` единиц работы; exited — контейнер завершился с `exit_code`; oom — убит\nза превышение памяти; killed — остановлен командой stop; lost — агент потерял контейнер (`detail`).",
+        "properties": {
+          "at": {
+            "maxLength": 40,
+            "title": "At",
+            "type": "string"
+          },
+          "attempt": {
+            "minimum": 1.0,
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "container_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Container Id"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "exit_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit Code"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress"
+          },
+          "run_id": {
+            "pattern": "^[0-9a-f]{16}$",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "seq": {
+            "minimum": 0.0,
+            "title": "Seq",
+            "type": "integer"
+          },
+          "task": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+            "title": "Task",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "accepted",
+              "rejected",
+              "started",
+              "checkpoint",
+              "exited",
+              "oom",
+              "killed",
+              "lost"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "task",
+          "attempt",
+          "seq",
+          "at",
+          "type"
+        ],
+        "title": "AgentEvent",
+        "type": "object"
+      },
       "AttemptOut": {
         "additionalProperties": false,
         "properties": {
@@ -91,6 +193,34 @@
           "saved"
         ],
         "title": "AttemptOut",
+        "type": "object"
+      },
+      "AttemptRef": {
+        "additionalProperties": false,
+        "description": "Попытка задачи в прогоне — то, чем управляет агент; `key` — метка её контейнера.",
+        "properties": {
+          "attempt": {
+            "minimum": 1.0,
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "run_id": {
+            "pattern": "^[0-9a-f]{16}$",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "task": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+            "title": "Task",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "task",
+          "attempt"
+        ],
+        "title": "AttemptRef",
         "type": "object"
       },
       "BlockedRecord": {
@@ -206,6 +336,46 @@
         "title": "ChainLink",
         "type": "object"
       },
+      "CheckpointCommand": {
+        "additionalProperties": false,
+        "description": "Сохранить чекпоинт сейчас, не дожидаясь интервала.",
+        "properties": {
+          "attempt": {
+            "minimum": 1.0,
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "command_id": {
+            "minimum": 1.0,
+            "title": "Command Id",
+            "type": "integer"
+          },
+          "kind": {
+            "const": "checkpoint",
+            "title": "Kind",
+            "type": "string"
+          },
+          "run_id": {
+            "pattern": "^[0-9a-f]{16}$",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "task": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+            "title": "Task",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "task",
+          "attempt",
+          "kind",
+          "command_id"
+        ],
+        "title": "CheckpointCommand",
+        "type": "object"
+      },
       "ClusterIn": {
         "additionalProperties": false,
         "properties": {
@@ -222,6 +392,75 @@
           "workers"
         ],
         "title": "ClusterIn",
+        "type": "object"
+      },
+      "ContainerOut": {
+        "additionalProperties": false,
+        "description": "Попытка задачи на агенте: где идёт, что с ней и сколько работы сохранено.",
+        "properties": {
+          "agent": {
+            "title": "Agent",
+            "type": "string"
+          },
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "container_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Container Id"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "progress": {
+            "title": "Progress",
+            "type": "integer"
+          },
+          "resume_from": {
+            "title": "Resume From",
+            "type": "integer"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          },
+          "worker": {
+            "title": "Worker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task",
+          "attempt",
+          "worker",
+          "agent",
+          "state",
+          "container_id",
+          "resume_from",
+          "progress",
+          "detail"
+        ],
+        "title": "ContainerOut",
         "type": "object"
       },
       "ContainerSpec": {
@@ -456,6 +695,9 @@
               "RUN_FAILED",
               "NOT_FOUND",
               "METHOD_NOT_ALLOWED",
+              "FORBIDDEN",
+              "EVENT_GAP",
+              "RUN_IN_PROGRESS",
               "INTERNAL"
             ],
             "title": "Code",
@@ -558,6 +800,41 @@
           "event"
         ],
         "title": "EventRequest",
+        "type": "object"
+      },
+      "EventsAck": {
+        "additionalProperties": false,
+        "properties": {
+          "next_event_seq": {
+            "minimum": 0.0,
+            "title": "Next Event Seq",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "next_event_seq"
+        ],
+        "title": "EventsAck",
+        "type": "object"
+      },
+      "EventsBatch": {
+        "additionalProperties": false,
+        "description": "События подряд по номерам; повтор уже принятых безопасен, пропуск номера — ошибка.",
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/AgentEvent"
+            },
+            "maxItems": 1000,
+            "minItems": 1,
+            "title": "Events",
+            "type": "array"
+          }
+        },
+        "required": [
+          "events"
+        ],
+        "title": "EventsBatch",
         "type": "object"
       },
       "EventsPage": {
@@ -772,6 +1049,97 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "Hello": {
+        "additionalProperties": false,
+        "description": "Агент представляется: что умеет и сколько ресурсов отдаёт; после своего перезапуска — что уже идёт.",
+        "properties": {
+          "agent_version": {
+            "maxLength": 64,
+            "title": "Agent Version",
+            "type": "string"
+          },
+          "capacity": {
+            "patternProperties": {
+              "^[a-z][a-z0-9_]{0,31}$": {
+                "minimum": 0.0,
+                "type": "integer"
+              }
+            },
+            "title": "Capacity",
+            "type": "object"
+          },
+          "max_containers": {
+            "maximum": 64.0,
+            "minimum": 1.0,
+            "title": "Max Containers",
+            "type": "integer"
+          },
+          "protocol": {
+            "const": 1,
+            "title": "Protocol",
+            "type": "integer"
+          },
+          "running": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/AttemptRef"
+            },
+            "title": "Running",
+            "type": "array"
+          },
+          "runtime": {
+            "enum": [
+              "docker",
+              "podman",
+              "fake"
+            ],
+            "title": "Runtime",
+            "type": "string"
+          }
+        },
+        "required": [
+          "protocol",
+          "agent_version",
+          "runtime",
+          "capacity",
+          "max_containers"
+        ],
+        "title": "Hello",
+        "type": "object"
+      },
+      "HelloAck": {
+        "additionalProperties": false,
+        "properties": {
+          "agent": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+            "title": "Agent",
+            "type": "string"
+          },
+          "heartbeat_timeout_s": {
+            "minimum": 1.0,
+            "title": "Heartbeat Timeout S",
+            "type": "integer"
+          },
+          "next_event_seq": {
+            "minimum": 0.0,
+            "title": "Next Event Seq",
+            "type": "integer"
+          },
+          "poll_timeout_s": {
+            "minimum": 1.0,
+            "title": "Poll Timeout S",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "agent",
+          "poll_timeout_s",
+          "heartbeat_timeout_s",
+          "next_event_seq"
+        ],
+        "title": "HelloAck",
+        "type": "object"
+      },
       "IdleInterval": {
         "additionalProperties": false,
         "description": "На узле свободны ресурсы `free` с `from` до `to` по причине `code`.",
@@ -970,6 +1338,80 @@
         "title": "InterruptedRecord",
         "type": "object"
       },
+      "LiveOut": {
+        "additionalProperties": false,
+        "properties": {
+          "containers": {
+            "items": {
+              "$ref": "#/components/schemas/ContainerOut"
+            },
+            "title": "Containers",
+            "type": "array"
+          },
+          "now": {
+            "title": "Now",
+            "type": "integer"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "done",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "time_scale_ms": {
+            "title": "Time Scale Ms",
+            "type": "integer"
+          },
+          "workers": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/WorkerLive"
+            },
+            "title": "Workers",
+            "type": "object"
+          }
+        },
+        "required": [
+          "run_id",
+          "status",
+          "now",
+          "time_scale_ms",
+          "workers",
+          "containers"
+        ],
+        "title": "LiveOut",
+        "type": "object"
+      },
+      "LiveStarted": {
+        "additionalProperties": false,
+        "properties": {
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "done",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "status"
+        ],
+        "title": "LiveStarted",
+        "type": "object"
+      },
       "MetricsOut": {
         "additionalProperties": false,
         "properties": {
@@ -1164,6 +1606,63 @@
         "title": "PolicyIn",
         "type": "object"
       },
+      "Poll": {
+        "additionalProperties": false,
+        "properties": {
+          "acked_command_id": {
+            "minimum": 0.0,
+            "title": "Acked Command Id",
+            "type": "integer"
+          },
+          "wait_s": {
+            "default": 25,
+            "maximum": 30.0,
+            "minimum": 0.0,
+            "title": "Wait S",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "acked_command_id"
+        ],
+        "title": "Poll",
+        "type": "object"
+      },
+      "PollReply": {
+        "additionalProperties": false,
+        "properties": {
+          "commands": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "checkpoint": "#/components/schemas/CheckpointCommand",
+                  "start": "#/components/schemas/StartCommand",
+                  "stop": "#/components/schemas/StopCommand"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/StartCommand"
+                },
+                {
+                  "$ref": "#/components/schemas/StopCommand"
+                },
+                {
+                  "$ref": "#/components/schemas/CheckpointCommand"
+                }
+              ]
+            },
+            "title": "Commands",
+            "type": "array"
+          }
+        },
+        "required": [
+          "commands"
+        ],
+        "title": "PollReply",
+        "type": "object"
+      },
       "ProblemIn": {
         "additionalProperties": false,
         "properties": {
@@ -1234,6 +1733,13 @@
             "maxItems": 100000,
             "title": "Tasks",
             "type": "array"
+          },
+          "time_scale_ms": {
+            "default": 1000,
+            "maximum": 3600000.0,
+            "minimum": 1.0,
+            "title": "Time Scale Ms",
+            "type": "integer"
           },
           "time_unit": {
             "default": "minute",
@@ -1964,6 +2470,103 @@
         "title": "SetPriority",
         "type": "object"
       },
+      "StartCommand": {
+        "additionalProperties": false,
+        "description": "Запустить попытку на узле `worker`. Без `container` — встроенная нагрузка: `work` единиц времени\nмодели по `time_scale_ms` миллисекунд, с чекпоинтами каждые `checkpoint_interval` единиц.",
+        "properties": {
+          "attempt": {
+            "minimum": 1.0,
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "checkpoint_interval": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkpoint Interval"
+          },
+          "command_id": {
+            "minimum": 1.0,
+            "title": "Command Id",
+            "type": "integer"
+          },
+          "container": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContainerSpec"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "const": "start",
+            "title": "Kind",
+            "type": "string"
+          },
+          "limits": {
+            "patternProperties": {
+              "^[a-z][a-z0-9_]{0,31}$": {
+                "minimum": 0.0,
+                "type": "integer"
+              }
+            },
+            "title": "Limits",
+            "type": "object"
+          },
+          "resume_from": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Resume From",
+            "type": "integer"
+          },
+          "run_id": {
+            "pattern": "^[0-9a-f]{16}$",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "task": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+            "title": "Task",
+            "type": "string"
+          },
+          "time_scale_ms": {
+            "minimum": 1.0,
+            "title": "Time Scale Ms",
+            "type": "integer"
+          },
+          "work": {
+            "minimum": 1.0,
+            "title": "Work",
+            "type": "integer"
+          },
+          "worker": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+            "title": "Worker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "task",
+          "attempt",
+          "kind",
+          "command_id",
+          "worker",
+          "limits",
+          "work",
+          "time_scale_ms"
+        ],
+        "title": "StartCommand",
+        "type": "object"
+      },
       "StartRecord": {
         "additionalProperties": false,
         "properties": {
@@ -2048,6 +2651,55 @@
           "delta"
         ],
         "title": "StartShift",
+        "type": "object"
+      },
+      "StopCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt": {
+            "minimum": 1.0,
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "command_id": {
+            "minimum": 1.0,
+            "title": "Command Id",
+            "type": "integer"
+          },
+          "kind": {
+            "const": "stop",
+            "title": "Kind",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "preempt",
+              "worker_down",
+              "cancel"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "run_id": {
+            "pattern": "^[0-9a-f]{16}$",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "task": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+            "title": "Task",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "task",
+          "attempt",
+          "kind",
+          "command_id",
+          "reason"
+        ],
+        "title": "StopCommand",
         "type": "object"
       },
       "SubmitRecord": {
@@ -2723,6 +3375,30 @@
         "title": "WorkerIn",
         "type": "object"
       },
+      "WorkerLive": {
+        "additionalProperties": false,
+        "properties": {
+          "agent": {
+            "title": "Agent",
+            "type": "string"
+          },
+          "dropped": {
+            "title": "Dropped",
+            "type": "boolean"
+          },
+          "up": {
+            "title": "Up",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "agent",
+          "up",
+          "dropped"
+        ],
+        "title": "WorkerLive",
+        "type": "object"
+      },
       "WorkerRecord": {
         "additionalProperties": false,
         "properties": {
@@ -2766,6 +3442,226 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/v1/agents/{agent_id}/events": {
+      "post": {
+        "operationId": "events_v1_agents__agent_id__events_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+              "title": "Agent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventsBatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventsAck"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Events",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
+    "/v1/agents/{agent_id}/hello": {
+      "post": {
+        "operationId": "hello_v1_agents__agent_id__hello_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+              "title": "Agent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Hello"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HelloAck"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Hello",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
+    "/v1/agents/{agent_id}/poll": {
+      "post": {
+        "description": "Отдаёт неподтверждённые команды сразу, а если их нет — ждёт до `wait_s` секунд.",
+        "operationId": "poll_v1_agents__agent_id__poll_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+              "title": "Agent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Poll"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PollReply"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Poll",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
     "/v1/policies": {
       "get": {
         "description": "Реализованные политики и параметры по умолчанию — для формы клиента.",
@@ -2828,7 +3724,7 @@
         "summary": "Runs"
       },
       "post": {
-        "description": "Прогон {problem, policy?}. Тот же вход с той же политикой не пересчитывается: отдаётся сохранённый.",
+        "description": "Прогон {problem, policy?}. Тот же вход с той же политикой не пересчитывается: отдаётся сохранённый.\n\nС `problem.mode = \"emulate\"` — прогон на агентах: 202 `{run_id, status}`, идёт в фоне, его состояние —\n`GET /v1/runs/{run_id}/containers`, результат появится по окончании.",
         "operationId": "create_run_v1_runs_post",
         "requestBody": {
           "content": {
@@ -2851,6 +3747,16 @@
             },
             "description": "Successful Response"
           },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveStarted"
+                }
+              }
+            },
+            "description": "Accepted"
+          },
           "400": {
             "content": {
               "application/json": {
@@ -2861,6 +3767,16 @@
             },
             "description": "Bad Request"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -2870,6 +3786,16 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "413": {
             "content": {
@@ -2961,6 +3887,16 @@
             },
             "description": "Bad Request"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -2970,6 +3906,16 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "413": {
             "content": {
@@ -3025,9 +3971,129 @@
         "summary": "Get Run"
       }
     },
+    "/v1/runs/{run_id}/actions": {
+      "post": {
+        "description": "Чекпоинт задачи сейчас, уронить или вернуть узел, отменить прогон.",
+        "operationId": "actions_v1_runs__run_id__actions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{16}$",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Body",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Actions",
+        "tags": [
+          "emulation"
+        ]
+      }
+    },
+    "/v1/runs/{run_id}/containers": {
+      "get": {
+        "description": "Прогон на агентах сейчас: часы модели, узлы и контейнеры попыток.",
+        "operationId": "containers_v1_runs__run_id__containers_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{16}$",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Containers",
+        "tags": [
+          "emulation"
+        ]
+      }
+    },
     "/v1/runs/{run_id}/events": {
       "get": {
-        "description": "Журнал страницами: записи с номерами [from_seq, from_seq + limit).",
+        "description": "Журнал страницами: записи с номерами [from_seq, from_seq + limit); у идущего прогона — сколько есть.",
         "operationId": "get_events_v1_runs__run_id__events_get",
         "parameters": [
           {
@@ -3085,6 +4151,16 @@
             },
             "description": "Bad Request"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -3094,6 +4170,16 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "413": {
             "content": {
@@ -3194,6 +4280,16 @@
             },
             "description": "Bad Request"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -3203,6 +4299,16 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "413": {
             "content": {
@@ -3344,6 +4450,16 @@
             },
             "description": "Bad Request"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -3353,6 +4469,16 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "413": {
             "content": {
@@ -3445,6 +4571,16 @@
             },
             "description": "Bad Request"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -3454,6 +4590,16 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "413": {
             "content": {
@@ -3565,6 +4711,16 @@
             },
             "description": "Bad Request"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -3574,6 +4730,16 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "413": {
             "content": {
@@ -3680,6 +4846,16 @@
             },
             "description": "Bad Request"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -3689,6 +4865,16 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "413": {
             "content": {
@@ -3779,6 +4965,16 @@
             },
             "description": "Bad Request"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -3788,6 +4984,16 @@
               }
             },
             "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
           },
           "413": {
             "content": {

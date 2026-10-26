@@ -8,6 +8,7 @@ name = Слои ядра
 type = layers
 layers =
     expsched.api | expsched.agent | (expsched.cli) | (expsched.io)
+    expsched.emulate
     expsched.pipeline
     expsched.explain | expsched.metrics
     expsched.verify
@@ -32,6 +33,7 @@ type = forbidden
 source_modules = expsched.agent
 forbidden_modules =
     expsched.api
+    expsched.emulate
     expsched.pipeline
     expsched.explain
     expsched.metrics

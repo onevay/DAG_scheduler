@@ -1,0 +1,99 @@
+"""Агенты глазами планировщика: кто на связи, какие команды им отданы, какие события от них приняты."""
+
+from __future__ import annotations
+
+import math
+import time
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from typing import Any
+
+from pydantic import TypeAdapter
+
+from expsched.contract.agent import (
+    AgentEvent,
+    Command,
+    EventsAck,
+    EventsBatch,
+    Hello,
+    HelloAck,
+    Poll,
+    PollReply,
+)
+
+COMMAND: TypeAdapter[Command] = TypeAdapter(Command)
+Listener = Callable[[AgentEvent], None]
+
+
+class EventGap(ValueError):
+    """В пачке пропущен номер события: агент должен дослать с `expected`."""
+
+    def __init__(self, expected: int, got: int) -> None:
+        super().__init__(f"expected event {expected}, got {got}")
+        self.expected = expected
+
+
+@dataclass
+class _Agent:
+    hello: Hello | None = None
+    last_seen: float = -math.inf
+    next_command: int = 1
+    commands: list[Command] = field(default_factory=list)  # отданные, но не подтверждённые
+    next_event: int = 0
+
+
+class AgentRegistry:
+    """Состояние агентов в памяти сервера. Команды ждут, пока агент их подтвердит; события доставляются
+    подписчику по `run_id` строго по номерам, повтор уже принятых пропускается."""
+
+    def __init__(
+        self, clock: Callable[[], float] = time.monotonic, heartbeat_s: int = 15, poll_s: int = 25
+    ) -> None:
+        self.clock = clock
+        self.heartbeat_s = heartbeat_s
+        self.poll_s = poll_s
+        self.agents: dict[str, _Agent] = {}
+        self.listeners: dict[str, Listener] = {}
+
+    def hello(self, agent_id: str, hello: Hello) -> HelloAck:
+        agent = self.agents.setdefault(agent_id, _Agent())
+        agent.hello, agent.last_seen = hello, self.clock()
+        return HelloAck(
+            agent=agent_id,
+            poll_timeout_s=self.poll_s,
+            heartbeat_timeout_s=self.heartbeat_s,
+            next_event_seq=agent.next_event,
+        )
+
+    def poll(self, agent_id: str, poll: Poll) -> PollReply:
+        agent = self.agents.setdefault(agent_id, _Agent())
+        agent.last_seen = self.clock()
+        agent.commands = [c for c in agent.commands if c.command_id > poll.acked_command_id]
+        return PollReply(commands=list(agent.commands))
+
+    def events(self, agent_id: str, batch: EventsBatch) -> EventsAck:
+        agent = self.agents.setdefault(agent_id, _Agent())
+        agent.last_seen = self.clock()
+        for event in batch.events:
+            if event.seq < agent.next_event:
+                continue  # уже принято: ответ на прошлую пачку потерялся
+            if event.seq > agent.next_event:
+                raise EventGap(agent.next_event, event.seq)
+            agent.next_event += 1
+            if listener := self.listeners.get(event.run_id):
+                listener(event)
+        return EventsAck(next_event_seq=agent.next_event)
+
+    def send(self, agent_id: str, command: dict[str, Any]) -> None:
+        """Команда агенту; номер ей даёт реестр. Агент заберёт её при следующем опросе."""
+        agent = self.agents.setdefault(agent_id, _Agent())
+        agent.commands.append(COMMAND.validate_python({**command, "command_id": agent.next_command}))
+        agent.next_command += 1
+
+    def alive(self, agent_id: str, since: float) -> bool:
+        """На связи: опрашивал не дольше `heartbeat_s` назад. Не бывший на связи с `since` — ещё в запасе."""
+        last = self.agents[agent_id].last_seen if agent_id in self.agents else -math.inf
+        return self.clock() - max(last, since) <= self.heartbeat_s
+
+    def pending(self, agent_id: str) -> bool:
+        return bool(agent_id in self.agents and self.agents[agent_id].commands)

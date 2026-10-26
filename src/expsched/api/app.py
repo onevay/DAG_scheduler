@@ -28,12 +28,16 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError
 from starlette.exceptions import HTTPException
 
+from expsched.api import agents, emulations
+from expsched.api.emulations import Emulations
+from expsched.api.errors import error_response
 from expsched.api.models import (
     ErrorCode,
     ErrorOut,
     EventRequest,
     EventsPage,
     ExplainView,
+    LiveStarted,
     PoliciesOut,
     RunOut,
     RunRequest,
@@ -50,6 +54,7 @@ from expsched.api.web import add_security_headers, mount_web
 from expsched.contract.io_models import PolicyIn, ProblemIn, load
 from expsched.contract.limits import MAX_BODY_BYTES, InputTooLarge
 from expsched.contract.whatif import apply, deltas
+from expsched.emulate.agents import AgentRegistry
 from expsched.pipeline import input_hash
 from expsched.policies.registry import implemented_policies
 from expsched.validation import Code, has_errors, validate
@@ -57,7 +62,7 @@ from expsched.validation.schema import schema_diagnostics
 
 SCHEMA_CODES = frozenset({Code.E001, Code.E070})  # вход не разобран: остальные проверки не выполнялись
 ERRORS: dict[int | str, dict[str, Any]] = {
-    status: {"model": ErrorOut} for status in (400, 404, 413, 422, 500, 503, 504)
+    status: {"model": ErrorOut} for status in (400, 403, 404, 409, 413, 422, 500, 503, 504)
 }
 RunId = Annotated[str, Path(pattern=RUN_ID_PATTERN)]
 # Тела запросов читаются вручную, с обрывом на лимите, поэтому их схемы добавляются в OpenAPI отдельно.
@@ -132,9 +137,15 @@ def runs(request: Request, limit: Annotated[int, Query(ge=1, le=500)] = 50) -> A
     return {"runs": _store(request).recent(limit)}
 
 
-@router.post("/runs", status_code=201, response_model=RunOut, responses=ERRORS)
+@router.post(
+    "/runs", status_code=201, response_model=RunOut, responses={**ERRORS, 202: {"model": LiveStarted}}
+)
 async def create_run(request: Request) -> Any:
-    """Прогон {problem, policy?}. Тот же вход с той же политикой не пересчитывается: отдаётся сохранённый."""
+    """Прогон {problem, policy?}. Тот же вход с той же политикой не пересчитывается: отдаётся сохранённый.
+
+    С `problem.mode = "emulate"` — прогон на агентах: 202 `{run_id, status}`, идёт в фоне, его состояние —
+    `GET /v1/runs/{run_id}/containers`, результат появится по окончании.
+    """
     try:
         run_request = await asyncio.to_thread(RunRequest.model_validate_json, await _read_body(request))
     except InputTooLarge as error:
@@ -142,9 +153,25 @@ async def create_run(request: Request) -> Any:
     except ValidationError as error:
         found = [d.to_dict() for d in schema_diagnostics(error)]
         return error_response(422, "SCHEMA_INVALID", "request does not match the schema", found)
-    return await _run_and_store(
-        request, run_request.problem, run_request.policy or run_request.problem.policy
-    )
+    problem, policy = run_request.problem, run_request.policy or run_request.problem.policy
+    if problem.mode in ("shadow", "replay"):
+        return error_response(400, "INVALID_REQUEST", f"mode {problem.mode!r} is not supported yet")
+    if problem.mode == "emulate":
+        return _start_emulation(request, problem, policy)
+    return await _run_and_store(request, problem, policy)
+
+
+def _start_emulation(request: Request, problem: ProblemIn, policy: PolicyIn) -> Any:
+    if not os.environ.get("EXPSCHED_AGENT_TOKEN"):
+        return error_response(403, "FORBIDDEN", "runs on agents need EXPSCHED_AGENT_TOKEN for the agent API")
+    manager: Emulations = request.app.state.emulations
+    if manager.running() >= manager.limit:
+        return error_response(503, "RUN_QUEUE_FULL", f"{manager.running()} runs on agents are already going")
+    try:
+        run_id = manager.start(problem, policy)
+    except ValueError as error:
+        return error_response(422, "INVALID_REQUEST", str(error))
+    return JSONResponse({"run_id": run_id, "status": "running"}, status_code=202)
 
 
 @router.post("/runs/{run_id}/events", status_code=201, response_model=RunOut, responses=ERRORS)
@@ -216,13 +243,17 @@ def _summary(run_id: str, result: dict[str, Any]) -> dict[str, Any]:
 
 @router.get("/runs/{run_id}", response_model=RunOut, responses=ERRORS)
 def get_run(request: Request, run_id: RunId) -> Any:
+    live = request.app.state.emulations.live.get(run_id)
+    if live is not None and live.emulation.status == "running":
+        return error_response(409, "RUN_IN_PROGRESS", f"run {run_id} is still going on agents")
     return {"run_id": run_id, "result": _store(request).result(run_id)}
 
 
 @router.get("/runs/{run_id}/problem", response_model=ProblemIn, responses=ERRORS)
 def get_problem(request: Request, run_id: RunId) -> Any:
     """Вход прогона с политикой, которой он посчитан."""
-    return _store(request).problem(run_id)
+    live = request.app.state.emulations.live.get(run_id)
+    return live.problem if live is not None else _store(request).problem(run_id)
 
 
 @router.get("/runs/{run_id}/events", response_model=EventsPage, responses=ERRORS)
@@ -232,8 +263,13 @@ def get_events(
     from_seq: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=10_000)] = 1000,
 ) -> Any:
-    """Журнал страницами: записи с номерами [from_seq, from_seq + limit)."""
-    events, total = _store(request).events(run_id, from_seq, limit)
+    """Журнал страницами: записи с номерами [from_seq, from_seq + limit); у идущего прогона — сколько есть."""
+    live = request.app.state.emulations.live.get(run_id)
+    if live is not None and live.emulation.status == "running":
+        records = live.emulation.sim.journal.records
+        events, total = list(records[from_seq : from_seq + limit]), len(records)
+    else:
+        events, total = _store(request).events(run_id, from_seq, limit)
     next_seq = from_seq + len(events)
     return {"events": events, "total": total, "next_seq": next_seq if next_seq < total else None}
 
@@ -275,6 +311,7 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         yield
+        app.state.emulations.close()  # прогоны на агентах отменяются: их контейнеры останавливаются
         runner.close()  # рабочие процессы не переживают сервер
 
     app = FastAPI(title="expsched", lifespan=lifespan)
@@ -287,7 +324,11 @@ def create_app(
         int(os.environ.get("EXPSCHED_MAX_RUNS", "100")),
         int(os.environ.get("EXPSCHED_MAX_RUNS_MB", "2048")) << 20,
     )
+    app.state.agents = AgentRegistry()
+    app.state.emulations = Emulations(app.state.agents, app.state.store)
     app.include_router(router)
+    app.include_router(agents.router)
+    app.include_router(emulations.router)
     add_security_headers(app)
     if web_dir is not None:
         mount_web(app, web_dir, lambda path: error_response(404, "NOT_FOUND", f"/{path} not found"))
@@ -312,13 +353,6 @@ def create_app(
 
     app.openapi = openapi  # type: ignore[method-assign]
     return app
-
-
-def error_response(
-    status: int, code: ErrorCode, message: str, diagnostics: list[dict[str, Any]] | None = None
-) -> JSONResponse:
-    body = ErrorOut.model_validate({"error": {"code": code, "message": message}, "diagnostics": diagnostics})
-    return JSONResponse(body.model_dump(mode="json", exclude_none=True), status_code=status)
 
 
 async def _run_and_store(request: Request, problem: ProblemIn, config: PolicyIn) -> Any:

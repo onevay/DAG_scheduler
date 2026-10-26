@@ -103,6 +103,8 @@ class ProblemIn(Strict):
     events: list[EventIn] = []
     policy: PolicyIn = PolicyIn()
     mode: Literal["simulate", "emulate", "shadow", "replay"] = "simulate"
+    # Для прогона на агентах: длительность единицы времени модели, мс (1000 — единица модели идёт секунду).
+    time_scale_ms: Annotated[int, Field(ge=1, le=3_600_000)] = 1000
 
     @model_validator(mode="after")
     def _ids_and_limits(self) -> ProblemIn:

@@ -51,7 +51,10 @@ What-if занимает места в очереди сразу под все �
 |---|---|---|
 | 400 | `POLICY_NOT_IMPLEMENTED` | политика ещё не реализована |
 | 404 | `NOT_FOUND` | нет такого пути или прогона (никогда не было или уже удалён как старый) |
+| 403 | `FORBIDDEN` | агентский API выключен (нет `EXPSCHED_AGENT_TOKEN`) или токен неверный |
 | 405 | `METHOD_NOT_ALLOWED` | путь есть, метод не тот |
+| 409 | `RUN_IN_PROGRESS` | прогон на агентах ещё идёт: результата пока нет |
+| 409 | `EVENT_GAP` | агент пропустил номер события; дослать с указанного |
 | 413 | `INPUT_TOO_LARGE` | тело больше лимита |
 | 422 | `SCHEMA_INVALID` | тело не соответствует схеме; подробности в `diagnostics` |
 | 422 | `INVALID_REQUEST` | неверный параметр запроса, например `mode` |
@@ -127,6 +130,30 @@ EXPSCHED_CORS_ORIGINS=http://localhost:5173 make api
 
 `run_id` — первые 16 символов `input_hash`, поэтому тот же вход с той же политикой не пересчитывается: API
 отдаёт сохранённый прогон. Ошибки — 400, 413, 422, 500, 503, 504 в [общем формате](#ошибки).
+
+### Прогон на агентах
+
+С `problem.mode = "emulate"` прогон идёт на [агентах](agent.md#прогон-на-агентах): ответ 202
+`{"run_id": "...", "status": "running"}` сразу, сам прогон — в фоне. Его id случайный (настоящие контейнеры не
+повторить), у каждого узла должен быть `agent` (иначе 422), на сервере — `EXPSCHED_AGENT_TOKEN` (иначе 403).
+Одновременно идёт не больше `EXPSCHED_EMULATIONS` (1) прогонов — сверх них 503 `RUN_QUEUE_FULL`, каждый не
+дольше `EXPSCHED_EMULATION_MAX_S` (3600) секунд, при остановке сервера идущие отменяются. Пока прогон идёт,
+`GET /v1/runs/{run_id}` отвечает 409 `RUN_IN_PROGRESS`, журнал и вход отдаются из памяти; по окончании прогон
+сохраняется как обычный. Режимы `shadow` и `replay` пока не поддерживаются — 400.
+
+`GET /v1/runs/{run_id}/containers` — состояние прогона на агентах:
+
+```json
+{"run_id": "...", "status": "running", "now": 37, "time_scale_ms": 1000,
+ "workers": {"laptop": {"agent": "laptop", "up": true, "dropped": false}},
+ "containers": [{"task": "train_small", "attempt": 1, "worker": "laptop", "agent": "laptop", "state": "checkpoint",
+                 "container_id": "3f2a…", "resume_from": 0, "progress": 10, "detail": null}]}
+```
+
+`POST /v1/runs/{run_id}/actions` — действие, ответ — то же состояние: `{"kind": "checkpoint", "task": "…"}` —
+сохранить чекпоинт сейчас; `{"kind": "worker_down", "worker": "…"}` — уронить узел (его контейнеры
+останавливаются, попытки прерываются, пока узел не вернут); `{"kind": "worker_up", "worker": "…"}`;
+`{"kind": "cancel"}`.
 
 ## `GET /v1/runs/{run_id}`
 

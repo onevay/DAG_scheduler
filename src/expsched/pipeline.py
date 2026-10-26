@@ -11,13 +11,14 @@ from expsched.contract.hashing import canonical_hash
 from expsched.contract.io_models import PolicyIn, ProblemIn, to_domain
 from expsched.domain.models import Problem, Task
 from expsched.domain.states import TaskStatus
+from expsched.engine.executor import Executor
 from expsched.engine.simulator import Simulator
 from expsched.explain.chain import critical_chain, decompose
 from expsched.explain.idle import idle_by_code, idle_intervals
 from expsched.explain.waits import wait_intervals
 from expsched.metrics.metrics import metrics
 from expsched.policies.registry import make_policy
-from expsched.validation import quarantine, validate_problem
+from expsched.validation import Quarantine, quarantine, validate_problem
 from expsched.verify.attempts import attempts_from_log
 from expsched.verify.invariants import verify
 
@@ -35,6 +36,23 @@ def input_hash(problem: ProblemIn, policy: PolicyIn) -> str:
     return canonical_hash({"problem": problem.model_dump(mode="json"), "policy": policy.model_dump()})
 
 
+@dataclass(frozen=True)
+class Prepared:
+    """Вход после проверки и карантина — всё, чтобы запустить симулятор и потом собрать результат."""
+
+    problem: ProblemIn
+    config: PolicyIn
+    base: dict[str, Any]
+    validated: Problem
+    diagnostics: list[dict[str, Any]]
+    plan: Quarantine
+    forecast: bool
+
+    def simulator(self, executor: Executor | None = None) -> Simulator:
+        policy = make_policy(self.config, self.problem.seed)
+        return Simulator(self.plan.problem, policy, forecast=self.forecast, executor=executor)
+
+
 def run(problem: ProblemIn, policy: PolicyIn | None = None) -> RunResult:
     """Прогон входа политикой `policy` (по умолчанию — из входа).
 
@@ -43,6 +61,16 @@ def run(problem: ProblemIn, policy: PolicyIn | None = None) -> RunResult:
     Диагностики результата — это ошибки входа; то, что случилось во время прогона, видно в журнале.
     `replans` — None, если задач больше `max_forecast_tasks` и прогноз не строился.
     """
+    prepared = prepare(problem, policy)
+    if isinstance(prepared, RunResult):
+        return prepared
+    sim = prepared.simulator()
+    sim.run_all()
+    return conclude(prepared, sim)
+
+
+def prepare(problem: ProblemIn, policy: PolicyIn | None = None) -> Prepared | RunResult:
+    """Проверка и карантин входа; RunResult — вход не прошёл строгую проверку (INFEASIBLE)."""
     config = policy or problem.policy
     base = {
         "schema_version": SCHEMA_VERSION,
@@ -69,8 +97,14 @@ def run(problem: ProblemIn, policy: PolicyIn | None = None) -> RunResult:
 
     plan = quarantine(validated, diagnostics)
     forecast = 0 < len(plan.problem.all_tasks()) <= config.max_forecast_tasks
-    sim = Simulator(plan.problem, make_policy(config, problem.seed), forecast=forecast)
-    log = sim.run_all()
+    return Prepared(problem, config, base, validated, found, plan, forecast)
+
+
+def conclude(prepared: Prepared, sim: Simulator, exact: bool = True) -> RunResult:
+    """Результат законченного прогона симулятора. `exact=False` — длительности попыток взяты из жизни
+    (прогон на агентах): проверка I1 «попытка шла ровно остаток работы» не делается."""
+    base, config, plan, forecast = prepared.base, prepared.config, prepared.plan, prepared.forecast
+    log = sim.run_all()  # у законченного прогона событий нет: только итоговая диагностика
     status = {**plan.excluded, **sim.state.status}
     planned = {k: t for k, t in sim.state.tasks.items() if status[k] is not TaskStatus.INFEASIBLE}
     lower_bound = analyze(replace(plan.problem, tasks=planned)).lb if planned else None
@@ -80,12 +114,12 @@ def run(problem: ProblemIn, policy: PolicyIn | None = None) -> RunResult:
         "status": "OK" if set(status.values()) <= {TaskStatus.SUCCEEDED} else "PARTIAL",
         "result_hash": sim.journal.result_hash(),
         "attempts": [asdict(a) for a in attempts_from_log(log)],
-        "tasks": _task_summaries(validated.all_tasks() | sim.state.tasks, status, log),
+        "tasks": _task_summaries(prepared.validated.all_tasks() | sim.state.tasks, status, log),
         "metrics": scores,
         "explain": _explain(plan.problem, sim.state.tasks, log, scores["makespan"]),
         "replans": [r for r in log if r["type"] == "REPLAN"] if forecast else None,
-        "diagnostics": found,
-        "violations": verify(plan.problem, log, config.max_preemptions_per_task),
+        "diagnostics": prepared.diagnostics,
+        "violations": verify(plan.problem, log, config.max_preemptions_per_task, exact),
     }
     return RunResult(result, log)
 

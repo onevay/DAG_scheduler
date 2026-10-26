@@ -10,6 +10,7 @@ services:
     environment:
       EXPSCHED_RUN_WORKERS: "2"
       EXPSCHED_RUN_MEMORY_MB: "2048"
+      EXPSCHED_AGENT_TOKEN: ${EXPSCHED_AGENT_TOKEN:-}  # задан — агенты на этой машине подключаются к :8000
     read_only: true
     tmpfs:
       - /tmp

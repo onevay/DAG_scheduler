@@ -432,6 +432,13 @@
       "title": "Tasks",
       "type": "array"
     },
+    "time_scale_ms": {
+      "default": 1000,
+      "maximum": 3600000,
+      "minimum": 1,
+      "title": "Time Scale Ms",
+      "type": "integer"
+    },
     "time_unit": {
       "default": "minute",
       "enum": [

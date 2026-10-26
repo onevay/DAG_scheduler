@@ -1,0 +1,180 @@
+"""Прогон на агентах: решения политики — команды агентам, события агентов — факты движка.
+
+Часы модели — часы стены в масштабе `time_scale_ms` мс на единицу времени модели. Движок с внешним
+исполнителем: окончание попытки приходит событием агента `exited`, сбой — `exited` с ненулевым кодом,
+`oom`, `lost` или `rejected`, сохранённая работа — по событиям `checkpoint`. Агент, переставший выходить на
+связь, — отказ всех его узлов; вернувшийся — их возврат.
+"""
+
+from __future__ import annotations
+
+import time
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any, Literal
+
+from expsched.contract.agent import AgentEvent
+from expsched.contract.io_models import ContainerSpec, PolicyIn, ProblemIn
+from expsched.domain.models import Event, EvType
+from expsched.domain.states import FINAL_STATUSES
+from expsched.emulate.agents import AgentRegistry
+from expsched.engine.events import Crash, Finish
+from expsched.engine.executor import External
+from expsched.pipeline import RunResult, conclude, prepare
+
+Status = Literal["running", "done", "cancelled"]
+
+
+@dataclass
+class Container:
+    """Попытка на агенте — то, что показывает экран «Контейнеры»."""
+
+    task: str
+    attempt: int
+    worker: str
+    agent: str
+    resume_from: int
+    state: str = "sent"  # sent, accepted, started, затем тип последнего события
+    container_id: str | None = None
+    progress: int = 0
+    detail: str | None = None
+
+
+class Emulation:
+    def __init__(
+        self,
+        run_id: str,
+        problem: ProblemIn,
+        policy: PolicyIn,
+        registry: AgentRegistry,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        missing = sorted(w.id for w in problem.cluster.workers if not w.agent)
+        if missing:
+            raise ValueError(f"workers without an agent: {', '.join(missing)}")
+        self.run_id = run_id
+        self.registry = registry
+        self.clock = clock
+        self.scale_ms = problem.time_scale_ms
+        self.agent_of = {w.id: str(w.agent) for w in problem.cluster.workers}
+        tasks = [*problem.tasks, *(e.task for e in problem.events if e.task)]
+        self.specs: dict[str, ContainerSpec | None] = {t.id: t.container for t in tasks}
+        self.containers: dict[tuple[str, int], Container] = {}
+        self.dropped: set[str] = set()  # узлы, уроненные вручную: не поднимаются, пока их не вернут
+        self.result: RunResult | None = None
+        self.status: Status = "running"
+        self.started = clock()
+        prepared = prepare(problem, policy)
+        if isinstance(prepared, RunResult):  # строгая проверка не пропустила вход
+            self.result, self.status = prepared, "done"
+            return
+        self.prepared = prepared
+        self.executor = External()
+        self.sim = prepared.simulator(self.executor)
+        registry.listeners[run_id] = self.on_event
+
+    def now(self) -> int:
+        return round((self.clock() - self.started) * 1000) // self.scale_ms  # до мс: без хвостов float
+
+    def tick(self) -> list[dict[str, Any]]:
+        """Часы модели дошли до сейчас: отказы и возвраты агентов, эпохи наступивших событий, команды."""
+        if self.status != "running":
+            return []
+        now = self.now()
+        for worker, agent in sorted(self.agent_of.items()):
+            alive = self.registry.alive(agent, since=self.started) and worker not in self.dropped
+            if alive != self.sim.state.up[worker] and now >= self.sim.t:
+                kind = EvType.WORKER_UP if alive else EvType.WORKER_DOWN
+                self.sim.inject(now, Event(now, kind, worker=worker))
+        records = self.sim.advance(now)
+        for r in records:
+            if r["type"] == "START":
+                self._start(r)
+            elif r["type"] == "INTERRUPTED" and r["cause"] in ("PREEMPT", "WORKER_DOWN"):
+                self._stop(r["task"], r["attempt"], "preempt" if r["cause"] == "PREEMPT" else "worker_down")
+        if self._finished():
+            self.result, self.status = conclude(self.prepared, self.sim, exact=False), "done"
+            self.registry.listeners.pop(self.run_id, None)
+        return records
+
+    def _finished(self) -> bool:
+        """Ничего не идёт и не ждёт очереди; узлы лежат при незаконченных задачах — ждать: агент вернётся."""
+        state = self.sim.state
+        if state.run or self.sim.next_time() is not None:
+            return False
+        unfinished = any(s not in FINAL_STATUSES for s in state.status.values())
+        return not (unfinished and not all(state.up.values()))
+
+    def on_event(self, event: AgentEvent) -> None:
+        c = self.containers.get((event.task, event.attempt))
+        if c is None or self.status != "running":
+            return
+        c.state = event.type
+        c.container_id = event.container_id or c.container_id
+        c.detail = event.detail or c.detail
+        if event.progress is not None:
+            c.progress = event.progress
+        now = max(self.now(), self.sim.t)
+        if event.type == "checkpoint" and event.progress is not None:
+            self.executor.checkpoint(event.task, event.attempt, event.progress - c.resume_from)
+        elif event.type == "exited" and event.exit_code == 0:
+            self.sim.inject(now, Finish(event.task, event.attempt))
+        elif event.type in ("exited", "lost", "rejected"):
+            detail = event.detail or f"exit code {event.exit_code}"
+            self.sim.inject(now, Crash(event.task, event.attempt, "FAILED", detail))
+        elif event.type == "oom":
+            self.sim.inject(
+                now, Crash(event.task, event.attempt, "OOM", "container exceeded its memory limit")
+            )
+
+    def checkpoint(self, task: str) -> None:
+        run = self.sim.state.run.get(task)
+        if run is not None:
+            ref = {"run_id": self.run_id, "task": task, "attempt": run.attempt}
+            self.registry.send(self.agent_of[run.worker], {**ref, "kind": "checkpoint"})
+
+    def drop(self, worker: str) -> None:
+        """Уронить узел вручную: его попытки прерываются, контейнеры останавливаются."""
+        self.dropped.add(worker)
+        self.tick()
+
+    def restore(self, worker: str) -> None:
+        """Вернуть уроненный вручную узел; поднимется, если его агент на связи."""
+        self.dropped.discard(worker)
+        self.tick()
+
+    def cancel(self) -> None:
+        for task, run in sorted(self.sim.state.run.items()):
+            self._stop(task, run.attempt, "cancel")
+        self.status = "cancelled"
+        self.registry.listeners.pop(self.run_id, None)
+
+    def _start(self, r: dict[str, Any]) -> None:
+        task, run = self.sim.state.tasks[r["task"]], self.sim.state.run[r["task"]]
+        agent = self.agent_of[r["worker"]]
+        self.containers[(r["task"], r["attempt"])] = Container(
+            r["task"], r["attempt"], r["worker"], agent, r["resume_from"]
+        )
+        spec = self.specs.get(r["task"])
+        self.registry.send(
+            agent,
+            {
+                "run_id": self.run_id,
+                "task": r["task"],
+                "attempt": r["attempt"],
+                "kind": "start",
+                "worker": r["worker"],
+                "container": spec.model_dump() if spec else None,
+                "limits": dict(task.resources.items()),
+                "work": run.end_pred - run.start,
+                "resume_from": r["resume_from"],
+                "checkpoint_interval": task.ckpt,
+                "time_scale_ms": self.scale_ms,
+            },
+        )
+
+    def _stop(self, task: str, attempt: int, reason: str) -> None:
+        c = self.containers.get((task, attempt))
+        if c is not None:
+            ref = {"run_id": self.run_id, "task": task, "attempt": attempt}
+            self.registry.send(c.agent, {**ref, "kind": "stop", "reason": reason})

@@ -92,6 +92,7 @@ class Scheduler:
 def serve(agent: Agent, scheduler: Scheduler) -> None:
     """Hello, затем по кругу: опрос команд, слежение за контейнерами, события. Сбой связи — заново."""
     agent.reconcile()
+    clock = time.monotonic()
     while True:
         try:
             agent.welcome(scheduler.call("hello", agent.hello(), HelloAck))
@@ -99,6 +100,10 @@ def serve(agent: Agent, scheduler: Scheduler) -> None:
                 busy = any(not a.done for a in agent.attempts.values())
                 wait = 1 if busy or agent.outbox else 25
                 agent.handle(scheduler.call("poll", agent.poll(wait), PollReply, timeout=wait + 30))
+                if isinstance(agent.runtime, FakeRuntime):  # у подделки работа идёт по часам стены
+                    now = time.monotonic()
+                    agent.runtime.advance(round((now - clock) * 1000))
+                    clock = now
                 agent.watch()
                 if batch := agent.batch():
                     agent.acked(scheduler.call("events", batch, EventsAck))

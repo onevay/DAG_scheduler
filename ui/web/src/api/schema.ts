@@ -4,6 +4,60 @@
  */
 
 export interface paths {
+  "/v1/agents/{agent_id}/events": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Events */
+    post: operations["events_v1_agents__agent_id__events_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/agents/{agent_id}/hello": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Hello */
+    post: operations["hello_v1_agents__agent_id__hello_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/agents/{agent_id}/poll": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Poll
+     * @description Отдаёт неподтверждённые команды сразу, а если их нет — ждёт до `wait_s` секунд.
+     */
+    post: operations["poll_v1_agents__agent_id__poll_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/policies": {
     parameters: {
       query?: never;
@@ -40,6 +94,9 @@ export interface paths {
     /**
      * Create Run
      * @description Прогон {problem, policy?}. Тот же вход с той же политикой не пересчитывается: отдаётся сохранённый.
+     *
+     *     С `problem.mode = "emulate"` — прогон на агентах: 202 `{run_id, status}`, идёт в фоне, его состояние —
+     *     `GET /v1/runs/{run_id}/containers`, результат появится по окончании.
      */
     post: operations["create_run_v1_runs_post"];
     delete?: never;
@@ -65,6 +122,46 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/runs/{run_id}/actions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Actions
+     * @description Чекпоинт задачи сейчас, уронить или вернуть узел, отменить прогон.
+     */
+    post: operations["actions_v1_runs__run_id__actions_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/runs/{run_id}/containers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Containers
+     * @description Прогон на агентах сейчас: часы модели, узлы и контейнеры попыток.
+     */
+    get: operations["containers_v1_runs__run_id__containers_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/runs/{run_id}/events": {
     parameters: {
       query?: never;
@@ -74,7 +171,7 @@ export interface paths {
     };
     /**
      * Get Events
-     * @description Журнал страницами: записи с номерами [from_seq, from_seq + limit).
+     * @description Журнал страницами: записи с номерами [from_seq, from_seq + limit); у идущего прогона — сколько есть.
      */
     get: operations["get_events_v1_runs__run_id__events_get"];
     put?: never;
@@ -226,6 +323,37 @@ export interface components {
       kind: "add_worker";
       worker: components["schemas"]["WorkerIn"];
     };
+    /**
+     * AgentEvent
+     * @description Что случилось с попыткой. accepted/rejected — ответ на команду start; started — контейнер запущен;
+     *     checkpoint — сохранено `progress` единиц работы; exited — контейнер завершился с `exit_code`; oom — убит
+     *     за превышение памяти; killed — остановлен командой stop; lost — агент потерял контейнер (`detail`).
+     */
+    AgentEvent: {
+      /** At */
+      at: string;
+      /** Attempt */
+      attempt: number;
+      /** Container Id */
+      container_id?: string | null;
+      /** Detail */
+      detail?: string | null;
+      /** Exit Code */
+      exit_code?: number | null;
+      /** Progress */
+      progress?: number | null;
+      /** Run Id */
+      run_id: string;
+      /** Seq */
+      seq: number;
+      /** Task */
+      task: string;
+      /**
+       * Type
+       * @enum {string}
+       */
+      type: "accepted" | "rejected" | "started" | "checkpoint" | "exited" | "oom" | "killed" | "lost";
+    };
     /** AttemptOut */
     AttemptOut: {
       /** Attempt */
@@ -244,6 +372,18 @@ export interface components {
       task: string;
       /** Worker */
       worker: string;
+    };
+    /**
+     * AttemptRef
+     * @description Попытка задачи в прогоне — то, чем управляет агент; `key` — метка её контейнера.
+     */
+    AttemptRef: {
+      /** Attempt */
+      attempt: number;
+      /** Run Id */
+      run_id: string;
+      /** Task */
+      task: string;
     };
     /** BlockedRecord */
     BlockedRecord: {
@@ -288,10 +428,53 @@ export interface components {
       /** Worker */
       worker: string;
     };
+    /**
+     * CheckpointCommand
+     * @description Сохранить чекпоинт сейчас, не дожидаясь интервала.
+     */
+    CheckpointCommand: {
+      /** Attempt */
+      attempt: number;
+      /** Command Id */
+      command_id: number;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "checkpoint";
+      /** Run Id */
+      run_id: string;
+      /** Task */
+      task: string;
+    };
     /** ClusterIn */
     ClusterIn: {
       /** Workers */
       workers: components["schemas"]["WorkerIn"][];
+    };
+    /**
+     * ContainerOut
+     * @description Попытка задачи на агенте: где идёт, что с ней и сколько работы сохранено.
+     */
+    ContainerOut: {
+      /** Agent */
+      agent: string;
+      /** Attempt */
+      attempt: number;
+      /** Container Id */
+      container_id: string | null;
+      /** Detail */
+      detail: string | null;
+      /** Progress */
+      progress: number;
+      /** Resume From */
+      resume_from: number;
+      /** State */
+      state: string;
+      /** Task */
+      task: string;
+      /** Worker */
+      worker: string;
     };
     /**
      * ContainerSpec
@@ -399,6 +582,9 @@ export interface components {
         | "RUN_FAILED"
         | "NOT_FOUND"
         | "METHOD_NOT_ALLOWED"
+        | "FORBIDDEN"
+        | "EVENT_GAP"
+        | "RUN_IN_PROGRESS"
         | "INTERNAL";
       /** Message */
       message: string;
@@ -425,6 +611,19 @@ export interface components {
     /** EventRequest */
     EventRequest: {
       event: components["schemas"]["EventIn"];
+    };
+    /** EventsAck */
+    EventsAck: {
+      /** Next Event Seq */
+      next_event_seq: number;
+    };
+    /**
+     * EventsBatch
+     * @description События подряд по номерам; повтор уже принятых безопасен, пропуск номера — ошибка.
+     */
+    EventsBatch: {
+      /** Events */
+      events: components["schemas"]["AgentEvent"][];
     };
     /** EventsPage */
     EventsPage: {
@@ -491,6 +690,46 @@ export interface components {
     HTTPValidationError: {
       /** Detail */
       detail?: components["schemas"]["ValidationError"][];
+    };
+    /**
+     * Hello
+     * @description Агент представляется: что умеет и сколько ресурсов отдаёт; после своего перезапуска — что уже идёт.
+     */
+    Hello: {
+      /** Agent Version */
+      agent_version: string;
+      /** Capacity */
+      capacity: {
+        [key: string]: number;
+      };
+      /** Max Containers */
+      max_containers: number;
+      /**
+       * Protocol
+       * @constant
+       */
+      protocol: 1;
+      /**
+       * Running
+       * @default []
+       */
+      running?: components["schemas"]["AttemptRef"][];
+      /**
+       * Runtime
+       * @enum {string}
+       */
+      runtime: "docker" | "podman" | "fake";
+    };
+    /** HelloAck */
+    HelloAck: {
+      /** Agent */
+      agent: string;
+      /** Heartbeat Timeout S */
+      heartbeat_timeout_s: number;
+      /** Next Event Seq */
+      next_event_seq: number;
+      /** Poll Timeout S */
+      poll_timeout_s: number;
     };
     /**
      * IdleInterval
@@ -567,6 +806,36 @@ export interface components {
       type: "INTERRUPTED";
       /** Worker */
       worker: string;
+    };
+    /** LiveOut */
+    LiveOut: {
+      /** Containers */
+      containers: components["schemas"]["ContainerOut"][];
+      /** Now */
+      now: number;
+      /** Run Id */
+      run_id: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "running" | "done" | "cancelled";
+      /** Time Scale Ms */
+      time_scale_ms: number;
+      /** Workers */
+      workers: {
+        [key: string]: components["schemas"]["WorkerLive"];
+      };
+    };
+    /** LiveStarted */
+    LiveStarted: {
+      /** Run Id */
+      run_id: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "running" | "done" | "cancelled";
     };
     /** MetricsOut */
     MetricsOut: {
@@ -649,6 +918,25 @@ export interface components {
        */
       validation_mode?: "strict" | "lenient";
     };
+    /** Poll */
+    Poll: {
+      /** Acked Command Id */
+      acked_command_id: number;
+      /**
+       * Wait S
+       * @default 25
+       */
+      wait_s?: number;
+    };
+    /** PollReply */
+    PollReply: {
+      /** Commands */
+      commands: (
+        | components["schemas"]["StartCommand"]
+        | components["schemas"]["StopCommand"]
+        | components["schemas"]["CheckpointCommand"]
+      )[];
+    };
     /** ProblemIn */
     ProblemIn: {
       cluster: components["schemas"]["ClusterIn"];
@@ -692,6 +980,11 @@ export interface components {
       seed?: number;
       /** Tasks */
       tasks: components["schemas"]["TaskIn"][];
+      /**
+       * Time Scale Ms
+       * @default 1000
+       */
+      time_scale_ms?: number;
       /**
        * Time Unit
        * @default minute
@@ -960,6 +1253,44 @@ export interface components {
       /** Task */
       task: string;
     };
+    /**
+     * StartCommand
+     * @description Запустить попытку на узле `worker`. Без `container` — встроенная нагрузка: `work` единиц времени
+     *     модели по `time_scale_ms` миллисекунд, с чекпоинтами каждые `checkpoint_interval` единиц.
+     */
+    StartCommand: {
+      /** Attempt */
+      attempt: number;
+      /** Checkpoint Interval */
+      checkpoint_interval?: number | null;
+      /** Command Id */
+      command_id: number;
+      container?: components["schemas"]["ContainerSpec"] | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "start";
+      /** Limits */
+      limits: {
+        [key: string]: number;
+      };
+      /**
+       * Resume From
+       * @default 0
+       */
+      resume_from?: number;
+      /** Run Id */
+      run_id: string;
+      /** Task */
+      task: string;
+      /** Time Scale Ms */
+      time_scale_ms: number;
+      /** Work */
+      work: number;
+      /** Worker */
+      worker: string;
+    };
     /** StartRecord */
     StartRecord: {
       /** Attempt */
@@ -992,6 +1323,27 @@ export interface components {
       new_start: number;
       /** Old Start */
       old_start: number;
+      /** Task */
+      task: string;
+    };
+    /** StopCommand */
+    StopCommand: {
+      /** Attempt */
+      attempt: number;
+      /** Command Id */
+      command_id: number;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "stop";
+      /**
+       * Reason
+       * @enum {string}
+       */
+      reason: "preempt" | "worker_down" | "cancel";
+      /** Run Id */
+      run_id: string;
       /** Task */
       task: string;
     };
@@ -1233,6 +1585,15 @@ export interface components {
         [key: string]: number;
       };
     };
+    /** WorkerLive */
+    WorkerLive: {
+      /** Agent */
+      agent: string;
+      /** Dropped */
+      dropped: boolean;
+      /** Up */
+      up: boolean;
+    };
     /** WorkerRecord */
     WorkerRecord: {
       /** Seq */
@@ -1256,6 +1617,165 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  events_v1_agents__agent_id__events_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        agent_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["EventsBatch"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EventsAck"];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+    };
+  };
+  hello_v1_agents__agent_id__hello_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        agent_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Hello"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HelloAck"];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+    };
+  };
+  poll_v1_agents__agent_id__poll_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        agent_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Poll"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PollReply"];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+    };
+  };
   policies_v1_policies_get: {
     parameters: {
       query?: never;
@@ -1329,6 +1849,15 @@ export interface operations {
           "application/json": components["schemas"]["RunOut"];
         };
       };
+      /** @description Accepted */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LiveStarted"];
+        };
+      };
       /** @description Bad Request */
       400: {
         headers: {
@@ -1338,8 +1867,26 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };
@@ -1423,8 +1970,26 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };
@@ -1479,6 +2044,92 @@ export interface operations {
       };
     };
   };
+  actions_v1_runs__run_id__actions_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        run_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          [key: string]: unknown;
+        };
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LiveOut"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+    };
+  };
+  containers_v1_runs__run_id__containers_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        run_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LiveOut"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+    };
+  };
   get_events_v1_runs__run_id__events_get: {
     parameters: {
       query?: {
@@ -1511,8 +2162,26 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };
@@ -1600,8 +2269,26 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };
@@ -1689,8 +2376,26 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };
@@ -1774,8 +2479,26 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };
@@ -1879,8 +2602,26 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };
@@ -1968,8 +2709,26 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };
@@ -2055,8 +2814,26 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };

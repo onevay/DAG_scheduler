@@ -41,6 +41,7 @@ packages = [
     "expsched.pipeline",
     "expsched.api",
     "expsched.agent",
+    "expsched.emulate",
 ]
 plugins = ["pydantic.mypy"]
 
