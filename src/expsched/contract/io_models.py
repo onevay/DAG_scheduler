@@ -17,6 +17,7 @@ ResMap = dict[
 ]
 Id = Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")]
 PolicyName = Literal["fifo", "fifo_skip", "priority", "priority_backfill", "cpsat"]
+RetryExitCode = Annotated[int, Field(strict=True, ge=1, le=255)]
 
 
 class Strict(BaseModel):
@@ -35,7 +36,15 @@ class TaskIn(Strict):
     preemptible: bool = False
     checkpoint_interval: Annotated[int, Field(ge=1)] | None = None
     max_retries: Annotated[int, Field(ge=0, le=20)] = 2
+    retry_exit_codes: list[RetryExitCode] = Field(default_factory=list, max_length=255)
+    retry_backoff: Annotated[int, Field(ge=0)] = 0
     constraints: dict[str, str] = {}
+
+    @model_validator(mode="after")
+    def _canonical_retry_exit_codes(self) -> TaskIn:
+        if self.retry_exit_codes != sorted(set(self.retry_exit_codes)):
+            raise ValueError("retry_exit_codes must be in canonical strictly increasing order")
+        return self
 
 
 class WorkerIn(Strict):
@@ -109,6 +118,8 @@ def to_task(t: TaskIn) -> Task:
         preemptible=t.preemptible,
         ckpt=t.checkpoint_interval,
         max_retries=t.max_retries,
+        retry_exit_codes=tuple(t.retry_exit_codes),
+        retry_backoff=t.retry_backoff,
         constraints=tuple(sorted(t.constraints.items())),
     )
 

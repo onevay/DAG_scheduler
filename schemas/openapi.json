@@ -2107,6 +2107,22 @@
             },
             "title": "Resources",
             "type": "object"
+          },
+          "retry_backoff": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Retry Backoff",
+            "type": "integer"
+          },
+          "retry_exit_codes": {
+            "items": {
+              "maximum": 255.0,
+              "minimum": 1.0,
+              "type": "integer"
+            },
+            "maxItems": 255,
+            "title": "Retry Exit Codes",
+            "type": "array"
           }
         },
         "required": [

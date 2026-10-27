@@ -34,8 +34,10 @@ class Task:
     deps: tuple[str, ...] = ()  # id задач, которые должны успешно завершиться раньше
     preemptible: bool = False
     ckpt: int | None = None  # интервал чекпоинта; None — чекпоинтов нет
-    max_retries: int = 2  # сколько раз задачу можно перезапустить после отказа узла
+    max_retries: int = 2  # сколько дополнительных попыток разрешено после retryable failure
     constraints: Labels = ()  # метки, которые обязаны быть у узла
+    retry_exit_codes: tuple[int, ...] = ()  # online exit codes, которые разрешают новую попытку
+    retry_backoff: int = 0  # online-задержка перед повторным попаданием в READY
 
     def __post_init__(self) -> None:
         if self.duration < 1:  # с нулевой длительностью симуляция может не завершиться
@@ -48,6 +50,14 @@ class Task:
             raise ValueError(f"task {self.id!r}: ckpt must be >= 1, got {self.ckpt}")
         if self.max_retries < 0:
             raise ValueError(f"task {self.id!r}: max_retries must be >= 0, got {self.max_retries}")
+        if self.retry_backoff < 0:
+            raise ValueError(f"task {self.id!r}: retry_backoff must be >= 0, got {self.retry_backoff}")
+        if tuple(sorted(set(self.retry_exit_codes))) != self.retry_exit_codes or any(
+            code < 1 or code > 255 for code in self.retry_exit_codes
+        ):
+            raise ValueError(
+                f"task {self.id!r}: retry_exit_codes must be unique sorted integers in 1..255"
+            )
         priority_class(self.priority)  # бросает ValueError вне диапазона
 
     @property

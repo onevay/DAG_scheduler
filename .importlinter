@@ -11,7 +11,7 @@ layers =
     expsched.pipeline
     expsched.explain | expsched.metrics
     expsched.verify
-    expsched.engine | expsched.policies
+    expsched.online | expsched.engine | expsched.policies
     expsched.validation
     expsched.analysis | expsched.contract
     expsched.domain
