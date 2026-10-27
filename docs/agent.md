@@ -14,24 +14,67 @@
 
 ```bash
 uv run python -m expsched.agent --scheduler http://127.0.0.1:8000 --id laptop
+uv run python -m expsched.agent --config agent.toml           # настройки из файла
+uv run python -m expsched.agent check --config agent.toml     # проверить, ничего не запуская
 ```
+
+Настройки — по умолчанию, поверх них файл `--config` (таблица `[agent]`, пример —
+[`containers/agent/agent.toml`](../containers/agent/agent.toml)), поверх файла — параметры командной строки.
+Имена в файле — как у параметров (`ram_mb`, `allow_images`, …); неизвестное имя — ошибка запуска.
 
 | Параметр | По умолчанию | |
 |---|---|---|
 | `--id` | — | id агента, как в поле `agent` узлов |
+| `--scheduler` | `http://127.0.0.1:8000` | адрес планировщика |
 | `--runtime` | `docker` | `docker`, `podman`, `gravesentinel` (чекпоинты CRIU) или `fake` — подделка без контейнеров для проверок |
 | `--workload-image` | `expsched-workload:local` | образ встроенной нагрузки (`make workload-image`); у gravesentinel — `localhost/expsched-workload:local` |
 | `--socket`, `--hypervisor-uid` | `/run/gravesentinel/hypervisor.sock`, `0` | сокет гипервизора gravesentinel и пользователь, от которого он обязан работать |
 | `--state` | `.expsched-agent` | каталог журнала `state.jsonl` и чекпоинтов задач |
 | `--cpu`, `--ram-mb`, `--gpu` | машина минус запас | ёмкость под задачи: ядра минус одно, ОЗУ минус 2 ГиБ, GPU по `nvidia-smi` |
 | `--max-containers` | 4 | сколько попыток одновременно |
-| `--allow-image` | — | разрешённый образ задач; можно повторять |
+| `--allow-image` | — | разрешённый образ задач; можно повторять (в файле — `allow_images`) |
+| `--token-file` | — | файл с токеном, если нет `EXPSCHED_AGENT_TOKEN`; в самом конфиге токена нет |
+| `--log-format` | `text` | `json` — запись журнала строкой JSON (`at`, `level`, `logger`, `message`) |
+| `--stop-on-exit` | нет | при остановке агента остановить и его контейнеры |
+| `retry_max_s` (только в файле) | 60 | предел паузы между попытками связаться с планировщиком |
 
 Журнал — единственное состояние агента: команды, id контейнеров, события и подтверждения. Каждая запись
 сбрасывается на диск до того, как агент на неё опирается. После перезапуска агент проигрывает журнал и
 сверяется со средой: свою попытку без контейнера запускает заново (её команда уже подтверждена и не придёт
 снова), контейнер, запущенный перед падением, подхватывает, чужие и законченные останавливает, пропавшие
 сообщает как `lost`. Недописанная последняя строка журнала (падение посреди записи) пропускается.
+
+Связь с планировщиком потеряна (сеть, ответ 5xx, 403, 409) — агент ждёт и начинает заново с `hello`:
+пауза 1, 2, 4 … секунды до `retry_max_s`, с разбросом ±20 %, чтобы агенты, потерявшие сервер разом, не
+возвращались хором; удачный `hello` сбрасывает её. SIGTERM и SIGINT завершают работу после текущего обмена
+(опрос длится до 25 с): журнал уже на диске, контейнеры остаются и подхватываются при следующем запуске; с
+`--stop-on-exit` агент их останавливает и, если сервер на связи, успевает сообщить об этом.
+
+`check` проверяет и печатает по строке на пункт: среда (Docker/Podman — демон и образ нагрузки,
+gravesentinel — `GetHealth` по сокету), каталог состояния доступен для записи, токен задан, планировщик
+отвечает на `hello` этим токеном. Код выхода 1, если что-то не готово.
+
+## Служба
+
+Агент — обычный процесс без своего демонизирования; на Linux его держит systemd
+([`containers/agent/expsched-agent.service`](../containers/agent/expsched-agent.service)): перед запуском —
+`check`, при сбое — перезапуск через 5 с, остановка — SIGTERM с запасом 60 с.
+
+```bash
+sudo useradd --system --home /var/lib/expsched-agent expsched
+sudo uv venv /opt/expsched/.venv && sudo uv pip install --python /opt/expsched/.venv .   # из корня репозитория
+sudo install -d -m 0750 /etc/expsched
+sudo install -m 0640 -g expsched containers/agent/agent.toml /etc/expsched/agent.toml      # поправить id, адрес
+echo "$EXPSCHED_AGENT_TOKEN" | sudo tee /etc/expsched/agent.token > /dev/null
+sudo chgrp expsched /etc/expsched/agent.token && sudo chmod 0640 /etc/expsched/agent.token
+sudo install -m 0644 containers/agent/expsched-agent.service /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now expsched-agent
+journalctl -u expsched-agent -f
+```
+
+Пользователю службы нужен доступ к среде: группа `docker` (так в юните), для rootful Podman — его сокет, для
+gravesentinel — группа сокета гипервизора (`--socket-gid` демона) и uid, равный его `--scheduler-uid`.
+Каталог состояния — `StateDirectory` (`/var/lib/expsched-agent`), как `state` в примере конфига.
 
 ## Контейнеры
 

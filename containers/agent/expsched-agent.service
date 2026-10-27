@@ -1,0 +1,28 @@
+# Агент expsched как служба systemd: /etc/systemd/system/expsched-agent.service
+# Установка — docs/agent.md, раздел «Служба».
+[Unit]
+Description=expsched agent: runs scheduled attempts in containers
+Wants=network-online.target
+After=network-online.target docker.service podman.socket gravesentinel-hypervisor.service
+
+[Service]
+Type=simple
+User=expsched
+Group=expsched
+# Доступ к Docker; для gravesentinel — группа сокета гипервизора (его --socket-gid), а uid — его --scheduler-uid
+SupplementaryGroups=docker
+StateDirectory=expsched-agent
+StateDirectoryMode=0700
+ExecStartPre=/opt/expsched/.venv/bin/python -m expsched.agent check --config /etc/expsched/agent.toml
+ExecStart=/opt/expsched/.venv/bin/python -m expsched.agent --config /etc/expsched/agent.toml
+# SIGTERM: агент дописывает журнал и выходит после текущего обмена (опрос — до 25 с)
+KillSignal=SIGTERM
+TimeoutStopSec=60
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -129,6 +129,12 @@ class Agent:
         self._write({"kind": "ack", "next_event_seq": ack.next_event_seq})
         self.outbox = [e for e in self.outbox if e.seq >= ack.next_event_seq]
 
+    def stop_all(self) -> None:
+        """Остановить все свои контейнеры: агент уходит и не оставляет работу без присмотра."""
+        for key, attempt in sorted(self.attempts.items()):
+            if not attempt.done:
+                self._stop(key)
+
     # ---- контейнеры ----
 
     def reconcile(self) -> None:
