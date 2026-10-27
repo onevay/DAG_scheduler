@@ -33,23 +33,27 @@ assert scheduler.statuses["train"] == "SUCCEEDED"
 
 - `OnlineScheduler(problem, policy)` — coordinator с одним последовательным writer;
 - `StartIntent` — неизменяемое описание попытки запуска;
-- `TaskPhase` — `PENDING`, `READY`, `STARTING`, `RUNNING`, `SUCCEEDED`, `FAILED`, `BLOCKED`;
+- `ReservationIntent` — текущий promise policy `(task, worker, t_res)`;
+- `PreemptionIntent` — запрос checkpoint/stop конкретной running attempt;
+- `TaskPhase` — `PENDING`, `READY`, `RETRY_WAIT`, `STARTING`, `RUNNING`, `PREEMPTING`, `SUCCEEDED`, `FAILED`, `BLOCKED`;
 - `OnlineError` и специализированные ошибки валидации.
 
 Основные операции `OnlineScheduler`:
 
 | Метод | Назначение |
 |---|---|
-| `plan(now)` | Получить и атомарно применить START-решения policy; вернуть упорядоченные intents |
+| `plan(now)` | Атомарно валидировать START/RESERVE/PREEMPT batch; вернуть starts либо создать `preemptions` |
 | `ack_start(event_id, intent, now=...)` | Подтвердить реальный запуск |
-| `reject_start(event_id, intent, now=...)` | Отклонить запуск, освободить intent и вернуть задачу в READY |
-| `task_exited(event_id, intent, success=..., now=...)` | Зафиксировать фактический успешный/неуспешный exit |
+| `reject_start(event_id, intent, now=..., retryable=...)` | Отклонить запуск, освободить intent и повторить его в пределах retry budget либо завершить задачу |
+| `task_exited(event_id, intent, success=..., retryable=..., now=...)` | Зафиксировать фактический exit и уже классифицированную executor-ом retryability |
+| `complete_preemption(event_id, intent, now=...)` | Подтвердить durable checkpoint + proven stop, освободить ресурсы и вернуть victim в READY |
 | `submit_task(event_id, task, now=...)` | Добавить задачу, зависимости которой уже известны |
 | `worker_down(...)` / `worker_up(...)` | Изменить доступность существующего worker |
 | `snapshot()` | Получить текущий `Snapshot` для наблюдения |
 
-`now` — неотрицательное целое логическое время; назад оно не переводится. `statuses`, `problem` и `now`
-доступны как read-only свойства.
+`now` — неотрицательное целое логическое время; назад оно не переводится. `statuses`, `attempts`,
+`retry_ready_at`, `reservations`, `preemptions`, `problem` и `now` доступны как read-only свойства. Каждый `StartIntent` имеет стабильный
+`attempt_id` вида `<task>:<attempt>`.
 
 ## Lifecycle и ресурсы
 
@@ -57,11 +61,17 @@ assert scheduler.statuses["train"] == "SUCCEEDED"
 stateDiagram-v2
     [*] --> PENDING
     PENDING --> READY: release и все deps SUCCEEDED
+    READY --> READY: plan / reservation promise
     READY --> STARTING: plan / start intent
     STARTING --> RUNNING: ack_start
-    STARTING --> READY: reject_start
+    STARTING --> RETRY_WAIT: retryable reject and budget remains
+    STARTING --> FAILED: non-retryable or exhausted reject
+    RUNNING --> PREEMPTING: policy PREEMPT
+    PREEMPTING --> READY: checkpointed stop acknowledged
     RUNNING --> SUCCEEDED: observed successful exit
-    RUNNING --> FAILED: observed failed exit
+    RUNNING --> RETRY_WAIT: retryable failed exit and budget remains
+    RUNNING --> FAILED: non-retryable or exhausted exit
+    RETRY_WAIT --> READY: retry_backoff elapsed
     FAILED --> BLOCKED: descendants
 ```
 
@@ -77,9 +87,12 @@ terminal по наступлению прогноза. Если задача п�
 остаток и сдвигает `end_pred` как минимум на следующий tick. Terminal-событие приходит только от executor через
 `task_exited`.
 
-Успешный exit освобождает прямых зависимых после выполнения всех их dependencies. Неуспешный exit терминален
-для текущего slice и рекурсивно переводит незавершённых потомков в `BLOCKED`; `Task.max_retries` здесь пока не
-интерпретируется.
+Успешный exit освобождает прямых зависимых после выполнения всех их dependencies. Для failed exit или
+rejected start вызывающий executor явно передаёт `retryable`: scheduler не знает runtime-specific error codes.
+Если failure retryable и номер текущей попытки не превышает `Task.max_retries`, задача переходит в
+`RETRY_WAIT`, а через `Task.retry_backoff` снова попадает в обычный `READY` snapshot. Иначе она становится
+`FAILED` и рекурсивно переводит незавершённых потомков в `BLOCKED`. `max_retries` — число дополнительных
+попыток после первой; каждый новый intent получает следующий attempt number и новый `attempt_id`.
 
 ## Детерминизм и защита от повторов
 
@@ -88,9 +101,17 @@ Policy видит те же `Problem`, `Task`, `Resources`, `Snapshot`, `Decisio
 хотя бы одно решение ошибочно, ни один intent из списка не создаётся. Валидные intents возвращаются в
 каноническом порядке `(task, worker, attempt)` независимо от порядка словарей.
 
-Поддерживается только `Decision(action="START", ...)`. `PREEMPT` и `RESERVE` завершаются явной
-`UnsupportedDecisionError`; поэтому для первого slice подходят существующие `fifo`, `fifo_skip` и `priority`.
-`priority_backfill` допустим только в эпохах, где он не выдаёт `RESERVE`.
+`Decision(action="START" | "RESERVE" | "PREEMPT", ...)` валидируются одним атомарным batch. Если batch
+содержит PREEMPT, online engine создаёт только preemption intents и не применяет START, который policy
+рассчитала на ещё не освобождённых ресурсах. После подтверждённых checkpoint/stop executor вызывает
+`complete_preemption`, и обычная policy на следующей эпохе заново выбирает urgent START. Поэтому async runtime
+никогда не получает ресурсы жертвы раньше доказанного stop.
+
+`RESERVE` не занимает ресурсы сам по себе: это текущий promise policy начать READY-задачу на worker не позже
+`t_res`. На каждом `plan(now)` policy заново вычисляет его из фактических runs и положительных end forecasts.
+Если реальная задача пережила прогноз, её `end_pred` сдвигается, и reservation тоже сдвигается вместо
+синтетического завершения. Worker down/up и другие изменения, делающие старый promise потенциально неверным,
+очищают его до следующего policy epoch.
 
 Каждая внешняя мутация имеет непустой `event_id`. Повтор идентичного события — no-op даже после продвижения
 логического времени; повтор того же id с другим типом, временем или payload даёт `EventConflictError`.
@@ -110,4 +131,5 @@ Policy видит те же `Problem`, `Task`, `Resources`, `Snapshot`, `Decisio
 - входной `Problem` должен иметь пустой `events` и строгий DAG с известными dependencies и хотя бы одним
   eligible worker для каждой задачи;
 - `submit_task` добавляет только новую вершину со ссылками на уже известные задачи;
-- retry, cancellation, preemption и reservation пока не реализованы.
+- retry, reservation и scheduler-side preemption handshake реализованы; durable checkpoint/stop/restore
+  orchestration предоставляет внешний control plane; cancellation пока не реализован.

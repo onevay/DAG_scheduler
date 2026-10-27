@@ -49,6 +49,38 @@ def test_to_domain_maps_fields():
     assert d.eligible(train) == ("node-A",)
 
 
+def test_online_retry_fields_are_canonical_and_map_to_domain():
+    raw = problem(
+        tasks=[
+            {
+                "id": "task",
+                "duration": 1,
+                "retry_exit_codes": [42, 137],
+                "retry_backoff": 5,
+                "max_retries": 3,
+            }
+        ]
+    )
+    task = to_domain(load(raw)).tasks["task"]
+    assert task.retry_exit_codes == (42, 137)
+    assert task.retry_backoff == 5
+    assert task.max_retries == 3
+
+    for retry_exit_codes in ([42, 42], [137, 42], [0], [256], [True]):
+        with pytest.raises(ValidationError):
+            load(
+                problem(
+                    tasks=[
+                        {
+                            "id": "task",
+                            "duration": 1,
+                            "retry_exit_codes": retry_exit_codes,
+                        }
+                    ]
+                )
+            )
+
+
 def test_submit_event_carries_task():
     ev = {"time": 9, "type": "submit_task", "task": {"id": "urgent", "duration": 3, "priority": 10}}
     d = to_domain(load(problem(events=[ev])))

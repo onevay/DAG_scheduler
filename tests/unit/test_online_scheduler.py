@@ -6,15 +6,15 @@ import pytest
 
 from expsched.domain.models import Problem, Task, Worker
 from expsched.domain.resources import Resources
-from expsched.domain.snapshot import Action, Decision, Policy, Snapshot
+from expsched.domain.snapshot import Decision, Policy, Snapshot
 from expsched.online import (
     EventConflictError,
     InvalidTransitionError,
     OnlineDecisionError,
     OnlineScheduler,
     TaskPhase,
-    UnsupportedDecisionError,
 )
+from expsched.policies.backfill import BackfillPolicy
 from expsched.policies.fifo import FifoPolicy
 from expsched.policies.priority import PriorityPolicy
 
@@ -101,6 +101,50 @@ def test_success_releases_dependency_only_after_observed_exit() -> None:
     assert (child_intent.task, child_intent.issued_at) == ("child", 7)
 
 
+def test_retryable_exit_waits_for_backoff_and_uses_a_new_attempt_identity() -> None:
+    root = Task(
+        "a",
+        1,
+        Resources({"cpu": 1}),
+        max_retries=1,
+        retry_exit_codes=(42,),
+        retry_backoff=3,
+    )
+    child = Task("b", 1, Resources({"cpu": 1}), deps=("a",))
+    scheduler = OnlineScheduler(make_problem(root, child), FifoPolicy())
+
+    (first,) = scheduler.plan(0)
+    assert first.attempt_id == "a:1"
+    scheduler.ack_start("ack-a-1", first, now=0)
+    scheduler.task_exited("exit-a-1", first, success=False, retryable=True, now=1)
+
+    assert scheduler.statuses == {"a": TaskPhase.RETRY_WAIT, "b": TaskPhase.PENDING}
+    assert scheduler.retry_ready_at == {"a": 4}
+    assert scheduler.plan(3) == ()
+
+    (second,) = scheduler.plan(4)
+    assert (second.attempt, second.attempt_id) == (2, "a:2")
+    scheduler.ack_start("ack-a-2", second, now=4)
+    scheduler.task_exited("exit-a-2", second, success=False, retryable=True, now=5)
+
+    assert scheduler.statuses == {"a": TaskPhase.FAILED, "b": TaskPhase.BLOCKED}
+    assert scheduler.retry_ready_at == {}
+
+
+def test_rejected_starts_consume_the_same_retry_budget() -> None:
+    task = Task("task", 1, Resources({"cpu": 1}), max_retries=1)
+    scheduler = OnlineScheduler(make_problem(task), FifoPolicy())
+
+    (first,) = scheduler.plan(0)
+    scheduler.reject_start("reject-1", first, now=0, retryable=True)
+    assert scheduler.statuses["task"] is TaskPhase.READY
+
+    (second,) = scheduler.plan(0)
+    scheduler.reject_start("reject-2", second, now=0, retryable=True)
+    assert scheduler.statuses["task"] is TaskPhase.FAILED
+    assert scheduler.plan(0) == ()
+
+
 def test_failed_exit_blocks_all_unfinished_descendants() -> None:
     root = Task("a", 1, Resources({"cpu": 1}))
     child = Task("b", 1, Resources({"cpu": 1}), deps=("a",))
@@ -160,15 +204,134 @@ def test_invalid_multi_start_plan_is_atomic() -> None:
     assert scheduler.snapshot().free["worker"] == Resources({"cpu": 1})
 
 
-@pytest.mark.parametrize("action", ["PREEMPT", "RESERVE"])
-def test_unsupported_policy_actions_fail_explicitly(action: Action) -> None:
+def test_preemption_holds_resources_until_checkpointed_stop_is_acknowledged() -> None:
+    low = Task("low", 10, Resources({"cpu": 1}), priority=0, preemptible=True, ckpt=2)
+    urgent = Task("urgent", 2, Resources({"cpu": 1}), priority=9, release=3)
+
+    def decide(snapshot: Snapshot) -> list[Decision]:
+        if "low" in snapshot.running and "urgent" in snapshot.ready:
+            return [
+                Decision(
+                    "PREEMPT",
+                    "low",
+                    "worker",
+                    {"code": "PREEMPTED_BY", "by": "urgent"},
+                ),
+                Decision("START", "urgent", "worker", {"code": "PREEMPTION_START"}),
+            ]
+        for task_id in ("urgent", "low"):
+            if task_id in snapshot.ready:
+                return [Decision("START", task_id, "worker")]
+        return []
+
+    scheduler = OnlineScheduler(
+        make_problem(low, urgent, capacity=Resources({"cpu": 1})),
+        StaticPolicy(decide),
+    )
+    (low_start,) = scheduler.plan(0)
+    scheduler.ack_start("ack-low", low_start, now=0)
+
+    assert scheduler.plan(3) == ()
+    (preemption,) = scheduler.preemptions
+    assert (preemption.task, preemption.worker, preemption.attempt_id) == (
+        "low",
+        "worker",
+        "low:1",
+    )
+    assert scheduler.statuses == {
+        "low": TaskPhase.PREEMPTING,
+        "urgent": TaskPhase.READY,
+    }
+    assert scheduler.snapshot().free["worker"] == Resources()
+    with pytest.raises(InvalidTransitionError, match="preemption is in flight"):
+        scheduler.plan(3)
+
+    scheduler.complete_preemption("preempted-low-1", preemption, now=4)
+    assert scheduler.statuses == {"low": TaskPhase.READY, "urgent": TaskPhase.READY}
+    assert scheduler.snapshot().free["worker"] == Resources({"cpu": 1})
+    assert scheduler.snapshot().preempt_count == {"low": 1}
+
+    (urgent_start,) = scheduler.plan(4)
+    assert urgent_start.task == "urgent"
+    scheduler.ack_start("ack-urgent", urgent_start, now=4)
+    scheduler.task_exited("exit-urgent", urgent_start, success=True, now=6)
+
+    (resumed,) = scheduler.plan(6)
+    assert (resumed.task, resumed.attempt, resumed.duration_estimate, resumed.worker) == (
+        "low",
+        2,
+        6,
+        "worker",
+    )
+
+
+def test_invalid_reservation_makes_the_whole_policy_epoch_atomic() -> None:
+    tasks = [Task(key, 1, Resources({"cpu": 1})) for key in ("a", "b")]
+    policy = StaticPolicy(
+        lambda snapshot: [
+            Decision("START", "a", "worker"),
+            Decision("RESERVE", "b", "worker", {"t_res": snapshot.t - 1}),
+        ]
+    )
+    scheduler = OnlineScheduler(make_problem(*tasks), policy)
+
+    with pytest.raises(OnlineDecisionError, match="t_res"):
+        scheduler.plan(1)
+    assert scheduler.statuses == {"a": TaskPhase.READY, "b": TaskPhase.READY}
+    assert scheduler.reservations == ()
+    assert scheduler.snapshot().free["worker"] == scheduler.problem.workers["worker"].capacity
+
+
+def test_priority_backfill_reservation_recomputes_when_a_real_task_overruns() -> None:
+    tasks = [
+        Task("a", 4, Resources({"cpu": 2}), priority=6),
+        Task("big", 2, Resources({"cpu": 4}), priority=3),
+        Task("short", 3, Resources({"cpu": 1})),
+        Task("long", 6, Resources({"cpu": 1})),
+    ]
+    scheduler = OnlineScheduler(
+        make_problem(*tasks, capacity=Resources({"cpu": 4})),
+        BackfillPolicy(),
+    )
+
+    intents = scheduler.plan(0)
+    assert [intent.task for intent in intents] == ["a", "short"]
+    assert [(item.task, item.worker, item.t_res) for item in scheduler.reservations] == [
+        ("big", "worker", 4)
+    ]
+    assert next(intent for intent in intents if intent.task == "short").reason == {
+        "code": "BACKFILL",
+        "head": "big",
+        "t_res": 4,
+    }
+    for intent in intents:
+        scheduler.ack_start(f"ack-{intent.task}", intent, now=0)
+
+    short = next(intent for intent in intents if intent.task == "short")
+    scheduler.task_exited("exit-short", short, success=True, now=3)
+    assert scheduler.plan(4) == ()
+    assert [(item.task, item.t_res) for item in scheduler.reservations] == [("big", 5)]
+
+    running = next(intent for intent in intents if intent.task == "a")
+    scheduler.task_exited("exit-a", running, success=True, now=5)
+    next_intents = scheduler.plan(5)
+    assert [intent.task for intent in next_intents] == ["big"]
+    assert [(item.task, item.t_res) for item in scheduler.reservations] == [("long", 7)]
+
+
+def test_worker_change_clears_a_stale_reservation_before_replanning() -> None:
     task = Task("task", 1, Resources({"cpu": 1}))
-    policy = StaticPolicy(lambda snapshot: [Decision(action, "task", "worker")])
+    policy = StaticPolicy(
+        lambda snapshot: [
+            Decision("RESERVE", "task", "worker", {"t_res": snapshot.t + 5})
+        ]
+    )
     scheduler = OnlineScheduler(make_problem(task), policy)
 
-    with pytest.raises(UnsupportedDecisionError, match=f"does not support {action}"):
-        scheduler.plan(0)
-    assert scheduler.statuses["task"] is TaskPhase.READY
+    assert scheduler.plan(0) == ()
+    assert [(item.task, item.t_res) for item in scheduler.reservations] == [("task", 5)]
+    scheduler.worker_down("down", "worker", now=1)
+    assert scheduler.reservations == ()
 
 
 @pytest.mark.parametrize("policy", [FifoPolicy(), PriorityPolicy()])
