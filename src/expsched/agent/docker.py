@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from collections.abc import Callable, Sequence
@@ -11,7 +12,7 @@ from pathlib import Path
 from typing import Literal
 
 from expsched.agent.runtime import State
-from expsched.contract.agent import StartCommand
+from expsched.contract.agent import StartCommand, Usage
 
 Run = Callable[[Sequence[str]], "subprocess.CompletedProcess[str]"]
 WORKLOAD_IMAGE = "expsched-workload:local"
@@ -40,6 +41,7 @@ class DockerRuntime:
         self.name: Literal["docker", "podman"] = binary
         self.workload_image = workload_image
         self.run = run
+        self.seen: dict[str, str] = {}  # время последней отданной строки журнала, по попытке
 
     def start(self, command: StartCommand, checkpoint_dir: Path) -> str:
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -78,6 +80,7 @@ class DockerRuntime:
 
     def stop(self, key: str) -> None:
         self.run([self.name, "rm", "-f", _name(key)])  # остановить и убрать; нет контейнера — не ошибка
+        self.seen.pop(key, None)
 
     def checkpoint(self, key: str) -> None:
         self.run([self.name, "kill", "--signal", "USR1", _name(key)])
@@ -106,6 +109,51 @@ class DockerRuntime:
             ]  # fmt: skip
         )
         return sorted(line for line in done.stdout.split() if line) if done.returncode == 0 else []
+
+    def usage(self, keys: list[str]) -> dict[str, Usage]:
+        """Одним `stats --no-stream` на все: он ждёт замера CPU около секунды."""
+        if not keys:
+            return {}
+        names = {_name(key): key for key in keys}
+        done = self.run([self.name, "stats", "--no-stream", "--format", "{{json .}}", *names])
+        out = {}
+        for line in done.stdout.splitlines():
+            try:
+                row = json.loads(line)
+                key = names[row["Name"].lstrip("/")]
+                cpu = float(row["CPUPerc"].rstrip("%") or 0)
+                out[key] = Usage(cpu_milli=round(cpu * 10), ram_mb=_mebibytes(row["MemUsage"].split("/")[0]))
+            except (ValueError, KeyError, AttributeError):
+                continue  # контейнер уже ушёл или строка не по формату — без замера
+        return out
+
+    def logs(self, key: str) -> list[str]:
+        """Строки после последней отданной: `--since` по её времени, повтор этой же секунды отбрасывается."""
+        args = [self.name, "logs", "--timestamps"]
+        if key in self.seen:
+            args += ["--since", self.seen[key]]
+        done = self.run([*args, _name(key)])
+        if done.returncode != 0:
+            return []
+        out = []
+        for line in (done.stdout + done.stderr).splitlines():
+            stamp, _, text = line.partition(" ")
+            if key in self.seen and stamp <= self.seen[key]:
+                continue
+            self.seen[key] = max(stamp, self.seen.get(key, ""))
+            out.append(text)
+        return out
+
+
+UNITS = {"b": 1, "kb": 1000, "kib": 1024, "mb": 1000**2, "mib": 1024**2, "gb": 1000**3, "gib": 1024**3}
+
+
+def _mebibytes(text: str) -> int:
+    """`12.5MiB`, `1.2GB`, `512kB` → МиБ."""
+    match = re.fullmatch(r"\s*([\d.]+)\s*([a-zA-Z]+)\s*", text)
+    if not match:
+        raise ValueError(f"unknown size {text!r}")
+    return round(float(match[1]) * UNITS[match[2].lower()] / 1024**2)
 
 
 def _name(key: str) -> str:

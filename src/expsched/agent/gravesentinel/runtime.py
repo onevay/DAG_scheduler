@@ -33,7 +33,7 @@ from expsched.agent.gravesentinel.client import (
     Submit,
 )
 from expsched.agent.runtime import State, write_progress
-from expsched.contract.agent import StartCommand
+from expsched.contract.agent import StartCommand, Usage
 
 log = logging.getLogger("expsched.agent")
 WORKLOAD_IMAGE = "localhost/expsched-workload:local"
@@ -178,6 +178,12 @@ class GravesentinelRuntime:
 
     def keys(self) -> list[str]:
         return sorted(self.attempts)
+
+    def usage(self, keys: list[str]) -> dict[str, Usage]:
+        return {}  # контейнеры у rootful Podman: агенту без root их потребление не видно
+
+    def logs(self, key: str) -> list[str]:
+        return []  # у гипервизора нет журнала контейнера, а `podman logs` агенту без root недоступен
 
     # ---- чекпоинты и операции ----
 

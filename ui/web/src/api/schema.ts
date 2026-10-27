@@ -162,6 +162,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/runs/{run_id}/containers/{task}/{attempt}/logs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Container Logs
+     * @description Журнал контейнера попытки — строки, что агент успел прислать; у сред без журнала он пуст.
+     */
+    get: operations["container_logs_v1_runs__run_id__containers__task___attempt__logs_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/runs/{run_id}/events": {
     parameters: {
       query?: never;
@@ -493,6 +513,7 @@ export interface components {
       state: string;
       /** Task */
       task: string;
+      usage?: components["schemas"]["Usage"] | null;
       /** Worker */
       worker: string;
     };
@@ -884,6 +905,14 @@ export interface components {
        */
       status: "running" | "done" | "cancelled";
     };
+    /**
+     * LogsOut
+     * @description Журнал контейнера попытки: последние строки, что прислал агент (сервер помнит до 500).
+     */
+    LogsOut: {
+      /** Lines */
+      lines: string[];
+    };
     /** MetricsOut */
     MetricsOut: {
       deadline_misses: components["schemas"]["DeadlineMisses"];
@@ -965,10 +994,28 @@ export interface components {
        */
       validation_mode?: "strict" | "lenient";
     };
-    /** Poll */
+    /**
+     * Poll
+     * @description Опрос команд; заодно — потребление идущих попыток и новые строки их журналов (без гарантии доставки:
+     *     потерянный опрос теряет и их).
+     */
     Poll: {
       /** Acked Command Id */
       acked_command_id: number;
+      /**
+       * Logs
+       * @default {}
+       */
+      logs?: {
+        [key: string]: string[];
+      };
+      /**
+       * Usage
+       * @default {}
+       */
+      usage?: {
+        [key: string]: components["schemas"]["Usage"];
+      };
       /**
        * Wait S
        * @default 25
@@ -1536,6 +1583,16 @@ export interface components {
      */
     TaskStatus:
       "PENDING" | "READY" | "RUNNING" | "SUCCEEDED" | "FAILED" | "INFEASIBLE" | "BLOCKED" | "CANCELLED";
+    /**
+     * Usage
+     * @description Сколько контейнер потребляет сейчас.
+     */
+    Usage: {
+      /** Cpu Milli */
+      cpu_milli: number;
+      /** Ram Mb */
+      ram_mb: number;
+    };
     /** ValidationError */
     ValidationError: {
       /** Context */
@@ -2202,6 +2259,48 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["LiveOut"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+    };
+  };
+  container_logs_v1_runs__run_id__containers__task___attempt__logs_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        run_id: string;
+        task: string;
+        attempt: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LogsOut"];
         };
       };
       /** @description Not Found */

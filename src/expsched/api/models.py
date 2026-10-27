@@ -6,6 +6,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import Field
 
+from expsched.contract.agent import Usage
 from expsched.contract.io_models import EventIn, Id, PolicyIn, PolicyName, ProblemIn, Strict
 from expsched.contract.output_models import (
     AttemptOut,
@@ -182,6 +183,13 @@ class ContainerOut(Strict):
     resume_from: int
     progress: int  # сохранено по последнему чекпоинту, в единицах модели
     detail: str | None
+    usage: Usage | None = None  # последний замер агента, пока контейнер идёт; среда без замеров — None
+
+
+class LogsOut(Strict):
+    """Журнал контейнера попытки: последние строки, что прислал агент (сервер помнит до 500)."""
+
+    lines: list[str]
 
 
 class WorkerLive(Strict):

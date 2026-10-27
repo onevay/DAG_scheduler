@@ -19,10 +19,12 @@ from expsched.contract.agent import (
     HelloAck,
     Poll,
     PollReply,
+    Usage,
 )
 
 COMMAND: TypeAdapter[Command] = TypeAdapter(Command)
 Listener = Callable[[AgentEvent], None]
+Telemetry = Callable[[str, int, Usage | None, list[str]], None]  # задача, попытка, потребление, строки
 
 
 class EventGap(ValueError):
@@ -54,6 +56,7 @@ class AgentRegistry:
         self.poll_s = poll_s
         self.agents: dict[str, _Agent] = {}
         self.listeners: dict[str, Listener] = {}
+        self.telemetry: dict[str, Telemetry] = {}  # по run_id: потребление и строки журналов попыток
 
     def hello(self, agent_id: str, hello: Hello) -> HelloAck:
         """Первый hello агента с запуска сервера: нумерация событий и команд — агента (сервер мог
@@ -78,6 +81,10 @@ class AgentRegistry:
         agent = self.agents.setdefault(agent_id, _Agent())
         agent.last_seen = self.clock()
         agent.commands = [c for c in agent.commands if c.command_id > poll.acked_command_id]
+        for key in sorted(set(poll.usage) | set(poll.logs)):
+            run_id, task, attempt = key.split(":")
+            if sink := self.telemetry.get(run_id):
+                sink(task, int(attempt), poll.usage.get(key), poll.logs.get(key, []))
         return PollReply(commands=list(agent.commands))
 
     def events(self, agent_id: str, batch: EventsBatch) -> EventsAck:

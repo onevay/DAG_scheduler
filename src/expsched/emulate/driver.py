@@ -10,11 +10,12 @@
 from __future__ import annotations
 
 import time
+from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from expsched.contract.agent import AgentEvent
+from expsched.contract.agent import AgentEvent, Usage
 from expsched.contract.io_models import ContainerSpec, PolicyIn, ProblemIn
 from expsched.domain.models import Event, EvType
 from expsched.domain.states import FINAL_STATUSES
@@ -25,6 +26,7 @@ from expsched.engine.executor import External
 from expsched.pipeline import RunResult, conclude, prepare
 
 Status = Literal["running", "done", "cancelled"]
+LOG_LINES = 500  # строк журнала контейнера, которые помнит сервер
 
 
 @dataclass
@@ -40,6 +42,7 @@ class Container:
     container_id: str | None = None
     progress: int = 0
     detail: str | None = None
+    usage: dict[str, int] | None = None  # последний замер агента, пока контейнер идёт
 
 
 class Emulation:
@@ -79,7 +82,9 @@ class Emulation:
             plan = prepared.simulator()
             plan.run_all()
             self.plan = conclude(prepared, plan)
+        self.logs: dict[tuple[str, int], deque[str]] = {}  # журналы контейнеров: последние LOG_LINES строк
         registry.listeners[run_id] = self.on_event
+        registry.telemetry[run_id] = self.on_telemetry
 
     def now(self) -> int:
         return round((self.clock() - self.started) * 1000) // self.scale_ms  # до мс: без хвостов float
@@ -105,6 +110,7 @@ class Emulation:
             if self.plan is not None:
                 self.result.result["shadow"] = self.shadow()
             self.registry.listeners.pop(self.run_id, None)
+            self.registry.telemetry.pop(self.run_id, None)
         return records
 
     def _finished(self) -> bool:
@@ -120,6 +126,8 @@ class Emulation:
         if c is None or self.status != "running":
             return
         c.state = event.type
+        if event.type in ("exited", "oom", "killed", "lost", "rejected"):
+            c.usage = None
         c.container_id = event.container_id or c.container_id
         c.detail = event.detail or c.detail
         if event.progress is not None:
@@ -130,12 +138,21 @@ class Emulation:
         elif event.type == "exited" and event.exit_code == 0:
             self.sim.inject(now, Finish(event.task, event.attempt))
         elif event.type in ("exited", "lost", "rejected"):
-            detail = event.detail or f"exit code {event.exit_code}"
+            code = f"exit code {event.exit_code}" if event.type == "exited" else None
+            detail = "; ".join(d for d in (code, event.detail) if d) or event.type
             self.sim.inject(now, Crash(event.task, event.attempt, "FAILED", detail))
         elif event.type == "oom":
-            self.sim.inject(
-                now, Crash(event.task, event.attempt, "OOM", "container exceeded its memory limit")
-            )
+            detail = "; ".join(d for d in ("container exceeded its memory limit", event.detail) if d)
+            self.sim.inject(now, Crash(event.task, event.attempt, "OOM", detail))
+
+    def on_telemetry(self, task: str, attempt: int, usage: Usage | None, lines: list[str]) -> None:
+        c = self.containers.get((task, attempt))
+        if c is None:
+            return
+        if usage is not None and c.state not in ("exited", "oom", "killed", "lost", "rejected"):
+            c.usage = usage.model_dump()
+        if lines:
+            self.logs.setdefault((task, attempt), deque(maxlen=LOG_LINES)).extend(lines)
 
     def checkpoint(self, task: str) -> None:
         run = self.sim.state.run.get(task)
@@ -173,6 +190,7 @@ class Emulation:
             self._stop(task, run.attempt, "cancel")
         self.status = "cancelled"
         self.registry.listeners.pop(self.run_id, None)
+        self.registry.telemetry.pop(self.run_id, None)
 
     def _start(self, r: dict[str, Any]) -> None:
         task, run = self.sim.state.tasks[r["task"]], self.sim.state.run[r["task"]]

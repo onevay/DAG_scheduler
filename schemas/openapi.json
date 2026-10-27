@@ -444,6 +444,16 @@
             "title": "Task",
             "type": "string"
           },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Usage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "worker": {
             "title": "Worker",
             "type": "string"
@@ -1476,6 +1486,24 @@
         "title": "LiveStarted",
         "type": "object"
       },
+      "LogsOut": {
+        "additionalProperties": false,
+        "description": "Журнал контейнера попытки: последние строки, что прислал агент (сервер помнит до 500).",
+        "properties": {
+          "lines": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Lines",
+            "type": "array"
+          }
+        },
+        "required": [
+          "lines"
+        ],
+        "title": "LogsOut",
+        "type": "object"
+      },
       "MetricsOut": {
         "additionalProperties": false,
         "properties": {
@@ -1672,11 +1700,39 @@
       },
       "Poll": {
         "additionalProperties": false,
+        "description": "Опрос команд; заодно — потребление идущих попыток и новые строки их журналов (без гарантии доставки:\nпотерянный опрос теряет и их).",
         "properties": {
           "acked_command_id": {
             "minimum": 0.0,
             "title": "Acked Command Id",
             "type": "integer"
+          },
+          "logs": {
+            "default": {},
+            "maxProperties": 64,
+            "patternProperties": {
+              "^[0-9a-f]{16}:[A-Za-z0-9][A-Za-z0-9_.-]{0,127}:[1-9][0-9]{0,5}$": {
+                "items": {
+                  "maxLength": 1024,
+                  "type": "string"
+                },
+                "maxItems": 200,
+                "type": "array"
+              }
+            },
+            "title": "Logs",
+            "type": "object"
+          },
+          "usage": {
+            "default": {},
+            "maxProperties": 64,
+            "patternProperties": {
+              "^[0-9a-f]{16}:[A-Za-z0-9][A-Za-z0-9_.-]{0,127}:[1-9][0-9]{0,5}$": {
+                "$ref": "#/components/schemas/Usage"
+              }
+            },
+            "title": "Usage",
+            "type": "object"
           },
           "wait_s": {
             "default": 25,
@@ -3192,6 +3248,28 @@
         "title": "TaskStatus",
         "type": "string"
       },
+      "Usage": {
+        "additionalProperties": false,
+        "description": "Сколько контейнер потребляет сейчас.",
+        "properties": {
+          "cpu_milli": {
+            "minimum": 0.0,
+            "title": "Cpu Milli",
+            "type": "integer"
+          },
+          "ram_mb": {
+            "minimum": 0.0,
+            "title": "Ram Mb",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "cpu_milli",
+          "ram_mb"
+        ],
+        "title": "Usage",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -4320,6 +4398,78 @@
           }
         },
         "summary": "Containers",
+        "tags": [
+          "emulation"
+        ]
+      }
+    },
+    "/v1/runs/{run_id}/containers/{task}/{attempt}/logs": {
+      "get": {
+        "description": "Журнал контейнера попытки — строки, что агент успел прислать; у сред без журнала он пуст.",
+        "operationId": "container_logs_v1_runs__run_id__containers__task___attempt__logs_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[0-9a-f]{16}$",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "task",
+            "required": true,
+            "schema": {
+              "title": "Task",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "attempt",
+            "required": true,
+            "schema": {
+              "title": "Attempt",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Container Logs",
         "tags": [
           "emulation"
         ]

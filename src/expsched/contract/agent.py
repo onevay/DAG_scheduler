@@ -85,9 +85,32 @@ class CheckpointCommand(AttemptRef):
 Command = Annotated[StartCommand | StopCommand | CheckpointCommand, Field(discriminator="kind")]
 
 
+AttemptKey = Annotated[str, Field(pattern=r"^[0-9a-f]{16}:[A-Za-z0-9][A-Za-z0-9_.-]{0,127}:[1-9][0-9]{0,5}$")]
+MAX_LOG_LINES = 200  # строк одной попытки за опрос
+MAX_LOG_LINE = 1024  # символов в строке; длиннее — обрезается агентом
+
+
+class Usage(Strict):
+    """Сколько контейнер потребляет сейчас."""
+
+    cpu_milli: Annotated[int, Field(ge=0)]  # тысячные доли ядра: 1500 — полтора ядра
+    ram_mb: Annotated[int, Field(ge=0)]
+
+
 class Poll(Strict):
+    """Опрос команд; заодно — потребление идущих попыток и новые строки их журналов (без гарантии доставки:
+    потерянный опрос теряет и их)."""
+
     acked_command_id: Annotated[int, Field(ge=0)]  # команды до этого номера агент записал в свой журнал
     wait_s: Annotated[int, Field(ge=0, le=30)] = 25
+    usage: Annotated[dict[AttemptKey, Usage], Field(max_length=64)] = {}
+    logs: Annotated[
+        dict[
+            AttemptKey,
+            Annotated[list[Annotated[str, Field(max_length=MAX_LOG_LINE)]], Field(max_length=MAX_LOG_LINES)],
+        ],
+        Field(max_length=64),
+    ] = {}
 
 
 class PollReply(Strict):

@@ -20,7 +20,7 @@ from fastapi import APIRouter, Path, Request
 from pydantic import TypeAdapter, ValidationError
 
 from expsched.api.errors import error_response
-from expsched.api.models import Action, CancelAction, CheckpointAction, ErrorOut, LiveOut
+from expsched.api.models import Action, CancelAction, CheckpointAction, ErrorOut, LiveOut, LogsOut
 from expsched.api.store import RUN_ID_PATTERN, RunStore
 from expsched.contract.io_models import PolicyIn, ProblemIn
 from expsched.emulate.agents import AgentRegistry
@@ -114,6 +114,17 @@ async def containers(request: Request, run_id: RunId) -> Any:
     if item is None:
         return error_response(404, "NOT_FOUND", f"run {run_id} is not running on agents in this server")
     return view(run_id, item.emulation)
+
+
+@router.get("/containers/{task}/{attempt}/logs", response_model=LogsOut, responses=ERRORS)
+async def container_logs(request: Request, run_id: RunId, task: str, attempt: int) -> Any:
+    """Журнал контейнера попытки — строки, что агент успел прислать; у сред без журнала он пуст."""
+    item = emulations(request).live.get(run_id)
+    if item is None or (task, attempt) not in item.emulation.containers:
+        return error_response(
+            404, "NOT_FOUND", f"run {run_id} has no attempt {attempt} of {task!r} on agents"
+        )
+    return {"lines": list(item.emulation.logs.get((task, attempt), ()))}
 
 
 @router.post("/actions", response_model=LiveOut, responses=ERRORS)

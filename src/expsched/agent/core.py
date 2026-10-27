@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -20,6 +21,8 @@ from pydantic import TypeAdapter
 
 from expsched.agent.runtime import Runtime, read_progress
 from expsched.contract.agent import (
+    MAX_LOG_LINE,
+    MAX_LOG_LINES,
     PROTOCOL,
     AgentEvent,
     AttemptRef,
@@ -32,10 +35,14 @@ from expsched.contract.agent import (
     PollReply,
     StartCommand,
     StopCommand,
+    Usage,
 )
 
 VERSION = "0.1.0"
 TERMINAL = frozenset({"rejected", "exited", "oom", "killed", "lost"})
+USAGE_EVERY_S = 5  # замер потребления: `docker stats` ждёт около секунды
+LOGS_EVERY_S = 2
+LOG_BYTES = 64 * 1024  # строк журналов на опрос, всех попыток вместе
 COMMAND: TypeAdapter[Command] = TypeAdapter(Command)
 
 
@@ -62,6 +69,7 @@ class Agent:
         max_containers: int = 4,
         allowed_images: Collection[str] = (),
         now: Callable[[], str] = utc_now,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.agent_id = agent_id
         self.runtime = runtime
@@ -76,6 +84,11 @@ class Agent:
         self.next_seq = 0
         self.outbox: list[AgentEvent] = []
         self.attempts: dict[str, Attempt] = {}
+        # Потребление и строки журналов — для показа, не для решений: не в журнале, теряются вместе с опросом
+        self.clock = clock
+        self.usage: dict[str, Usage] = {}
+        self.logs: dict[str, list[str]] = {}
+        self.measured = self.read_logs = -float("inf")
         self._replay()
 
     # ---- обмен с планировщиком ----
@@ -106,7 +119,9 @@ class Agent:
         self.acked(EventsAck(next_event_seq=ack.next_event_seq))
 
     def poll(self, wait_s: int) -> Poll:
-        return Poll(acked_command_id=self.last_command, wait_s=wait_s)
+        """Опрос несёт накопленные строки журналов (они отдаются один раз) и последний замер потребления."""
+        logs, self.logs = self.logs, {}
+        return Poll(acked_command_id=self.last_command, wait_s=wait_s, usage=self.usage, logs=logs)
 
     def handle(self, reply: PollReply) -> None:
         for command in sorted(reply.commands, key=lambda c: c.command_id):
@@ -168,13 +183,40 @@ class Agent:
                     if state.exit_code == 0
                     else attempt.progress
                 )
-                self._emit(attempt, "exited", exit_code=state.exit_code, progress=work)
+                tail = self._tail(key) if state.exit_code != 0 else None
+                self._emit(attempt, "exited", exit_code=state.exit_code, progress=work, detail=tail)
                 self.runtime.stop(key)
             elif state.status == "oom":
-                self._emit(attempt, "oom", progress=attempt.progress)
+                self._emit(attempt, "oom", progress=attempt.progress, detail=self._tail(key))
                 self.runtime.stop(key)
             elif state.status == "missing":
                 self._emit(attempt, "lost", progress=attempt.progress, detail="container disappeared")
+        self._observe()
+
+    def _tail(self, key: str) -> str | None:
+        """Последние строки журнала упавшего контейнера — причина сбоя в его событии (и в журнале прогона)."""
+        lines = [line[:MAX_LOG_LINE] for line in self.runtime.logs(key)]
+        if lines:
+            self.logs[key] = (self.logs.get(key, []) + lines)[-MAX_LOG_LINES:]
+        tail = " | ".join(line.strip() for line in self.logs.get(key, [])[-3:] if line.strip())
+        return f"log: {tail}"[:500] if tail else None
+
+    def _observe(self) -> None:
+        """Замер потребления и новые строки журналов идущих попыток — не чаще своих интервалов."""
+        live = sorted(k for k, a in self.attempts.items() if not a.done and a.container_id is not None)
+        now = self.clock()
+        if now - self.measured >= USAGE_EVERY_S:
+            self.measured = now
+            self.usage = self.runtime.usage(live) if live else {}
+        if now - self.read_logs >= LOGS_EVERY_S:
+            self.read_logs = now
+            for key in live:
+                lines = [line[:MAX_LOG_LINE] for line in self.runtime.logs(key)]
+                if lines:
+                    self.logs[key] = (self.logs.get(key, []) + lines)[-MAX_LOG_LINES:]
+            while sum(len(line) for lines in self.logs.values() for line in lines) > LOG_BYTES:
+                longest = max(self.logs, key=lambda k: len(self.logs[k]))
+                self.logs[longest] = self.logs[longest][len(self.logs[longest]) // 2 + 1 :]  # старые — прочь
 
     def _start(self, attempt: Attempt) -> None:
         command = attempt.command

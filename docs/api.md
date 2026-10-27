@@ -154,8 +154,14 @@ EXPSCHED_CORS_ORIGINS=http://localhost:5173 make api
 {"run_id": "...", "status": "running", "now": 37, "time_scale_ms": 1000,
  "workers": {"laptop": {"agent": "laptop", "up": true, "dropped": false}},
  "containers": [{"task": "train_small", "attempt": 1, "worker": "laptop", "agent": "laptop", "state": "checkpoint",
-                 "container_id": "3f2a…", "resume_from": 0, "progress": 10, "detail": null}]}
+                 "container_id": "3f2a…", "resume_from": 0, "progress": 10, "detail": null,
+                 "usage": {"cpu_milli": 1520, "ram_mb": 830}}]}
 ```
+
+`usage` — последний замер агента, пока контейнер идёт (у среды без замеров — `null`).
+`GET /v1/runs/{run_id}/containers/{task}/{attempt}/logs` — журнал контейнера попытки: `{"lines": [...]}`,
+последние 500 строк, что прислал агент; живёт в памяти сервера (у сохранённого прогона остаётся только хвост
+в причине сбоя упавших попыток). Нет такой попытки — 404.
 
 `POST /v1/runs/{run_id}/actions` — действие, ответ — то же состояние: `{"kind": "checkpoint", "task": "…"}` —
 сохранить чекпоинт сейчас; `{"kind": "worker_down", "worker": "…"}` — уронить узел (его контейнеры

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Protocol
 
-from expsched.contract.agent import StartCommand
+from expsched.contract.agent import StartCommand, Usage
 
 Status = Literal["running", "exited", "oom", "missing"]
 
@@ -34,6 +34,10 @@ class Runtime(Protocol):
 
     def keys(self) -> list[str]: ...  # попытки, контейнеры которых есть в среде
 
+    def usage(self, keys: list[str]) -> dict[str, Usage]: ...  # чего среда не знает — того нет в ответе
+
+    def logs(self, key: str) -> list[str]: ...  # новые строки журнала контейнера с прошлого вызова
+
 
 def read_progress(checkpoint_dir: Path) -> int | None:
     """Сохранённая работа из `checkpoint.json` задачи; None — чекпоинта нет или он недописан."""
@@ -57,6 +61,7 @@ class _FakeContainer:
     checkpoint_dir: Path
     done: float  # сделано работы, в единицах модели
     state: State
+    lines: list[str]  # журнал контейнера, ещё не отданный агенту
 
 
 class FakeRuntime:
@@ -71,8 +76,13 @@ class FakeRuntime:
 
     def start(self, command: StartCommand, checkpoint_dir: Path) -> str:
         self.started += 1
+        total = command.resume_from + command.work
         self.containers[command.key] = _FakeContainer(
-            command, checkpoint_dir, command.resume_from, State("running")
+            command,
+            checkpoint_dir,
+            command.resume_from,
+            State("running"),
+            [f"start: {command.resume_from} of {total} units"],
         )
         return f"fake-{self.started}"
 
@@ -103,14 +113,35 @@ class FakeRuntime:
                 mark = (min(int(c.done), total - 1)) // step * step
                 if mark > int(before) // step * step:
                     write_progress(c.checkpoint_dir, mark)
+                    c.lines.append(f"checkpoint: {mark} units")
             if c.done >= total:
                 c.state = State("exited", 0)
+                c.lines.append(f"done: {total} units")
+
+    def usage(self, keys: list[str]) -> dict[str, Usage]:
+        """Идущий контейнер занимает девять десятых своих ядер и половину своей памяти."""
+        out = {}
+        for key in keys:
+            c = self.containers.get(key)
+            if c and c.state.status == "running":
+                limits = c.command.limits
+                out[key] = Usage(cpu_milli=limits.get("cpu", 1) * 900, ram_mb=limits.get("ram_mb", 128) // 2)
+        return out
+
+    def logs(self, key: str) -> list[str]:
+        c = self.containers.get(key)
+        if c is None:
+            return []
+        lines, c.lines = c.lines, []
+        return lines
 
     def fail(self, key: str, exit_code: int = 1) -> None:
         self.containers[key].state = State("exited", exit_code)
+        self.containers[key].lines.append(f"error: exit code {exit_code}")
 
     def oom(self, key: str) -> None:
         self.containers[key].state = State("oom")
+        self.containers[key].lines.append("killed: out of memory")
 
     def vanish(self, key: str) -> None:
         del self.containers[key]

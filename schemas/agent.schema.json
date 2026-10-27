@@ -353,11 +353,39 @@
     },
     "Poll": {
       "additionalProperties": false,
+      "description": "Опрос команд; заодно — потребление идущих попыток и новые строки их журналов (без гарантии доставки:\nпотерянный опрос теряет и их).",
       "properties": {
         "acked_command_id": {
           "minimum": 0,
           "title": "Acked Command Id",
           "type": "integer"
+        },
+        "logs": {
+          "default": {},
+          "maxProperties": 64,
+          "patternProperties": {
+            "^[0-9a-f]{16}:[A-Za-z0-9][A-Za-z0-9_.-]{0,127}:[1-9][0-9]{0,5}$": {
+              "items": {
+                "maxLength": 1024,
+                "type": "string"
+              },
+              "maxItems": 200,
+              "type": "array"
+            }
+          },
+          "title": "Logs",
+          "type": "object"
+        },
+        "usage": {
+          "default": {},
+          "maxProperties": 64,
+          "patternProperties": {
+            "^[0-9a-f]{16}:[A-Za-z0-9][A-Za-z0-9_.-]{0,127}:[1-9][0-9]{0,5}$": {
+              "$ref": "#/$defs/Usage"
+            }
+          },
+          "title": "Usage",
+          "type": "object"
         },
         "wait_s": {
           "default": 25,
@@ -554,6 +582,28 @@
         "reason"
       ],
       "title": "StopCommand",
+      "type": "object"
+    },
+    "Usage": {
+      "additionalProperties": false,
+      "description": "Сколько контейнер потребляет сейчас.",
+      "properties": {
+        "cpu_milli": {
+          "minimum": 0,
+          "title": "Cpu Milli",
+          "type": "integer"
+        },
+        "ram_mb": {
+          "minimum": 0,
+          "title": "Ram Mb",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "cpu_milli",
+        "ram_mb"
+      ],
+      "title": "Usage",
       "type": "object"
     }
   },
