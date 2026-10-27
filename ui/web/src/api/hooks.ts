@@ -14,6 +14,7 @@ export const keys = {
   validation: (problem: Problem, mode: string) => ["validation", mode, problem] as const,
   live: (runId: string) => ["live", runId] as const,
   liveEvents: (runId: string) => ["live", runId, "events"] as const,
+  logs: (runId: string, task: string, attempt: number) => ["live", runId, "logs", task, attempt] as const,
 };
 
 // Прогон по run_id не меняется никогда: однажды загруженный, он не перезапрашивается.
@@ -118,6 +119,14 @@ export const useLiveEvents = (runId: string | undefined, running: boolean) =>
     queryFn: ({ signal }) => api.eventsPage(runId as string, 0, 10_000, signal).then((p) => p.events),
     enabled: runId !== undefined,
     refetchInterval: running ? 1000 : false,
+  });
+
+/** Журнал контейнера попытки; пока попытка идёт и не на паузе — раз в 2 с. */
+export const useContainerLogs = (runId: string, task: string, attempt: number, follow: boolean) =>
+  useQuery({
+    queryKey: keys.logs(runId, task, attempt),
+    queryFn: ({ signal }) => api.logs(runId, task, attempt, signal).then((r) => r.lines),
+    refetchInterval: follow ? 2000 : false,
   });
 
 /** Действие над прогоном на агентах; ответ — его новое состояние. */

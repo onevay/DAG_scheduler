@@ -81,11 +81,15 @@ class AgentRegistry:
         agent = self.agents.setdefault(agent_id, _Agent())
         agent.last_seen = self.clock()
         agent.commands = [c for c in agent.commands if c.command_id > poll.acked_command_id]
+        return PollReply(commands=list(agent.commands))
+
+    def report(self, poll: Poll) -> None:
+        """Потребление и строки журналов из опроса — прогонам, которым они принадлежат. Один раз на опрос:
+        долгий опрос повторяет `poll`, пока ждёт команд, а строки повторяться не должны."""
         for key in sorted(set(poll.usage) | set(poll.logs)):
             run_id, task, attempt = key.split(":")
             if sink := self.telemetry.get(run_id):
                 sink(task, int(attempt), poll.usage.get(key), poll.logs.get(key, []))
-        return PollReply(commands=list(agent.commands))
 
     def events(self, agent_id: str, batch: EventsBatch) -> EventsAck:
         agent = self.agents.setdefault(agent_id, _Agent())

@@ -34,6 +34,7 @@ async def poll(request: Request, agent_id: AgentId, body: Poll) -> Any:
     if denied := _denied(request):
         return denied
     registry = _registry(request)
+    registry.report(body)
     loop = asyncio.get_running_loop()
     deadline = loop.time() + min(body.wait_s, registry.poll_s)
     while not (reply := registry.poll(agent_id, body)).commands and loop.time() < deadline:

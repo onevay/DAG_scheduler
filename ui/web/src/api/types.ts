@@ -33,6 +33,8 @@ export type TaskKind = NonNullable<Task["kind"]>;
 export type Live = S["LiveOut"];
 export type LiveStarted = S["LiveStarted"];
 export type Container = S["ContainerOut"];
+export type Usage = S["Usage"];
+export type Logs = S["LogsOut"];
 // Тело действия API проверяет сам (в OpenAPI его схемы нет): чекпоинт задачи, уронить или вернуть узел, отмена
 export type RunAction =
   | { kind: "checkpoint"; task: string }

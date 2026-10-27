@@ -12,7 +12,6 @@ from expsched.agent.core import Agent
 from expsched.agent.docker import DockerRuntime
 from expsched.agent.runtime import FakeRuntime
 from expsched.contract.agent import AgentEvent, Poll, PollReply, Usage
-from expsched.emulate.agents import AgentRegistry
 
 RUN = "0123456789abcdef"
 KEY = f"{RUN}:train:1"
@@ -122,16 +121,18 @@ def test_registry_hands_telemetry_to_the_run_and_the_api_serves_logs(tmp_path, m
             worker["agent"] = "box"
         problem.update(mode="emulate", time_scale_ms=100)
         run_id = client.post("/v1/runs", json={"problem": problem}).json()["run_id"]
-        registry: AgentRegistry = app.state.emulations.registry
         emulation = app.state.emulations.live[run_id].emulation
         emulation.tick()
         task, attempt = next(iter(emulation.containers))
         key = f"{run_id}:{task}:{attempt}"
-        registry.poll(
-            "box",
-            Poll(acked_command_id=0, usage={key: Usage(cpu_milli=900, ram_mb=40)}, logs={key: ["a", "b"]}),
+        auth = {"Authorization": "Bearer t"}
+        # Через настоящий долгий опрос: пока он ждёт команд (здесь — секунду), строки не должны повторяться
+        first = {"acked_command_id": 99, "wait_s": 1, "usage": {key: {"cpu_milli": 900, "ram_mb": 40}}}
+        client.post("/v1/agents/box/poll", json={**first, "logs": {key: ["a", "b"]}}, headers=auth)
+        other = {key: ["c"], f"{'f' * 16}:x:1": ["other run"]}
+        client.post(
+            "/v1/agents/box/poll", json={"acked_command_id": 99, "wait_s": 1, "logs": other}, headers=auth
         )
-        registry.poll("box", Poll(acked_command_id=0, logs={key: ["c"], f"{'f' * 16}:x:1": ["other run"]}))
 
         live = client.get(f"/v1/runs/{run_id}/containers").json()
         row = next(c for c in live["containers"] if c["task"] == task)

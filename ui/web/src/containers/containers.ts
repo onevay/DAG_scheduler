@@ -1,4 +1,5 @@
-import type { Container, JournalRecord, Problem } from "../api/types";
+import type { Container, JournalRecord, Problem, Usage } from "../api/types";
+import { amount, type Resources } from "../ui/resources";
 
 export type Mode = NonNullable<Problem["mode"]>;
 
@@ -81,3 +82,36 @@ export function attemptLog(events: readonly JournalRecord[], c: Container, unit:
 /** Узлы без агента: прогон на агентах для такого входа не запустится. */
 export const withoutAgent = (problem: Problem) =>
   problem.cluster.workers.filter((w) => !w.agent).map((w) => w.id);
+
+export interface Meter {
+  label: string;
+  text: string;
+  share: number | null; // доля лимита задачи; без лимита — null
+  near: boolean; // память у самого предела: ещё немного — и OOM
+}
+
+const cores = (n: number) => n.toLocaleString("ru-RU", { maximumFractionDigits: 1 });
+
+/** Потребление контейнера против ресурсов его задачи (они же — лимиты контейнера). */
+export function usageMeters(usage: Usage, limits: Resources | undefined): Meter[] {
+  const cpu = usage.cpu_milli / 1000;
+  const cpuLimit = limits?.cpu;
+  const ramLimit = limits?.ram_mb;
+  const ramShare = ramLimit ? usage.ram_mb / ramLimit : null;
+  return [
+    {
+      label: "CPU",
+      text: cpuLimit ? `${cores(cpu)} из ${cpuLimit} ядер` : `${cores(cpu)} ядер`,
+      share: cpuLimit ? cpu / cpuLimit : null,
+      near: false,
+    },
+    {
+      label: "ОЗУ",
+      text: ramLimit
+        ? `${amount("ram_mb", usage.ram_mb)} из ${amount("ram_mb", ramLimit)}`
+        : amount("ram_mb", usage.ram_mb),
+      share: ramShare,
+      near: ramShare !== null && ramShare >= 0.9,
+    },
+  ];
+}

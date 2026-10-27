@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { MemoryRouter, Route, Routes } from "react-router";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createQueryClient } from "../api/hooks";
 import type { Container } from "../api/types";
@@ -15,6 +15,7 @@ import {
   scaleLabel,
   share,
   stateLabel,
+  usageMeters,
   withoutAgent,
 } from "../containers/containers";
 import { type Draft } from "../draft/draft";
@@ -43,7 +44,11 @@ const LIVE = {
   containers: [
     container("load_data", "exited", { progress: 10 }),
     container("embed_index", "oom", { progress: 10 }),
-    container("train_small", "checkpoint", { progress: 20, container_id: "3f2a" }),
+    container("train_small", "checkpoint", {
+      progress: 20,
+      container_id: "3f2a",
+      usage: { cpu_milli: 1500, ram_mb: 950 },
+    }),
   ],
 };
 const PROBLEM = {
@@ -52,7 +57,7 @@ const PROBLEM = {
   tasks: [
     { id: "load_data", duration: 10 },
     { id: "embed_index", duration: 25 },
-    { id: "train_small", duration: 40 },
+    { id: "train_small", duration: 40, resources: { cpu: 2, ram_mb: 1024 } },
   ],
 };
 const EVENTS = [
@@ -71,6 +76,9 @@ const posted: unknown[] = [];
 const server = setupServer(
   http.get(`/v1/runs/${RUN}/containers`, () => HttpResponse.json(LIVE)),
   http.get(`/v1/runs/${RUN}/problem`, () => HttpResponse.json(PROBLEM)),
+  http.get(`/v1/runs/${RUN}/containers/train_small/1/logs`, () =>
+    HttpResponse.json({ lines: ["start: 0 of 40 units", "checkpoint: 20 units"] }),
+  ),
   http.get(`/v1/runs/${RUN}/events`, () => HttpResponse.json({ events: EVENTS, total: 1, next_seq: null })),
   http.post(`/v1/runs/${RUN}/actions`, async ({ request }) => {
     const action = (await request.json()) as { kind: string };
@@ -111,6 +119,14 @@ describe("containers", () => {
     expect(stateLabel(oom)).toBe("убит: не хватило памяти");
     expect([scaleLabel(100), scaleLabel(5000), scaleLabel(60_000)]).toEqual(["100 мс", "5 с", "1 мин"]);
     expect(attemptLog(EVENTS as never, running, "мин")).toEqual(["35 мин · старт на laptop с позиции 0"]);
+    expect(usageMeters({ cpu_milli: 1500, ram_mb: 950 }, { cpu: 2, ram_mb: 1024 })).toEqual([
+      { label: "CPU", text: "1,5 из 2 ядер", share: 0.75, near: false },
+      { label: "ОЗУ", text: "950 МБ из 1 ГБ", share: 950 / 1024, near: true },
+    ]);
+    expect(usageMeters({ cpu_milli: 300, ram_mb: 64 }, undefined).map((m) => [m.text, m.share])).toEqual([
+      ["0,3 ядер", null],
+      ["64 МБ", null],
+    ]);
     expect(withoutAgent({ ...PROBLEM, cluster: { workers: [{ id: "a", resources: {} }] } } as never)).toEqual(
       ["a"],
     );
@@ -139,6 +155,31 @@ describe("ContainersPage", () => {
       { kind: "worker_down", worker: "laptop" },
     ]);
     expect(await within(panel).findByRole("button", { name: "Вернуть узел laptop" })).toBeInTheDocument();
+  });
+
+  it("shows the usage of the selected container against its limits and the tail of its log", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    renderAt(`/containers/${RUN}`, PROBLEM as Draft);
+    const panel = await screen.findByRole("region", { name: "Выбранный контейнер · TRAIN_SMALL" });
+    expect(await within(panel).findByRole("meter", { name: "CPU: 1,5 из 2 ядер" })).toHaveAttribute(
+      "aria-valuenow",
+      "75",
+    );
+    expect(within(panel).getByRole("meter", { name: "ОЗУ: 950 МБ из 1 ГБ" })).toHaveAttribute(
+      "aria-valuenow",
+      "93",
+    );
+    expect(within(panel).getByText(/у предела памяти/)).toBeInTheDocument();
+    const log = await within(panel).findByRole("region", { name: "Журнал контейнера" });
+    expect(log).toHaveTextContent("start: 0 of 40 units checkpoint: 20 units");
+    expect(within(panel).getByText("Журнал контейнера · 2 строки")).toBeInTheDocument();
+    const pause = within(panel).getByRole("button", { name: "Пауза" });
+    await userEvent.click(pause);
+    expect(within(panel).getByRole("button", { name: "Продолжить" })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(within(panel).getByRole("button", { name: "Копировать" }));
+    expect(writeText).toHaveBeenCalledWith("start: 0 of 40 units\ncheckpoint: 20 units");
+    expect(await within(panel).findByRole("button", { name: "Скопировано" })).toBeInTheDocument();
   });
 
   it("chooses the mode, gives nodes an agent and starts a run on agents", async () => {

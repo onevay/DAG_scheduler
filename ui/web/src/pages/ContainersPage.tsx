@@ -1,7 +1,14 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
-import { useLive, useLiveEvents, useRunAction, useRunProblem, useStartOnAgents } from "../api/hooks";
+import {
+  useContainerLogs,
+  useLive,
+  useLiveEvents,
+  useRunAction,
+  useRunProblem,
+  useStartOnAgents,
+} from "../api/hooks";
 import type { Container, Live } from "../api/types";
 import {
   attemptLog,
@@ -15,6 +22,7 @@ import {
   SCALES,
   share,
   stateLabel,
+  usageMeters,
   withoutAgent,
 } from "../containers/containers";
 import styles from "../containers/Containers.module.css";
@@ -23,6 +31,8 @@ import { useDraft } from "../draft/DraftContext";
 import { Button, Segmented } from "../ui/controls";
 import { Section } from "../ui/data";
 import { PageHeader } from "../ui/PageHeader";
+import { plural } from "../ui/plural";
+import type { Resources } from "../ui/resources";
 
 const UNITS = { hour: "ч", minute: "мин", second: "с" } as const;
 const RING = 2 * Math.PI * 26;
@@ -141,11 +151,12 @@ function LiveRun({ runId, live }: { runId: string; live: Live }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [picked, setPicked] = useState<string | null>(null);
   const unit = UNITS[problem.data?.time_unit ?? "hour"];
-  const durations = new Map(
-    [...(problem.data?.tasks ?? []), ...(problem.data?.events ?? []).flatMap((e) => e.task ?? [])].map(
-      (t) => [t.id, t.duration],
-    ),
-  );
+  const tasks = [
+    ...(problem.data?.tasks ?? []),
+    ...(problem.data?.events ?? []).flatMap((e) => e.task ?? []),
+  ];
+  const durations = new Map(tasks.map((t) => [t.id, t.duration]));
+  const limits = new Map<string, Resources | undefined>(tasks.map((t) => [t.id, t.resources]));
   const key = (c: Container) => `${c.task}#${c.attempt}`;
   const shown = live.containers.filter((c) => filter === "all" || phase(c) === filter);
   const selected = live.containers.find((c) => key(c) === picked) ?? shown.at(-1);
@@ -244,6 +255,13 @@ function LiveRun({ runId, live }: { runId: string; live: Live }) {
             <dt>Контейнер</dt>
             <dd>{selected.container_id ?? "—"}</dd>
           </dl>
+          {selected.usage && (
+            <div role="group" aria-label="Потребление" className={styles.meters}>
+              {usageMeters(selected.usage, limits.get(selected.task)).map((m) => (
+                <UsageMeter key={m.label} meter={m} />
+              ))}
+            </div>
+          )}
           <ul className={styles.log} aria-label="Журнал попытки">
             {attemptLog(events.data ?? [], selected, unit).map((line) => (
               <li key={line}>{line}</li>
@@ -270,6 +288,12 @@ function LiveRun({ runId, live }: { runId: string; live: Live }) {
               )}
             </div>
           )}
+          <ContainerLog
+            key={key(selected)}
+            runId={runId}
+            container={selected}
+            follow={running && phase(selected) !== "done" && phase(selected) !== "killed"}
+          />
           <p className={styles.note}>
             Fence — номер попытки: команды и события адресуются по нему, поэтому запоздавшее событие старой
             попытки после отказа узла не меняет новую.
@@ -279,5 +303,83 @@ function LiveRun({ runId, live }: { runId: string; live: Live }) {
 
       {live.shadow && <PlanVsFact shadow={live.shadow} unit={unit} />}
     </>
+  );
+}
+
+function UsageMeter({ meter }: { meter: ReturnType<typeof usageMeters>[number] }) {
+  const pct = meter.share === null ? null : Math.round(meter.share * 100);
+  return (
+    <>
+      <span className={styles.caption}>{meter.label}</span>
+      <div
+        role="meter"
+        aria-label={`${meter.label}: ${meter.text}`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={pct ?? 0}
+        className={styles.bar}
+      >
+        <div
+          className={styles.fill}
+          data-near={meter.near}
+          style={{ width: `${Math.min(100, pct ?? 0)}%` }}
+        />
+      </div>
+      <span>
+        {meter.text}
+        {meter.near && " · у предела памяти"}
+      </span>
+    </>
+  );
+}
+
+const LINES = ["строка", "строки", "строк"] as const;
+
+/** Хвост журнала контейнера: обновляется, пока попытка идёт; пауза держит его на месте для чтения. */
+function ContainerLog({
+  runId,
+  container,
+  follow,
+}: {
+  runId: string;
+  container: Container;
+  follow: boolean;
+}) {
+  const [paused, setPaused] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const logs = useContainerLogs(runId, container.task, container.attempt, follow && !paused);
+  const lines = logs.data ?? [];
+  const box = useRef<HTMLPreElement>(null);
+  useEffect(() => {
+    if (!paused && box.current) box.current.scrollTop = box.current.scrollHeight;
+  }, [lines.length, paused]);
+  const copy = () =>
+    void navigator.clipboard?.writeText(lines.join("\n")).then(
+      () => setCopied(true),
+      () => setCopied(false),
+    );
+  return (
+    <div className={styles.field}>
+      <div className={styles.row}>
+        <span className={styles.caption}>Журнал контейнера · {plural(lines.length, LINES)}</span>
+        {follow && (
+          <Button variant="secondary" aria-pressed={paused} onClick={() => setPaused(!paused)}>
+            {paused ? "Продолжить" : "Пауза"}
+          </Button>
+        )}
+        <Button variant="secondary" disabled={lines.length === 0} onClick={copy}>
+          {copied ? "Скопировано" : "Копировать"}
+        </Button>
+      </div>
+      {lines.length > 0 ? (
+        <pre ref={box} tabIndex={0} role="region" aria-label="Журнал контейнера" className={styles.console}>
+          {lines.join("\n")}
+        </pre>
+      ) : (
+        <p className={styles.note}>
+          Строк нет: агент ещё не прислал их, или среда журнала не отдаёт (gravesentinel).
+        </p>
+      )}
+    </div>
   );
 }
