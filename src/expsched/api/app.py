@@ -383,6 +383,7 @@ def create_app(
     app.include_router(router)
     app.include_router(agents.listing)
     app.include_router(agents.router)
+    app.include_router(emulations.listing)
     app.include_router(emulations.router)
     add_security_headers(app)
     if web_dir is not None:

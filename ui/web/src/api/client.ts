@@ -6,7 +6,9 @@ import type {
   InputEvent,
   Intervention,
   JournalRecord,
+  LiveRun,
   Logs,
+  Agents,
   Live,
   LiveStarted,
   Policies,
@@ -113,6 +115,9 @@ export const api = {
   live: (runId: string, signal?: AbortSignal) => request<Live>(`/v1/runs/${runId}/containers`, { signal }),
   action: (runId: string, action: RunAction) =>
     request<Live>(`/v1/runs/${runId}/actions`, { method: "POST", body: action }),
+  agents: (signal?: AbortSignal) => request<Agents>("/v1/agents", { signal }),
+  liveRuns: (signal?: AbortSignal) =>
+    request<{ runs: LiveRun[] }>("/v1/live", { signal }).then((r) => r.runs),
   logs: (runId: string, task: string, attempt: number, signal?: AbortSignal) =>
     request<Logs>(`/v1/runs/${runId}/containers/${encodeURIComponent(task)}/${attempt}/logs`, { signal }),
   replay: (runId: string) => request<Replay>(`/v1/runs/${runId}/replay`, { method: "POST" }),

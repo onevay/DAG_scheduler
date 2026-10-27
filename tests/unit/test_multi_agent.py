@@ -117,6 +117,10 @@ def test_agents_are_listed_with_their_capacity_and_running_attempts(client):
         ("alpha", "fake", {"cpu": 4, "ram_mb": 8192}, True)
     ]
     assert listed[0]["running"] == [f"{run_id}:prepare:1"]
+    live = client.get("/v1/live").json()["runs"]
+    assert [(r["run_id"], r["name"], r["mode"], r["status"], r["running"]) for r in live] == [
+        (run_id, "two_machines", "emulate", "running", 1)
+    ]
     client.post(f"/v1/runs/{run_id}/actions", json={"kind": "cancel"})
 
 

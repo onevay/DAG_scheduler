@@ -204,6 +204,22 @@ class AgentsOut(Strict):
     heartbeat_timeout_s: int
 
 
+class LiveRunOut(Strict):
+    run_id: str
+    name: str | None
+    mode: Literal["emulate", "shadow"]
+    status: Literal["running", "done", "cancelled"]
+    now: int  # часы модели
+    containers: int  # попыток всего
+    running: int  # из них идут сейчас
+
+
+class LiveRunsOut(Strict):
+    """Прогоны на агентах, которые помнит этот сервер (до его перезапуска), — новые первыми."""
+
+    runs: list[LiveRunOut]
+
+
 class LogsOut(Strict):
     """Журнал контейнера попытки: последние строки, что прислал агент (сервер помнит до 500)."""
 

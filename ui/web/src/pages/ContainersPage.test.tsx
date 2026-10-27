@@ -72,8 +72,38 @@ const EVENTS = [
     reason: {},
   },
 ];
+const AGENTS = {
+  heartbeat_timeout_s: 15,
+  agents: [
+    {
+      id: "laptop",
+      runtime: "docker",
+      version: "0.1.0",
+      capacity: { cpu: 7, ram_mb: 14336 },
+      max_containers: 4,
+      alive: true,
+      seen_s_ago: 0.4,
+      running: [`${RUN}:train_small:1`],
+    },
+    {
+      id: "beta",
+      runtime: "fake",
+      version: "0.1.0",
+      capacity: { cpu: 4 },
+      max_containers: 4,
+      alive: false,
+      seen_s_ago: 42,
+      running: [],
+    },
+  ],
+};
+const LIVE_RUNS = [
+  { run_id: RUN, name: "laptop", mode: "shadow", status: "running", now: 37, containers: 3, running: 1 },
+];
 const posted: unknown[] = [];
 const server = setupServer(
+  http.get("/v1/agents", () => HttpResponse.json(AGENTS)),
+  http.get("/v1/live", () => HttpResponse.json({ runs: LIVE_RUNS })),
   http.get(`/v1/runs/${RUN}/containers`, () => HttpResponse.json(LIVE)),
   http.get(`/v1/runs/${RUN}/problem`, () => HttpResponse.json(PROBLEM)),
   http.get(`/v1/runs/${RUN}/containers/train_small/1/logs`, () =>
@@ -202,5 +232,47 @@ describe("ContainersPage", () => {
       },
     ]);
     expect(await screen.findByText("идёт · момент модели 37")).toBeInTheDocument();
+  });
+
+  it("lists agents and runs on agents, and gives each node an agent the server knows", async () => {
+    const draft = {
+      ...PROBLEM,
+      mode: "emulate",
+      cluster: {
+        workers: [
+          { id: "laptop", resources: { cpu: 8 } },
+          { id: "spare", resources: { cpu: 2 } },
+        ],
+      },
+    } as Draft;
+    renderAt("/containers", draft);
+    const agents = await screen.findByRole("list", { name: "Агенты" });
+    const laptop = within(agents).getByRole("listitem", { name: "Агент laptop: на связи" });
+    expect(laptop).toHaveTextContent("docker");
+    expect(laptop).toHaveTextContent("7 CPU · 14 ГБ");
+    expect(laptop).toHaveTextContent("1 из 4");
+    expect(within(agents).getByRole("listitem", { name: "Агент beta: нет связи" })).toHaveTextContent(
+      "нет связи · 42 с",
+    );
+    expect(await screen.findByRole("link", { name: "laptop" })).toHaveAttribute("href", `/containers/${RUN}`);
+    expect(screen.getByText(/Shadow · идёт · момент модели 37 · идут 1 из 3/)).toBeInTheDocument();
+
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Агент узла laptop" }), "laptop");
+    const spare = screen.getByRole("combobox", { name: "Агент узла spare" });
+    expect(within(spare).getByRole("option", { name: "beta — нет связи" })).toBeInTheDocument();
+    await userEvent.selectOptions(spare, "beta");
+    await userEvent.click(screen.getByRole("button", { name: "Запустить на агентах" }));
+    expect(posted).toEqual([
+      {
+        problem: expect.objectContaining({
+          cluster: {
+            workers: [
+              { id: "laptop", resources: { cpu: 8 }, agent: "laptop" },
+              { id: "spare", resources: { cpu: 2 }, agent: "beta" },
+            ],
+          },
+        }),
+      },
+    ]);
   });
 });

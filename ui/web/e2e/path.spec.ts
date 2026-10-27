@@ -97,30 +97,28 @@ test("остальные экраны доступны и не шире экра
   }
 });
 
+/** Агент без контейнеров: работа идёт по часам стены в масштабе прогона. */
+function spawnAgent(id: string, cpu: number, ramMb: number): ChildProcess {
+  const root = resolve("../..");
+  const python = join(root, ".venv", process.platform === "win32" ? "Scripts/python.exe" : "bin/python");
+  const state = mkdtempSync(join(tmpdir(), `expsched-agent-${id}-`));
+  const args = ["-m", "expsched.agent", "--scheduler", String(test.info().project.use.baseURL), "--id", id];
+  return spawn(
+    python,
+    args.concat(["--runtime", "fake", "--cpu", String(cpu), "--ram-mb", String(ramMb), "--state", state]),
+    {
+      cwd: root,
+      env: { ...process.env, EXPSCHED_AGENT_TOKEN: "e2e-token" },
+      stdio: ["ignore", "ignore", "inherit"],
+    },
+  );
+}
+
 test.describe("на агенте fake", () => {
   let agent: ChildProcess | undefined;
 
   test.beforeAll(() => {
-    // Агент без контейнеров: работа идёт по часам стены в масштабе прогона
-    const root = resolve("../..");
-    const python = join(root, ".venv", process.platform === "win32" ? "Scripts/python.exe" : "bin/python");
-    const state = mkdtempSync(join(tmpdir(), "expsched-agent-"));
-    agent = spawn(
-      python,
-      [
-        "-m",
-        "expsched.agent",
-        "--scheduler",
-        String(test.info().project.use.baseURL),
-        "--id",
-        "laptop",
-      ].concat(["--runtime", "fake", "--cpu", "8", "--ram-mb", "16384", "--state", state]),
-      {
-        cwd: root,
-        env: { ...process.env, EXPSCHED_AGENT_TOKEN: "e2e-token" },
-        stdio: ["ignore", "ignore", "inherit"],
-      },
-    );
+    agent = spawnAgent("laptop", 8, 16384);
   });
 
   test.afterAll(() => {
@@ -157,5 +155,47 @@ test.describe("на агенте fake", () => {
     await replay.getByRole("button", { name: "Проиграть журнал" }).click();
     await expect(replay.getByRole("status")).toContainText("Решения совпали");
     await checkScreen(page, "Прогон на агентах");
+  });
+});
+
+test.describe("на двух агентах fake", () => {
+  const agents: ChildProcess[] = [];
+
+  test.beforeAll(() => {
+    agents.push(spawnAgent("alpha", 4, 8192), spawnAgent("beta", 4, 8192));
+  });
+
+  test.afterAll(() => {
+    for (const agent of agents) agent.kill();
+  });
+
+  test("две машины: агенты на связи, у каждого узла свой, прогон до конца", async ({ page }) => {
+    await page.goto("/");
+    await page
+      .getByRole("region", { name: /Соберите DAG/ })
+      .getByRole("button", { name: /^two_machines/ })
+      .click();
+    await expect(page.getByText("Вход корректен")).toBeVisible();
+    await page.goto("/containers");
+
+    const agents = page.getByRole("list", { name: "Агенты" });
+    await expect(agents.getByRole("listitem", { name: "Агент alpha: на связи" })).toBeVisible();
+    await expect(agents.getByRole("listitem", { name: "Агент beta: на связи" })).toBeVisible();
+    await page.getByRole("radio", { name: "Эмуляция" }).click();
+    await page.getByRole("radio", { name: "100 мс" }).click();
+    // Пример уже называет агентов узлов — выбор показывает их
+    await expect(page.getByRole("combobox", { name: "Агент узла ws-1" })).toHaveValue("alpha");
+    await expect(page.getByRole("combobox", { name: "Агент узла ws-2" })).toHaveValue("beta");
+    await checkScreen(page, "Контейнеры: агенты");
+    await page.getByRole("button", { name: "Запустить на агентах" }).click();
+
+    await expect(page).toHaveURL(/\/containers\/[0-9a-f]{16}$/);
+    await expect(page.getByText(/^закончен · момент модели \d+$/)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole("button", { name: /на ws-1: завершён/ }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /на ws-2: завершён/ }).first()).toBeVisible();
+
+    await page.goto("/containers");
+    await expect(page.getByRole("link", { name: "two_machines" }).first()).toBeVisible();
+    await expect(page.getByText(/Эмуляция · закончен/).first()).toBeVisible();
   });
 });

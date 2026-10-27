@@ -78,6 +78,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/live": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Live Runs
+     * @description Прогоны на агентах этого сервера — идущие и законченные с его запуска, новые первыми.
+     */
+    get: operations["live_runs_v1_live_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/policies": {
     parameters: {
       query?: never;
@@ -945,6 +965,37 @@ export interface components {
       workers: {
         [key: string]: components["schemas"]["WorkerLive"];
       };
+    };
+    /** LiveRunOut */
+    LiveRunOut: {
+      /** Containers */
+      containers: number;
+      /**
+       * Mode
+       * @enum {string}
+       */
+      mode: "emulate" | "shadow";
+      /** Name */
+      name: string | null;
+      /** Now */
+      now: number;
+      /** Run Id */
+      run_id: string;
+      /** Running */
+      running: number;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "running" | "done" | "cancelled";
+    };
+    /**
+     * LiveRunsOut
+     * @description Прогоны на агентах, которые помнит этот сервер (до его перезапуска), — новые первыми.
+     */
+    LiveRunsOut: {
+      /** Runs */
+      runs: components["schemas"]["LiveRunOut"][];
     };
     /** LiveStarted */
     LiveStarted: {
@@ -1994,6 +2045,26 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+    };
+  };
+  live_runs_v1_live_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LiveRunsOut"];
         };
       };
     };

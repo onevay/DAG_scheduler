@@ -182,6 +182,12 @@ EXPSCHED_CORS_ORIGINS=http://localhost:5173 make api
 
 `alive` — опрашивал не дольше `heartbeat_timeout_s` назад; `running` — идущие попытки прогонов этого сервера.
 
+## `GET /v1/live`
+
+Прогоны на агентах, которые помнит сервер с запуска (идущие и законченные), новые первыми:
+`{"runs": [{"run_id": "…", "name": "two_machines", "mode": "emulate", "status": "done", "now": 61,
+"containers": 5, "running": 0}]}`. Законченный прогон дальше смотрят как обычный: `GET /v1/runs/{run_id}`.
+
 ## `POST /v1/runs/{run_id}/replay`
 
 Журнал сохранённого прогона проигрывается его же фактами, без контейнеров: окончания и сбои попыток, отказы и

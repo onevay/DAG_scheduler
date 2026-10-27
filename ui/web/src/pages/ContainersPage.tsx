@@ -2,14 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
 import {
+  useAgents,
   useContainerLogs,
   useLive,
+  useLiveRuns,
   useLiveEvents,
   useRunAction,
   useRunProblem,
   useStartOnAgents,
 } from "../api/hooks";
-import type { Container, Live } from "../api/types";
+import type { AgentInfo, Container, Live } from "../api/types";
 import {
   attemptLog,
   counts,
@@ -32,7 +34,7 @@ import { Button, Segmented } from "../ui/controls";
 import { Section } from "../ui/data";
 import { PageHeader } from "../ui/PageHeader";
 import { plural } from "../ui/plural";
-import type { Resources } from "../ui/resources";
+import { formatResources, type Resources } from "../ui/resources";
 
 const UNITS = { hour: "ч", minute: "мин", second: "с" } as const;
 const RING = 2 * Math.PI * 26;
@@ -60,6 +62,8 @@ export function ContainersPage() {
         Попытки задач в настоящих контейнерах на агентах: состояние, чекпоинты, отказы узлов.
       </PageHeader>
       <ModePanel />
+      <AgentsPanel />
+      {!runId && <LiveRuns />}
       {runId && live.isError && (
         <p role="alert" className={styles.error}>
           {live.error.message}
@@ -75,6 +79,7 @@ function ModePanel() {
   const { draft, dispatch } = useDraft();
   const navigate = useNavigate();
   const start = useStartOnAgents();
+  const known = useAgents().data?.agents ?? [];
   const [agent, setAgent] = useState("laptop");
   const mode: Mode = draft.mode ?? "simulate";
   const scale = draft.time_scale_ms ?? 1000;
@@ -83,6 +88,12 @@ function ModePanel() {
   const set = (patch: Partial<typeof draft>) => dispatch({ type: "replace", draft: { ...draft, ...patch } });
   const assign = () =>
     set({ cluster: { workers: draft.cluster.workers.map((w) => ({ ...w, agent: w.agent || agent })) } });
+  const choose = (worker: string, next: string) =>
+    set({
+      cluster: {
+        workers: draft.cluster.workers.map((w) => (w.id === worker ? { ...w, agent: next || undefined } : w)),
+      },
+    });
 
   return (
     <Section title="Режим прогона">
@@ -109,6 +120,32 @@ function ModePanel() {
               onChange={(ms) => set({ time_scale_ms: Number(ms) })}
             />
           </div>
+          {known.length > 0 && (
+            <div role="group" aria-label="Агенты узлов" className={styles.nodes}>
+              {draft.cluster.workers.map((w) => (
+                <label key={w.id} className={styles.node}>
+                  <span className={styles.task}>{w.id}</span>
+                  <select
+                    className={styles.input}
+                    aria-label={`Агент узла ${w.id}`}
+                    value={w.agent ?? ""}
+                    onChange={(e) => choose(w.id, e.target.value)}
+                  >
+                    <option value="">без агента</option>
+                    {[...new Set([...known.map((a) => a.id), ...(w.agent ? [w.agent] : [])])].map((id) => {
+                      const a = known.find((k) => k.id === id);
+                      return (
+                        <option key={id} value={id}>
+                          {id}
+                          {!a ? " — сервер его не видел" : a.alive ? "" : " — нет связи"}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </label>
+              ))}
+            </div>
+          )}
           {missing.length > 0 && (
             <div className={styles.field}>
               <span className={styles.caption}>Без агента: {missing.join(", ")}</span>
@@ -140,6 +177,75 @@ function ModePanel() {
           )}
         </div>
       )}
+    </Section>
+  );
+}
+
+/** Агенты, представившиеся серверу: на связи ли, что отдают под задачи, сколько контейнеров заняты. */
+function AgentsPanel() {
+  const agents = useAgents();
+  const list = agents.data?.agents ?? [];
+  return (
+    <Section title={`Агенты · ${list.length}`}>
+      {list.length === 0 ? (
+        <p className={styles.note}>
+          Ни один агент ещё не представился серверу. На машине с Docker:{" "}
+          <code>python -m expsched.agent --id laptop --scheduler {window.location.origin}</code> с тем же
+          EXPSCHED_AGENT_TOKEN, что у сервера (подробно — docs/agent.md).
+        </p>
+      ) : (
+        <ul className={styles.cards} aria-label="Агенты">
+          {list.map((a) => (
+            <AgentCard key={a.id} agent={a} />
+          ))}
+        </ul>
+      )}
+    </Section>
+  );
+}
+
+function AgentCard({ agent: a }: { agent: AgentInfo }) {
+  return (
+    <li className={styles.card} aria-label={`Агент ${a.id}: ${a.alive ? "на связи" : "нет связи"}`}>
+      <span className={styles.cardHead}>
+        <span className={styles.task}>{a.id}</span>
+        <span className={styles.chip} data-phase={a.alive ? "running" : "killed"}>
+          <span className={styles.chipDot} />
+          {a.alive ? "на связи" : `нет связи · ${Math.round(a.seen_s_ago)} с`}
+        </span>
+      </span>
+      <dl className={styles.facts}>
+        <dt>Среда</dt>
+        <dd>{a.runtime}</dd>
+        <dt>Отдаёт</dt>
+        <dd>{formatResources(a.capacity)}</dd>
+        <dt>Контейнеры</dt>
+        <dd>
+          {a.running.length} из {a.max_containers}
+        </dd>
+      </dl>
+    </li>
+  );
+}
+
+/** Прогоны на агентах, которые помнит сервер, — чтобы вернуться к идущему или посмотреть законченный. */
+function LiveRuns() {
+  const runs = useLiveRuns().data ?? [];
+  if (runs.length === 0) return null;
+  return (
+    <Section title="Прогоны на агентах">
+      <ul className={styles.runs}>
+        {runs.map((r) => (
+          <li key={r.run_id}>
+            <Link to={`/containers/${r.run_id}`}>{r.name ?? r.run_id}</Link>
+            <span className={styles.caption}>
+              {" "}
+              · {MODES[r.mode].label} · {STATUS[r.status]} · момент модели {r.now} · идут {r.running} из{" "}
+              {r.containers}
+            </span>
+          </li>
+        ))}
+      </ul>
     </Section>
   );
 }

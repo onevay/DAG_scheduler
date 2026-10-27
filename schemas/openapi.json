@@ -1540,6 +1540,84 @@
         "title": "LiveOut",
         "type": "object"
       },
+      "LiveRunOut": {
+        "additionalProperties": false,
+        "properties": {
+          "containers": {
+            "title": "Containers",
+            "type": "integer"
+          },
+          "mode": {
+            "enum": [
+              "emulate",
+              "shadow"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "now": {
+            "title": "Now",
+            "type": "integer"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "running": {
+            "title": "Running",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "done",
+              "cancelled"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "name",
+          "mode",
+          "status",
+          "now",
+          "containers",
+          "running"
+        ],
+        "title": "LiveRunOut",
+        "type": "object"
+      },
+      "LiveRunsOut": {
+        "additionalProperties": false,
+        "description": "Прогоны на агентах, которые помнит этот сервер (до его перезапуска), — новые первыми.",
+        "properties": {
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/LiveRunOut"
+            },
+            "title": "Runs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "runs"
+        ],
+        "title": "LiveRunsOut",
+        "type": "object"
+      },
       "LiveStarted": {
         "additionalProperties": false,
         "properties": {
@@ -4071,6 +4149,28 @@
         "summary": "Poll",
         "tags": [
           "agents"
+        ]
+      }
+    },
+    "/v1/live": {
+      "get": {
+        "description": "Прогоны на агентах этого сервера — идущие и законченные с его запуска, новые первыми.",
+        "operationId": "live_runs_v1_live_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveRunsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Live Runs",
+        "tags": [
+          "emulation"
         ]
       }
     },

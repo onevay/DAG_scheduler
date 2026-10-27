@@ -13,6 +13,8 @@ export const keys = {
   explain: (runId: string, filter: ExplainFilter) => ["run", runId, "explain", filter] as const,
   validation: (problem: Problem, mode: string) => ["validation", mode, problem] as const,
   live: (runId: string) => ["live", runId] as const,
+  agents: ["agents"] as const,
+  liveRuns: ["live-runs"] as const,
   liveEvents: (runId: string) => ["live", runId, "events"] as const,
   logs: (runId: string, task: string, attempt: number) => ["live", runId, "logs", task, attempt] as const,
 };
@@ -120,6 +122,14 @@ export const useLiveEvents = (runId: string | undefined, running: boolean) =>
     enabled: runId !== undefined,
     refetchInterval: running ? 1000 : false,
   });
+
+/** Агенты, представившиеся серверу; на связи ли — меняется, поэтому раз в 3 с. */
+export const useAgents = () =>
+  useQuery({ queryKey: keys.agents, queryFn: ({ signal }) => api.agents(signal), refetchInterval: 3000 });
+
+/** Прогоны на агентах, которые помнит сервер; раз в 3 с. */
+export const useLiveRuns = () =>
+  useQuery({ queryKey: keys.liveRuns, queryFn: ({ signal }) => api.liveRuns(signal), refetchInterval: 3000 });
 
 /** Журнал контейнера попытки; пока попытка идёт и не на паузе — раз в 2 с. */
 export const useContainerLogs = (runId: string, task: string, attempt: number, follow: boolean) =>

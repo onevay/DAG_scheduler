@@ -20,7 +20,15 @@ from fastapi import APIRouter, Path, Request
 from pydantic import TypeAdapter, ValidationError
 
 from expsched.api.errors import error_response
-from expsched.api.models import Action, CancelAction, CheckpointAction, ErrorOut, LiveOut, LogsOut
+from expsched.api.models import (
+    Action,
+    CancelAction,
+    CheckpointAction,
+    ErrorOut,
+    LiveOut,
+    LiveRunsOut,
+    LogsOut,
+)
 from expsched.api.store import RUN_ID_PATTERN, RunStore
 from expsched.contract.io_models import PolicyIn, ProblemIn
 from expsched.emulate.agents import AgentRegistry
@@ -28,6 +36,7 @@ from expsched.emulate.driver import Emulation
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/runs/{run_id}", tags=["emulation"])
+listing = APIRouter(prefix="/v1", tags=["emulation"])
 RunId = Annotated[str, Path(pattern=RUN_ID_PATTERN)]
 ACTION: TypeAdapter[Action] = TypeAdapter(Action)
 ERRORS: dict[int | str, dict[str, Any]] = {status: {"model": ErrorOut} for status in (404, 422)}
@@ -105,6 +114,28 @@ def view(run_id: str, emulation: Emulation) -> dict[str, Any]:
 def emulations(request: Request) -> Emulations:
     manager: Emulations = request.app.state.emulations
     return manager
+
+
+@listing.get("/live", response_model=LiveRunsOut)
+async def live_runs(request: Request) -> Any:
+    """Прогоны на агентах этого сервера — идущие и законченные с его запуска, новые первыми."""
+    out = []
+    for run_id, item in reversed(emulations(request).live.items()):
+        e = item.emulation
+        out.append(
+            {
+                "run_id": run_id,
+                "name": item.problem.get("name"),
+                "mode": item.problem.get("mode", "emulate"),
+                "status": e.status,
+                "now": e.now(),
+                "containers": len(e.containers),
+                "running": sum(
+                    c.state in ("sent", "accepted", "started", "checkpoint") for c in e.containers.values()
+                ),
+            }
+        )
+    return {"runs": out}
 
 
 @router.get("/containers", response_model=LiveOut, responses=ERRORS)
