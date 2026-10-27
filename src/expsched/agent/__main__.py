@@ -25,6 +25,9 @@ from pydantic import BaseModel
 
 from expsched.agent.core import Agent
 from expsched.agent.docker import WORKLOAD_IMAGE, DockerRuntime
+from expsched.agent.gravesentinel import client as gs
+from expsched.agent.gravesentinel.runtime import WORKLOAD_IMAGE as GS_WORKLOAD_IMAGE
+from expsched.agent.gravesentinel.runtime import GravesentinelRuntime
 from expsched.agent.runtime import FakeRuntime, Runtime
 from expsched.contract.agent import EventsAck, HelloAck, PollReply
 
@@ -117,8 +120,12 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="python -m expsched.agent", description="Агент expsched")
     parser.add_argument("--scheduler", default="http://127.0.0.1:8000")
     parser.add_argument("--id", required=True, help="id агента, как в поле agent узлов")
-    parser.add_argument("--runtime", choices=["docker", "podman", "fake"], default="docker")
-    parser.add_argument("--workload-image", default=WORKLOAD_IMAGE, help="образ встроенной нагрузки")
+    parser.add_argument("--runtime", choices=["docker", "podman", "fake", "gravesentinel"], default="docker")
+    parser.add_argument("--workload-image", help="образ встроенной нагрузки")
+    parser.add_argument("--socket", default=gs.SOCKET, help="сокет гипервизора gravesentinel")
+    parser.add_argument(
+        "--hypervisor-uid", type=int, default=0, help="пользователь, от которого работает гипервизор"
+    )
     parser.add_argument("--state", type=Path, default=Path(".expsched-agent"), help="журнал и чекпоинты")
     parser.add_argument("--cpu", type=int, help="ядер под задачи (по умолчанию — машина минус одно)")
     parser.add_argument("--ram-mb", type=int, help="ОЗУ под задачи, МиБ (по умолчанию — машина минус 2 ГиБ)")
@@ -132,9 +139,18 @@ def main(argv: list[str] | None = None) -> None:
     for name, value in (("cpu", args.cpu), ("ram_mb", args.ram_mb), ("gpu", args.gpu)):
         if value is not None:
             capacity[name] = value
-    runtime: Runtime = (
-        FakeRuntime() if args.runtime == "fake" else DockerRuntime(args.id, args.runtime, args.workload_image)
-    )
+    runtime: Runtime
+    if args.runtime == "fake":
+        runtime = FakeRuntime()
+    elif args.runtime == "gravesentinel":
+        # Пары CPU гипервизора: по контейнеру на пару, у контейнера — один CPU
+        client = gs.Client(lambda: gs.unix_transport(args.socket, server_uid=args.hypervisor_uid))
+        runtime = GravesentinelRuntime(client, args.state, args.workload_image or GS_WORKLOAD_IMAGE)
+        capacity["cpu"] = min(capacity.get("cpu", len(gs.CPU_PAIRS)), len(gs.CPU_PAIRS))
+        capacity.pop("gpu", None)
+        args.max_containers = min(args.max_containers, len(gs.CPU_PAIRS))
+    else:
+        runtime = DockerRuntime(args.id, args.runtime, args.workload_image or WORKLOAD_IMAGE)
     agent = Agent(args.id, runtime, args.state, capacity, args.max_containers, args.allow_image)
     log.info("agent %s: runtime %s, capacity %s", args.id, runtime.name, capacity)
     serve(agent, Scheduler(args.scheduler, args.id, os.environ.get("EXPSCHED_AGENT_TOKEN")))

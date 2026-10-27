@@ -65,3 +65,50 @@ jobs:
             //tests/integration:hypervisor_four_cpu_e2e \
             --test_output=streamed \
             --nocache_test_results
+
+  # Агент expsched на настоящем гипервизоре: прогон criu_pairs, отказ узла, восстановление из снимка CRIU
+  agent-smoke:
+    if: github.event_name == 'workflow_dispatch'
+    needs: e2e
+    runs-on: [self-hosted, linux, x64, gravesentinel-e2e]
+    timeout-minutes: 60
+    concurrency:
+      group: gravesentinel-e2e
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v7
+      - uses: bazel-contrib/setup-bazel@0.15.0
+        with:
+          bazelisk-cache: true
+          disk-cache: gravesentinel-e2e
+          repository-cache: true
+      - uses: astral-sh/setup-uv@v10.3.2
+      - run: uv sync --locked --extra api
+      - name: Гипервизор и образ нагрузки
+        run: |
+          export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
+          GS="$RUNNER_TEMP/gravesentinel" && echo "GS=$GS" >> "$GITHUB_ENV"
+          (cd containers/gravesentinel && bazel build --config=release //src/hypervisor:gravesentinel_hypervisor)
+          podman build -f containers/workload/Containerfile -t localhost/expsched-workload:local .
+          rm -rf "$GS" && mkdir -p "$GS/storage"
+          containers/gravesentinel/bazel-bin/src/hypervisor/gravesentinel_hypervisor \
+            --socket "$GS/hypervisor.sock" --storage "$GS/storage" \
+            --podman /usr/bin/podman --criu /usr/sbin/criu --runtime-profile podman-criu-rootful-v1 \
+            --scheduler-uid "$(id -u)" > "$GS/hypervisor.log" 2>&1 &
+          echo $! > "$GS/hypervisor.pid"
+          for i in $(seq 60); do grep -q 'startup ready' "$GS/hypervisor.log" && break; sleep 1; done
+          grep -q 'startup ready' "$GS/hypervisor.log"
+      - name: Сквозной прогон на агенте gravesentinel
+        run: make agent-smoke-gs GS_SOCKET="$GS/hypervisor.sock"
+      - name: Журнал гипервизора
+        if: always()
+        run: cat "$GS/hypervisor.log" || true
+      - name: Остановить гипервизор и убрать контейнеры прогона
+        if: always()
+        run: |
+          kill "$(cat "$GS/hypervisor.pid")" 2>/dev/null || true
+          podman ps -a --filter label=io.gravesentinel.ccm.managed=true --format '{{.Names}}' \
+            | grep '^expsched-' | xargs -r podman rm -f

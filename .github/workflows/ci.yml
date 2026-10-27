@@ -67,6 +67,8 @@ jobs:
       - run: uv sync --locked --extra dev
       - name: Агент в настоящем Docker — нагрузка, лимиты, OOM
         run: make test-docker
+      - name: Сквозной прогон на агенте Docker с отказом узла
+        run: make agent-smoke
       - run: docker build -t expsched:ci .
       - name: Контейнер поднимается, отдаёт клиент и API
         run: |

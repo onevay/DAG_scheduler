@@ -3,8 +3,9 @@
 Делает EXPSCHED_WORK единиц работы по EXPSCHED_TIME_SCALE_MS мс, начиная с сохранённого: с
 EXPSCHED_RESUME_FROM или с `checkpoint.json` в EXPSCHED_CHECKPOINT_DIR, если там больше. Каждые
 EXPSCHED_CHECKPOINT_INTERVAL единиц и по сигналу SIGUSR1 сохраняет прогресс; держит в памяти
-EXPSCHED_USE_RAM_MB МиБ — так видно лимит памяти и нехватку её (OOM). Только стандартная библиотека:
-в образе нет ничего, кроме Python и этого файла.
+EXPSCHED_USE_RAM_MB МиБ — так видно лимит памяти и нехватку её (OOM). Пустой EXPSCHED_CHECKPOINT_DIR —
+без файлов: прогресс только в памяти процесса, его сохраняет и восстанавливает снимок CRIU. Только
+стандартная библиотека: в образе нет ничего, кроме Python и этого файла.
 """
 
 from __future__ import annotations
@@ -21,7 +22,9 @@ def env(name: str, default: int = 0) -> int:
     return int(os.environ.get(name) or default)
 
 
-def saved(directory: Path) -> int:
+def saved(directory: Path | None) -> int:
+    if directory is None:
+        return 0
     try:
         return int(json.loads((directory / "checkpoint.json").read_text(encoding="utf-8"))["progress"])
     except (FileNotFoundError, ValueError, KeyError, TypeError):
@@ -35,8 +38,10 @@ def save(directory: Path, progress: int) -> None:
 
 
 def main() -> int:
-    directory = Path(os.environ.get("EXPSCHED_CHECKPOINT_DIR", "/checkpoint"))
-    directory.mkdir(parents=True, exist_ok=True)
+    path = os.environ.get("EXPSCHED_CHECKPOINT_DIR", "/checkpoint")
+    directory = Path(path) if path else None
+    if directory:
+        directory.mkdir(parents=True, exist_ok=True)
     total = env("EXPSCHED_RESUME_FROM") + env("EXPSCHED_WORK", 1)
     step = env("EXPSCHED_CHECKPOINT_INTERVAL")
     scale = env("EXPSCHED_TIME_SCALE_MS", 1000) / 1000
@@ -54,7 +59,7 @@ def main() -> int:
     while progress < total:
         time.sleep(scale)
         progress += 1
-        if progress < total and ((step and progress % step == 0) or requested):
+        if directory and progress < total and ((step and progress % step == 0) or requested):
             save(directory, progress)
             requested = False
     del ballast

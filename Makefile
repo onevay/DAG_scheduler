@@ -2,7 +2,7 @@
 RUN := uv run
 WEB := npm --prefix ui/web
 
-.PHONY: setup lint types test perf workload-image test-docker test-all schema run docker api web-install web-dev web-lint web-test web-build web-e2e audit audit-py audit-web
+.PHONY: setup lint types test perf workload-image test-docker agent-smoke agent-smoke-gs test-all schema run docker api web-install web-dev web-lint web-test web-build web-e2e audit audit-py audit-web
 
 setup:
 	uv sync --all-extras
@@ -29,6 +29,15 @@ workload-image:
 
 test-docker: workload-image
 	$(RUN) pytest -m docker
+
+# Сквозной прогон: сервер и агент отдельными процессами, отказ узла, повтор с сохранённой работы
+agent-smoke: workload-image
+	$(RUN) --extra api python scripts/agent_smoke.py --runtime docker
+
+# То же на гипервизоре gravesentinel (Linux, стенд): образ нагрузки — в хранилище rootful Podman
+GS_SOCKET ?= /run/gravesentinel/hypervisor.sock
+agent-smoke-gs:
+	$(RUN) --extra api python scripts/agent_smoke.py --runtime gravesentinel --socket $(GS_SOCKET)
 
 test-all:
 	$(RUN) pytest

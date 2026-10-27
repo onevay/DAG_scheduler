@@ -1144,7 +1144,8 @@
             "enum": [
               "docker",
               "podman",
-              "fake"
+              "fake",
+              "gravesentinel"
             ],
             "title": "Runtime",
             "type": "string"

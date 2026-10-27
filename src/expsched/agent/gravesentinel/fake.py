@@ -50,6 +50,7 @@ class FakeHypervisor:
         self.operations: dict[str, Op] = {}
         self.by_request: dict[str, str] = {}
         self.failures: dict[str, tuple[str, bool]] = {}  # метод → (код ошибки, indeterminate), один раз
+        self.busy_unregisters = 0  # столько Unregister подряд откажут: идёт обслуживание поколений
         self.connections = 0
         self.methods: list[str] = []  # журнал вызовов, для проверок
 
@@ -122,6 +123,9 @@ class FakeHypervisor:
         if container_id not in self.registrations:
             raise _Refused()  # как у демона: незарегистрированный контейнер — request_failed
         if method == "Unregister":
+            if self.busy_unregisters:
+                self.busy_unregisters -= 1
+                raise _Refused()
             del self.registrations[container_id]
             return {}
         if method == "GetRuntimeStatus":

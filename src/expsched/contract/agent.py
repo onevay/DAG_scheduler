@@ -38,7 +38,7 @@ class Hello(Strict):
 
     protocol: Literal[1]
     agent_version: Annotated[str, Field(max_length=64)]
-    runtime: Literal["docker", "podman", "fake"]
+    runtime: Literal["docker", "podman", "fake", "gravesentinel"]
     capacity: ResMap
     max_containers: Annotated[int, Field(ge=1, le=64)]
     running: list[AttemptRef] = []

@@ -37,7 +37,9 @@ Workflow `ci-gravesentinel` (`.github/workflows/gravesentinel.yml`):
 - `unit` (ubuntu-24.04, при изменениях в `containers/gravesentinel/`): release-сборка и unit-тесты, они же под
   asan, ubsan и tsan;
 - `e2e` — только при ручном запуске (Actions → ci-gravesentinel → Run workflow), после `unit`: self-hosted
-  runner с метками `self-hosted, linux, x64, gravesentinel-e2e` от uid 0, проверка стенда и rootful-наборы.
+  runner с метками `self-hosted, linux, x64, gravesentinel-e2e` от uid 0, проверка стенда и rootful-наборы;
+- `agent-smoke` — после `e2e`, там же: агент expsched на этом гипервизоре проходит прогон с отказом узла и
+  восстановлением из снимка CRIU ([`docs/agent.md`](../docs/agent.md#сквозной-прогон)).
 
 Shell-скрипты должны быть исполняемыми (`scripts/*.sh`, `tests/**/*.sh`). Git под Windows этот бит не хранит,
 поэтому при первом добавлении в индекс:

@@ -22,7 +22,7 @@ class Runtime(Protocol):
     """Контейнеры агента помечены ключом попытки `run:task:attempt` — по нему их находят снова."""
 
     @property
-    def name(self) -> Literal["docker", "podman", "fake"]: ...
+    def name(self) -> Literal["docker", "podman", "fake", "gravesentinel"]: ...
 
     def start(self, command: StartCommand, checkpoint_dir: Path) -> str: ...  # id контейнера
 

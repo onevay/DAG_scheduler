@@ -764,7 +764,7 @@ export interface components {
        * Runtime
        * @enum {string}
        */
-      runtime: "docker" | "podman" | "fake";
+      runtime: "docker" | "podman" | "fake" | "gravesentinel";
     };
     /** HelloAck */
     HelloAck: {

@@ -40,6 +40,7 @@ def statuses(result):
         ("ml_platform", "OK"),
         ("priority_preemption", "OK"),
         ("laptop", "OK"),
+        ("criu_pairs", "OK"),
     ],
 )
 @pytest.mark.parametrize("policy", POLICIES)
