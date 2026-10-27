@@ -1,0 +1,20 @@
+{
+  "name": "two_machines",
+  "time_unit": "minute",
+  "cluster": {
+    "workers": [
+      {"id": "ws-1", "resources": {"cpu": 4, "ram_mb": 8192}, "agent": "alpha"},
+      {"id": "ws-2", "resources": {"cpu": 4, "ram_mb": 8192}, "agent": "beta"}
+    ]
+  },
+  "tasks": [
+    {"id": "prepare", "kind": "data", "duration": 10, "resources": {"cpu": 2, "ram_mb": 2048}},
+    {"id": "train_a", "kind": "train", "duration": 30, "resources": {"cpu": 4, "ram_mb": 4096},
+     "dependencies": ["prepare"], "checkpoint_interval": 10},
+    {"id": "train_b", "kind": "train", "duration": 30, "resources": {"cpu": 4, "ram_mb": 4096},
+     "dependencies": ["prepare"], "checkpoint_interval": 10},
+    {"id": "merge", "kind": "eval", "duration": 10, "resources": {"cpu": 2, "ram_mb": 2048},
+     "dependencies": ["train_a", "train_b"]}
+  ],
+  "policy": {"name": "priority_backfill"}
+}

@@ -136,6 +136,8 @@ EXPSCHED_CORS_ORIGINS=http://localhost:5173 make api
 С `problem.mode = "emulate"` прогон идёт на [агентах](agent.md#прогон-на-агентах): ответ 202
 `{"run_id": "...", "status": "running"}` сразу, сам прогон — в фоне. Его id случайный (настоящие контейнеры не
 повторить), у каждого узла должен быть `agent` (иначе 422), на сервере — `EXPSCHED_AGENT_TOKEN` (иначе 403).
+Узлы одного агента вместе не больше его ёмкости из `hello` по каждому ресурсу (иначе 422 с тем, чего не
+хватает); агента, которого сервер ещё не видел, не проверить — прогон ждёт его.
 Одновременно идёт не больше `EXPSCHED_EMULATIONS` (1) прогонов — сверх них 503 `RUN_QUEUE_FULL`, каждый не
 дольше `EXPSCHED_EMULATION_MAX_S` (3600) секунд, при остановке сервера идущие отменяются. Пока прогон идёт,
 `GET /v1/runs/{run_id}` отвечает 409 `RUN_IN_PROGRESS`, журнал и вход отдаются из памяти; по окончании прогон
@@ -167,6 +169,18 @@ EXPSCHED_CORS_ORIGINS=http://localhost:5173 make api
 сохранить чекпоинт сейчас; `{"kind": "worker_down", "worker": "…"}` — уронить узел (его контейнеры
 останавливаются, попытки прерываются, пока узел не вернут); `{"kind": "worker_up", "worker": "…"}`;
 `{"kind": "cancel"}`.
+
+## `GET /v1/agents`
+
+Агенты, представившиеся серверу (без токена агентов: только чтение, только на основном адресе):
+
+```json
+{"heartbeat_timeout_s": 15,
+ "agents": [{"id": "alpha", "runtime": "docker", "version": "0.1.0", "capacity": {"cpu": 7, "ram_mb": 14336},
+             "max_containers": 4, "alive": true, "seen_s_ago": 0.4, "running": ["3f9c…:train_a:1"]}]}
+```
+
+`alive` — опрашивал не дольше `heartbeat_timeout_s` назад; `running` — идущие попытки прогонов этого сервера.
 
 ## `POST /v1/runs/{run_id}/replay`
 

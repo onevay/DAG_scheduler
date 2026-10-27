@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+  "/v1/agents": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Agents
+     * @description Агенты, представившиеся серверу: среда, ёмкость, на связи ли, какие попытки у них идут.
+     */
+    get: operations["agents_v1_agents_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/agents/{agent_id}/events": {
     parameters: {
       query?: never;
@@ -393,6 +413,37 @@ export interface components {
        * @enum {string}
        */
       type: "accepted" | "rejected" | "started" | "checkpoint" | "exited" | "oom" | "killed" | "lost";
+    };
+    /**
+     * AgentOut
+     * @description Агент, который хоть раз представился этому серверу.
+     */
+    AgentOut: {
+      /** Alive */
+      alive: boolean;
+      /** Capacity */
+      capacity: {
+        [key: string]: number;
+      };
+      /** Id */
+      id: string;
+      /** Max Containers */
+      max_containers: number;
+      /** Running */
+      running: string[];
+      /** Runtime */
+      runtime: string;
+      /** Seen S Ago */
+      seen_s_ago: number;
+      /** Version */
+      version: string;
+    };
+    /** AgentsOut */
+    AgentsOut: {
+      /** Agents */
+      agents: components["schemas"]["AgentOut"][];
+      /** Heartbeat Timeout S */
+      heartbeat_timeout_s: number;
     };
     /** AttemptOut */
     AttemptOut: {
@@ -1768,6 +1819,26 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  agents_v1_agents_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AgentsOut"];
+        };
+      };
+    };
+  };
   events_v1_agents__agent_id__events_post: {
     parameters: {
       query?: never;

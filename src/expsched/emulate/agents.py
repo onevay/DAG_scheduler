@@ -110,6 +110,13 @@ class AgentRegistry:
         agent.commands.append(COMMAND.validate_python({**command, "command_id": agent.next_command}))
         agent.next_command += 1
 
+    def known(self) -> dict[str, tuple[Hello, float]]:
+        """Представившиеся агенты: их hello и сколько секунд назад они были на связи."""
+        now = self.clock()
+        return {
+            k: (a.hello, now - a.last_seen) for k, a in sorted(self.agents.items()) if a.hello is not None
+        }
+
     def alive(self, agent_id: str, since: float) -> bool:
         """На связи: опрашивал не дольше `heartbeat_s` назад. Не бывший на связи с `since` — ещё в запасе."""
         last = self.agents[agent_id].last_seen if agent_id in self.agents else -math.inf

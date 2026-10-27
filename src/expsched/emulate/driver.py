@@ -57,6 +57,7 @@ class Emulation:
         missing = sorted(w.id for w in problem.cluster.workers if not w.agent)
         if missing:
             raise ValueError(f"workers without an agent: {', '.join(missing)}")
+        _check_capacity(problem, registry)
         self.run_id = run_id
         self.registry = registry
         self.clock = clock
@@ -221,3 +222,26 @@ class Emulation:
         if c is not None:
             ref = {"run_id": self.run_id, "task": task, "attempt": attempt}
             self.registry.send(c.agent, {**ref, "kind": "stop", "reason": reason})
+
+
+def _check_capacity(problem: ProblemIn, registry: AgentRegistry) -> None:
+    """Узлы агента вместе не больше того, что он отдаёт под задачи. Агент, которого сервер ещё не видел, —
+    без проверки: прогон подождёт его, а не знающий ёмкости сервер не отказывает."""
+    need: dict[str, dict[str, int]] = {}
+    for w in problem.cluster.workers:
+        total = need.setdefault(str(w.agent), {})
+        for r, v in w.resources.items():
+            total[r] = total.get(r, 0) + v
+    known = registry.known()
+    for agent, total in sorted(need.items()):
+        if agent not in known:
+            continue
+        capacity = known[agent][0].capacity
+        short = [
+            f"{r} {v} > {capacity.get(r, 0)}" for r, v in sorted(total.items()) if v > capacity.get(r, 0)
+        ]
+        if short:
+            raise ValueError(
+                f"workers of agent {agent} need more than it offers: {', '.join(short)}; "
+                "give the agent more (--cpu, --ram-mb, --gpu) or split the workers between agents"
+            )

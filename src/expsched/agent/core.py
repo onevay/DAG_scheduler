@@ -232,7 +232,14 @@ class Agent:
             return
         self._write({"kind": "container", "key": command.key, "container_id": container_id})
         attempt.container_id = container_id
-        self._emit(attempt, "started", container_id=container_id)
+        here = read_progress(self._dir(command)) or 0
+        elsewhere = (  # прежнюю попытку вёл другой агент: её чекпоинт остался на той машине
+            f"checkpoint at {command.resume_from} is not on this machine (here: {here}); "
+            "the built-in workload resumes from the scheduler's position, a task's own state starts over"
+            if here < command.resume_from
+            else None
+        )
+        self._emit(attempt, "started", container_id=container_id, detail=elsewhere)
 
     def _refusal(self, command: StartCommand) -> str | None:
         if command.container and command.container.image not in self.allowed_images:

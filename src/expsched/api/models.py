@@ -186,6 +186,24 @@ class ContainerOut(Strict):
     usage: Usage | None = None  # последний замер агента, пока контейнер идёт; среда без замеров — None
 
 
+class AgentOut(Strict):
+    """Агент, который хоть раз представился этому серверу."""
+
+    id: str
+    runtime: str
+    version: str
+    capacity: dict[str, int]
+    max_containers: int
+    alive: bool  # опрашивал не дольше heartbeat_timeout_s назад
+    seen_s_ago: float  # сколько секунд назад был на связи
+    running: list[str]  # идущие попытки прогонов этого сервера: run:task:attempt
+
+
+class AgentsOut(Strict):
+    agents: list[AgentOut]
+    heartbeat_timeout_s: int
+
+
 class LogsOut(Strict):
     """Журнал контейнера попытки: последние строки, что прислал агент (сервер помнит до 500)."""
 

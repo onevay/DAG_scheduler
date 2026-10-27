@@ -122,6 +122,84 @@
         "title": "AgentEvent",
         "type": "object"
       },
+      "AgentOut": {
+        "additionalProperties": false,
+        "description": "Агент, который хоть раз представился этому серверу.",
+        "properties": {
+          "alive": {
+            "title": "Alive",
+            "type": "boolean"
+          },
+          "capacity": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Capacity",
+            "type": "object"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "max_containers": {
+            "title": "Max Containers",
+            "type": "integer"
+          },
+          "running": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Running",
+            "type": "array"
+          },
+          "runtime": {
+            "title": "Runtime",
+            "type": "string"
+          },
+          "seen_s_ago": {
+            "title": "Seen S Ago",
+            "type": "number"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "runtime",
+          "version",
+          "capacity",
+          "max_containers",
+          "alive",
+          "seen_s_ago",
+          "running"
+        ],
+        "title": "AgentOut",
+        "type": "object"
+      },
+      "AgentsOut": {
+        "additionalProperties": false,
+        "properties": {
+          "agents": {
+            "items": {
+              "$ref": "#/components/schemas/AgentOut"
+            },
+            "title": "Agents",
+            "type": "array"
+          },
+          "heartbeat_timeout_s": {
+            "title": "Heartbeat Timeout S",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "agents",
+          "heartbeat_timeout_s"
+        ],
+        "title": "AgentsOut",
+        "type": "object"
+      },
       "AttemptOut": {
         "additionalProperties": false,
         "properties": {
@@ -3754,6 +3832,28 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/v1/agents": {
+      "get": {
+        "description": "Агенты, представившиеся серверу: среда, ёмкость, на связи ли, какие попытки у них идут.",
+        "operationId": "agents_v1_agents_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Agents",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
     "/v1/agents/{agent_id}/events": {
       "post": {
         "operationId": "events_v1_agents__agent_id__events_post",

@@ -14,13 +14,45 @@ from fastapi import APIRouter, Path, Request
 from fastapi.responses import JSONResponse
 
 from expsched.api.errors import error_response
-from expsched.api.models import ErrorOut
+from expsched.api.models import AgentsOut, ErrorOut
 from expsched.contract.agent import EventsAck, EventsBatch, Hello, HelloAck, Poll, PollReply
 from expsched.emulate.agents import AgentRegistry, EventGap
 
 router = APIRouter(prefix="/v1/agents/{agent_id}", tags=["agents"])
+# Список — для клиента, без токена агентов и только на основном адресе: отдельный слушатель агентов его не
+# показывает
+listing = APIRouter(prefix="/v1/agents", tags=["agents"])
 AgentId = Annotated[str, Path(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")]
 ERRORS: dict[int | str, dict[str, Any]] = {status: {"model": ErrorOut} for status in (403, 409, 422)}
+
+
+@listing.get("", response_model=AgentsOut)
+async def agents(request: Request) -> Any:
+    """Агенты, представившиеся серверу: среда, ёмкость, на связи ли, какие попытки у них идут."""
+    registry = _registry(request)
+    running: dict[str, list[str]] = {}
+    for run_id, item in request.app.state.emulations.live.items():
+        if item.emulation.status != "running":
+            continue
+        for c in item.emulation.containers.values():
+            if c.state not in ("exited", "oom", "killed", "lost", "rejected"):
+                running.setdefault(c.agent, []).append(f"{run_id}:{c.task}:{c.attempt}")
+    return {
+        "agents": [
+            {
+                "id": agent_id,
+                "runtime": hello.runtime,
+                "version": hello.agent_version,
+                "capacity": dict(hello.capacity),
+                "max_containers": hello.max_containers,
+                "alive": seen <= registry.heartbeat_s,
+                "seen_s_ago": round(seen, 1),
+                "running": sorted(running.get(agent_id, [])),
+            }
+            for agent_id, (hello, seen) in registry.known().items()
+        ],
+        "heartbeat_timeout_s": registry.heartbeat_s,
+    }
 
 
 @router.post("/hello", response_model=HelloAck, responses=ERRORS)

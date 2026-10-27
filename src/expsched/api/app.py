@@ -13,13 +13,15 @@ EXPSCHED_MAX_RUNS_MB (2048) мегабайт. Каждый прогон идёт
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import os
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Iterator, Sequence
 from contextlib import asynccontextmanager, nullcontext
 from pathlib import Path as FilePath
 from typing import Annotated, Any, Literal
 
+import uvicorn
 from fastapi import APIRouter, FastAPI, Path, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -314,6 +316,33 @@ def get_explain(
     return explain_view(result, task, worker, t)
 
 
+class _AgentServer(uvicorn.Server):
+    """Слушатель агентов в цикле событий основного сервера; сигналы ловит основной — он и останавливает."""
+
+    @contextlib.contextmanager
+    def capture_signals(self) -> Iterator[None]:
+        yield
+
+
+def agent_listener(app: FastAPI, listen: str | None) -> uvicorn.Server | None:
+    """Отдельный адрес только для агентов (`EXPSCHED_AGENT_LISTEN=0.0.0.0:8001`): агенты с других машин
+    ходят на него, а клиент и остальной API остаются на 127.0.0.1. Без токена агентов адрес не открывается."""
+    if not listen:
+        return None
+    if not os.environ.get("EXPSCHED_AGENT_TOKEN"):
+        raise RuntimeError("EXPSCHED_AGENT_LISTEN needs EXPSCHED_AGENT_TOKEN: the agent API would be open")
+    host, _, port = listen.rpartition(":")
+    if not port.isdigit():
+        raise RuntimeError(f"EXPSCHED_AGENT_LISTEN must be host:port, got {listen!r}")
+    agent_app = FastAPI(title="expsched agents", docs_url=None, redoc_url=None, openapi_url=None)
+    agent_app.state = app.state  # тот же реестр агентов и те же прогоны
+    agent_app.include_router(agents.router)
+    config = uvicorn.Config(
+        agent_app, host=host or "0.0.0.0", port=int(port), lifespan="off", log_level="info"
+    )
+    return _AgentServer(config)
+
+
 def create_app(
     cors_origins: Sequence[str] = (),
     store: RunStore | None = None,
@@ -330,7 +359,12 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        listener = agent_listener(app, os.environ.get("EXPSCHED_AGENT_LISTEN"))
+        task = asyncio.create_task(listener.serve()) if listener else None
         yield
+        if listener and task:
+            listener.should_exit = True
+            await task
         app.state.emulations.close()  # прогоны на агентах отменяются: их контейнеры останавливаются
         runner.close()  # рабочие процессы не переживают сервер
 
@@ -347,6 +381,7 @@ def create_app(
     app.state.agents = AgentRegistry()
     app.state.emulations = Emulations(app.state.agents, app.state.store)
     app.include_router(router)
+    app.include_router(agents.listing)
     app.include_router(agents.router)
     app.include_router(emulations.router)
     add_security_headers(app)
