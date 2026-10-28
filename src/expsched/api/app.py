@@ -33,6 +33,7 @@ from starlette.exceptions import HTTPException
 from expsched.api import agents, emulations
 from expsched.api.emulations import Emulations
 from expsched.api.errors import error_response
+from expsched.api.local_agents import LocalAgents
 from expsched.api.models import (
     ErrorCode,
     ErrorOut,
@@ -366,6 +367,7 @@ def create_app(
             listener.should_exit = True
             await task
         app.state.emulations.close()  # прогоны на агентах отменяются: их контейнеры останавливаются
+        await asyncio.to_thread(app.state.local_agents.close)  # свои агенты уходят вместе с сервером
         runner.close()  # рабочие процессы не переживают сервер
 
     app = FastAPI(title="expsched", lifespan=lifespan)
@@ -380,8 +382,16 @@ def create_app(
     )
     app.state.agents = AgentRegistry()
     app.state.emulations = Emulations(app.state.agents, app.state.store)
+    app.state.local_agents = LocalAgents(
+        FilePath(
+            os.environ.get(
+                "EXPSCHED_LOCAL_AGENTS_DIR", app.state.store.root.parent / ".expsched-local-agents"
+            )
+        )
+    )
     app.include_router(router)
     app.include_router(agents.listing)
+    app.include_router(agents.local)
     app.include_router(agents.router)
     app.include_router(emulations.listing)
     app.include_router(emulations.router)

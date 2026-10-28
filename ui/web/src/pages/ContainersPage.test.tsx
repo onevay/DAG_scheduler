@@ -100,10 +100,39 @@ const AGENTS = {
 const LIVE_RUNS = [
   { run_id: RUN, name: "laptop", mode: "shadow", status: "running", now: 37, containers: 3, running: 1 },
 ];
+const LOCALS = [
+  {
+    id: "laptop",
+    runtime: "docker",
+    pid: 42,
+    alive: true,
+    exit_code: null,
+    log: ["agent laptop: runtime docker"],
+  },
+];
 const posted: unknown[] = [];
+const deleted: string[] = [];
+let checkFails = false;
 const server = setupServer(
   http.get("/v1/agents", () => HttpResponse.json(AGENTS)),
   http.get("/v1/live", () => HttpResponse.json({ runs: LIVE_RUNS })),
+  http.get("/v1/local-agents", () => HttpResponse.json({ agents: LOCALS })),
+  http.post("/v1/local-agents", async ({ request }) => {
+    const body = (await request.json()) as { id: string; runtime: string };
+    posted.push(body);
+    if (checkFails)
+      return HttpResponse.json(
+        {
+          error: { code: "AGENT_NOT_READY", message: "ok   runtime\nFAIL runtime docker: no workload image" },
+        },
+        { status: 422 },
+      );
+    return HttpResponse.json({ ...body, pid: 7, alive: true, exit_code: null, log: [] }, { status: 201 });
+  }),
+  http.delete("/v1/local-agents/:id", ({ params }) => {
+    deleted.push(String(params.id));
+    return new HttpResponse(null, { status: 204 });
+  }),
   http.get(`/v1/runs/${RUN}/containers`, () => HttpResponse.json(LIVE)),
   http.get(`/v1/runs/${RUN}/problem`, () => HttpResponse.json(PROBLEM)),
   http.get(`/v1/runs/${RUN}/containers/train_small/1/logs`, () =>
@@ -122,7 +151,11 @@ const server = setupServer(
   }),
 );
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterEach(() => (posted.length = 0));
+afterEach(() => {
+  posted.length = 0;
+  deleted.length = 0;
+  checkFails = false;
+});
 afterAll(() => server.close());
 
 function renderAt(path: string, draft: Draft) {
@@ -274,5 +307,35 @@ describe("ContainersPage", () => {
         }),
       },
     ]);
+  });
+
+  it("starts an agent on the server's machine and stops a local one", async () => {
+    renderAt("/containers", PROBLEM as Draft);
+    const agents = await screen.findByRole("list", { name: "Агенты" });
+    const laptop = await within(agents).findByRole("listitem", { name: "Агент laptop: на связи" });
+    expect(laptop).toHaveTextContent("на этой машине · pid 42");
+    await userEvent.click(within(laptop).getByText("Журнал процесса"));
+    expect(within(laptop).getByText("agent laptop: runtime docker")).toBeVisible();
+    await userEvent.click(within(laptop).getByRole("button", { name: "Остановить агента laptop" }));
+    expect(deleted).toEqual(["laptop"]);
+
+    const form = screen.getByRole("form", { name: "Запустить агента на этой машине" });
+    expect(within(form).getByRole("textbox", { name: "Id нового агента" })).toHaveAttribute(
+      "placeholder",
+      "local-1",
+    );
+    await userEvent.click(within(form).getByRole("radio", { name: "Без контейнеров" }));
+    await userEvent.click(within(form).getByRole("switch", { name: /Ёмкость автоматически/ }));
+    await userEvent.click(within(form).getByRole("button", { name: "Больше ядер агента" }));
+    await userEvent.click(within(form).getByRole("button", { name: "Запустить local-1" }));
+    expect(posted).toEqual([{ id: "local-1", runtime: "fake", cpu: 5, ram_mb: 8192 }]);
+
+    checkFails = true;
+    await userEvent.type(within(form).getByRole("textbox", { name: "Id нового агента" }), "gpu-box");
+    await userEvent.click(within(form).getByRole("radio", { name: "Docker" }));
+    await userEvent.click(within(form).getByRole("button", { name: "Запустить gpu-box" }));
+    expect(await within(form).findByRole("alert")).toHaveTextContent(
+      "FAIL runtime docker: no workload image",
+    );
   });
 });

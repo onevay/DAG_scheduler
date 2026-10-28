@@ -173,3 +173,11 @@ def test_json_log_lines():
     assert (
         line["level"] == "warning" and line["message"] == "scheduler: down" and line["at"].endswith("+00:00")
     )
+
+
+def test_check_without_hello_does_not_introduce_the_agent(tmp_path, capsys):
+    s = settings(None, {"id": "box", "runtime": "fake", "state": str(tmp_path)})
+    scheduler = Scheduler(threading.Event())
+    assert check(s, build(s), scheduler, lambda: "fake runtime", hello=False) == 0
+    out = capsys.readouterr().out
+    assert scheduler.paths == [] and "ok   scheduler" not in out and "FAIL scheduler" not in out

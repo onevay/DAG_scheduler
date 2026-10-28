@@ -38,6 +38,8 @@ export type Logs = S["LogsOut"];
 export type Agents = S["AgentsOut"];
 export type AgentInfo = S["AgentOut"];
 export type LiveRun = S["LiveRunOut"];
+export type LocalAgent = S["LocalAgentOut"];
+export type LocalAgentStart = S["LocalAgentIn"];
 // Тело действия API проверяет сам (в OpenAPI его схемы нет): чекпоинт задачи, уронить или вернуть узел, отмена
 export type RunAction =
   | { kind: "checkpoint"; task: string }

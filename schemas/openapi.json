@@ -827,6 +827,8 @@
               "FORBIDDEN",
               "EVENT_GAP",
               "RUN_IN_PROGRESS",
+              "AGENT_RUNNING",
+              "AGENT_NOT_READY",
               "INTERNAL"
             ],
             "title": "Code",
@@ -1640,6 +1642,142 @@
           "status"
         ],
         "title": "LiveStarted",
+        "type": "object"
+      },
+      "LocalAgentIn": {
+        "additionalProperties": false,
+        "description": "Агент на машине сервера: id, среда и, если не автоматически, ёмкость под задачи.",
+        "properties": {
+          "cpu": {
+            "anyOf": [
+              {
+                "maximum": 1024.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu"
+          },
+          "gpu": {
+            "anyOf": [
+              {
+                "maximum": 64.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gpu"
+          },
+          "id": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "ram_mb": {
+            "anyOf": [
+              {
+                "maximum": 16777216.0,
+                "minimum": 128.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ram Mb"
+          },
+          "runtime": {
+            "default": "docker",
+            "enum": [
+              "docker",
+              "podman",
+              "fake"
+            ],
+            "title": "Runtime",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "LocalAgentIn",
+        "type": "object"
+      },
+      "LocalAgentOut": {
+        "additionalProperties": false,
+        "properties": {
+          "alive": {
+            "title": "Alive",
+            "type": "boolean"
+          },
+          "exit_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit Code"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "log": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Log",
+            "type": "array"
+          },
+          "pid": {
+            "title": "Pid",
+            "type": "integer"
+          },
+          "runtime": {
+            "enum": [
+              "docker",
+              "podman",
+              "fake"
+            ],
+            "title": "Runtime",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "runtime",
+          "pid",
+          "alive",
+          "exit_code",
+          "log"
+        ],
+        "title": "LocalAgentOut",
+        "type": "object"
+      },
+      "LocalAgentsOut": {
+        "additionalProperties": false,
+        "properties": {
+          "agents": {
+            "items": {
+              "$ref": "#/components/schemas/LocalAgentOut"
+            },
+            "title": "Agents",
+            "type": "array"
+          }
+        },
+        "required": [
+          "agents"
+        ],
+        "title": "LocalAgentsOut",
         "type": "object"
       },
       "LogsOut": {
@@ -3978,6 +4116,16 @@
             },
             "description": "Forbidden"
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "409": {
             "content": {
               "application/json": {
@@ -4050,6 +4198,16 @@
               }
             },
             "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
           },
           "409": {
             "content": {
@@ -4125,6 +4283,16 @@
             },
             "description": "Forbidden"
           },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
           "409": {
             "content": {
               "application/json": {
@@ -4171,6 +4339,165 @@
         "summary": "Live Runs",
         "tags": [
           "emulation"
+        ]
+      }
+    },
+    "/v1/local-agents": {
+      "get": {
+        "description": "Агенты, которых запустил этот сервер: идут ли, код выхода, хвост журнала процесса.",
+        "operationId": "local_agents_v1_local_agents_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalAgentsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Local Agents",
+        "tags": [
+          "agents"
+        ]
+      },
+      "post": {
+        "description": "Проверить среду (`agent check`) и запустить агента на машине сервера; он сам представится серверу.",
+        "operationId": "start_local_agent_v1_local_agents_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalAgentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalAgentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Start Local Agent",
+        "tags": [
+          "agents"
+        ]
+      }
+    },
+    "/v1/local-agents/{agent_id}": {
+      "delete": {
+        "description": "Остановить агента; его контейнеры остаются и подхватываются, если запустить его снова.",
+        "operationId": "stop_local_agent_v1_local_agents__agent_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agent_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+              "title": "Agent Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Stop Local Agent",
+        "tags": [
+          "agents"
         ]
       }
     },

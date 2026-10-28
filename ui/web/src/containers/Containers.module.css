@@ -293,3 +293,13 @@
 li.card {
   cursor: auto;
 }
+
+.details {
+  width: 100%;
+  font: var(--text-small);
+}
+
+.details summary {
+  cursor: pointer;
+  margin-bottom: var(--space-2);
+}

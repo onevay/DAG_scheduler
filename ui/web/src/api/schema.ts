@@ -98,6 +98,50 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/local-agents": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Local Agents
+     * @description Агенты, которых запустил этот сервер: идут ли, код выхода, хвост журнала процесса.
+     */
+    get: operations["local_agents_v1_local_agents_get"];
+    put?: never;
+    /**
+     * Start Local Agent
+     * @description Проверить среду (`agent check`) и запустить агента на машине сервера; он сам представится серверу.
+     */
+    post: operations["start_local_agent_v1_local_agents_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/local-agents/{agent_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Stop Local Agent
+     * @description Остановить агента; его контейнеры остаются и подхватываются, если запустить его снова.
+     */
+    delete: operations["stop_local_agent_v1_local_agents__agent_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/policies": {
     parameters: {
       query?: never;
@@ -713,6 +757,8 @@ export interface components {
         | "FORBIDDEN"
         | "EVENT_GAP"
         | "RUN_IN_PROGRESS"
+        | "AGENT_RUNNING"
+        | "AGENT_NOT_READY"
         | "INTERNAL";
       /** Message */
       message: string;
@@ -1006,6 +1052,49 @@ export interface components {
        * @enum {string}
        */
       status: "running" | "done" | "cancelled";
+    };
+    /**
+     * LocalAgentIn
+     * @description Агент на машине сервера: id, среда и, если не автоматически, ёмкость под задачи.
+     */
+    LocalAgentIn: {
+      /** Cpu */
+      cpu?: number | null;
+      /** Gpu */
+      gpu?: number | null;
+      /** Id */
+      id: string;
+      /** Ram Mb */
+      ram_mb?: number | null;
+      /**
+       * Runtime
+       * @default docker
+       * @enum {string}
+       */
+      runtime?: "docker" | "podman" | "fake";
+    };
+    /** LocalAgentOut */
+    LocalAgentOut: {
+      /** Alive */
+      alive: boolean;
+      /** Exit Code */
+      exit_code: number | null;
+      /** Id */
+      id: string;
+      /** Log */
+      log: string[];
+      /** Pid */
+      pid: number;
+      /**
+       * Runtime
+       * @enum {string}
+       */
+      runtime: "docker" | "podman" | "fake";
+    };
+    /** LocalAgentsOut */
+    LocalAgentsOut: {
+      /** Agents */
+      agents: components["schemas"]["LocalAgentOut"][];
     };
     /**
      * LogsOut
@@ -1923,6 +2012,15 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Conflict */
       409: {
         headers: {
@@ -1969,6 +2067,15 @@ export interface operations {
       };
       /** @description Forbidden */
       403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Not Found */
+      404: {
         headers: {
           [name: string]: unknown;
         };
@@ -2029,6 +2136,15 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Conflict */
       409: {
         headers: {
@@ -2065,6 +2181,142 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["LiveRunsOut"];
+        };
+      };
+    };
+  };
+  local_agents_v1_local_agents_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LocalAgentsOut"];
+        };
+      };
+    };
+  };
+  start_local_agent_v1_local_agents_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LocalAgentIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LocalAgentOut"];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+    };
+  };
+  stop_local_agent_v1_local_agents__agent_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        agent_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
         };
       };
     };

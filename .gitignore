@@ -27,3 +27,4 @@ ui/web/playwright-report/
 
 # журнал и чекпоинты агента, запущенного из репозитория
 .expsched-agent/
+.expsched-local-agents/

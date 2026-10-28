@@ -195,8 +195,9 @@ def probe_runtime(s: Settings, run: Run = run_cli) -> str:
     return f"{s.runtime} {done.stdout.strip()}, workload image {image}"
 
 
-def check(s: Settings, agent: Agent, scheduler: Calls, probe: Callable[[], str]) -> int:
-    """Перед запуском службы: среда, каталог состояния, токен и связь с планировщиком. 0 — всё готово."""
+def check(s: Settings, agent: Agent, scheduler: Calls, probe: Callable[[], str], hello: bool = True) -> int:
+    """Перед запуском службы: среда, каталог состояния, токен и связь с планировщиком. 0 — всё готово.
+    `hello=False` — без связи: hello представил бы агента серверу, даже если его так и не запустят."""
     failed = 0
 
     def report(ok: bool, what: str) -> None:
@@ -218,6 +219,8 @@ def check(s: Settings, agent: Agent, scheduler: Calls, probe: Callable[[], str])
         print(
             "warn no token: EXPSCHED_AGENT_TOKEN or token_file; a scheduler with agents enabled will refuse"
         )
+    if not hello:
+        return 1 if failed else 0
     try:
         ack = scheduler.call("hello", agent.hello(), HelloAck, timeout=10)
         report(True, f"scheduler {s.scheduler}: heartbeat {ack.heartbeat_timeout_s} s")
@@ -229,6 +232,9 @@ def check(s: Settings, agent: Agent, scheduler: Calls, probe: Callable[[], str])
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="python -m expsched.agent", description="Агент expsched")
     parser.add_argument("command", nargs="?", choices=["run", "check"], default="run")
+    parser.add_argument(
+        "--no-hello", action="store_true", help="check: не проверять связь (сервер запускает агента сам)"
+    )
     parser.add_argument("--config", type=Path, help="файл настроек agent.toml (таблица [agent])")
     parser.add_argument("--scheduler", help="адрес планировщика (http://127.0.0.1:8000)")
     parser.add_argument("--id", help="id агента, как в поле agent узлов")
@@ -248,7 +254,7 @@ def main(argv: list[str] | None = None) -> None:
         "--stop-on-exit", action="store_true", default=None, help="остановить контейнеры при выходе"
     )
     args = parser.parse_args(argv)
-    overrides = {k: v for k, v in vars(args).items() if k not in ("command", "config")}
+    overrides = {k: v for k, v in vars(args).items() if k not in ("command", "config", "no_hello")}
     try:
         s = settings(args.config, overrides)
     except (ValueError, OSError) as error:  # TOMLDecodeError — тоже ValueError
@@ -257,7 +263,7 @@ def main(argv: list[str] | None = None) -> None:
     agent = build(s)
     scheduler = Scheduler(s.scheduler, s.id, s.token())
     if args.command == "check":
-        sys.exit(check(s, agent, scheduler, lambda: probe_runtime(s)))
+        sys.exit(check(s, agent, scheduler, lambda: probe_runtime(s), hello=not args.no_hello))
     stop = threading.Event()
     for signum in (signal.SIGTERM, signal.SIGINT):
         signal.signal(signum, lambda *_: stop.set())

@@ -35,6 +35,8 @@ ErrorCode = Literal[
     "FORBIDDEN",  # агентский API выключен или токен неверный
     "EVENT_GAP",  # агент пропустил номер события; дослать с указанного
     "RUN_IN_PROGRESS",  # прогон на агентах ещё идёт: результата пока нет
+    "AGENT_RUNNING",  # локальный агент с этим id уже идёт или их слишком много
+    "AGENT_NOT_READY",  # проверка локального агента не прошла: среда или связь не готовы
     "INTERNAL",  # ошибка сервера; подробности только в его журнале
 ]
 
@@ -202,6 +204,29 @@ class AgentOut(Strict):
 class AgentsOut(Strict):
     agents: list[AgentOut]
     heartbeat_timeout_s: int
+
+
+class LocalAgentIn(Strict):
+    """Агент на машине сервера: id, среда и, если не автоматически, ёмкость под задачи."""
+
+    id: Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")]
+    runtime: Literal["docker", "podman", "fake"] = "docker"
+    cpu: Annotated[int, Field(ge=1, le=1024)] | None = None
+    ram_mb: Annotated[int, Field(ge=128, le=16_777_216)] | None = None
+    gpu: Annotated[int, Field(ge=0, le=64)] | None = None
+
+
+class LocalAgentOut(Strict):
+    id: str
+    runtime: Literal["docker", "podman", "fake"]
+    pid: int
+    alive: bool  # процесс идёт
+    exit_code: int | None  # процесс закончился с этим кодом
+    log: list[str]  # последние строки журнала процесса
+
+
+class LocalAgentsOut(Strict):
+    agents: list[LocalAgentOut]
 
 
 class LiveRunOut(Strict):

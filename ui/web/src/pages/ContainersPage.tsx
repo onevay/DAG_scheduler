@@ -6,12 +6,14 @@ import {
   useContainerLogs,
   useLive,
   useLiveRuns,
+  useLocalAgentControl,
+  useLocalAgents,
   useLiveEvents,
   useRunAction,
   useRunProblem,
   useStartOnAgents,
 } from "../api/hooks";
-import type { AgentInfo, Container, Live } from "../api/types";
+import type { AgentInfo, Container, Live, LocalAgent, LocalAgentStart } from "../api/types";
 import {
   attemptLog,
   counts,
@@ -30,8 +32,9 @@ import {
 import styles from "../containers/Containers.module.css";
 import { PlanVsFact } from "../containers/PlanVsFact";
 import { useDraft } from "../draft/DraftContext";
-import { Button, Segmented } from "../ui/controls";
+import { Button, Segmented, Switch } from "../ui/controls";
 import { Section } from "../ui/data";
+import { ResourceFields } from "../ui/ResourceFields";
 import { PageHeader } from "../ui/PageHeader";
 import { plural } from "../ui/plural";
 import { formatResources, type Resources } from "../ui/resources";
@@ -184,47 +187,185 @@ function ModePanel() {
 /** Агенты, представившиеся серверу: на связи ли, что отдают под задачи, сколько контейнеров заняты. */
 function AgentsPanel() {
   const agents = useAgents();
-  const list = agents.data?.agents ?? [];
+  const locals = useLocalAgents().data ?? [];
+  const control = useLocalAgentControl();
+  const known = agents.data?.agents ?? [];
+  // Запущенный только что ещё не представился серверу — карточка есть и у него
+  const ids = [...new Set([...known.map((a) => a.id), ...locals.map((l) => l.id)])].sort();
   return (
-    <Section title={`Агенты · ${list.length}`}>
-      {list.length === 0 ? (
+    <Section title={`Агенты · ${ids.length}`}>
+      {ids.length === 0 ? (
         <p className={styles.note}>
-          Ни один агент ещё не представился серверу. На машине с Docker:{" "}
-          <code>python -m expsched.agent --id laptop --scheduler {window.location.origin}</code> с тем же
-          EXPSCHED_AGENT_TOKEN, что у сервера (подробно — docs/agent.md).
+          Ни один агент ещё не представился серверу. Запустите его здесь, на машине сервера, или на другой
+          машине: <code>python -m expsched.agent --id laptop --scheduler {window.location.origin}</code> с тем
+          же EXPSCHED_AGENT_TOKEN, что у сервера (подробно — docs/agent.md).
         </p>
       ) : (
         <ul className={styles.cards} aria-label="Агенты">
-          {list.map((a) => (
-            <AgentCard key={a.id} agent={a} />
+          {ids.map((id) => (
+            <AgentCard
+              key={id}
+              id={id}
+              agent={known.find((a) => a.id === id)}
+              local={locals.find((l) => l.id === id)}
+              onStop={() => control.stop.mutate(id)}
+              stopping={control.stop.isPending && control.stop.variables === id}
+            />
           ))}
         </ul>
       )}
+      <LocalAgentForm taken={ids} start={control.start} />
     </Section>
   );
 }
 
-function AgentCard({ agent: a }: { agent: AgentInfo }) {
+function AgentCard({
+  id,
+  agent: a,
+  local,
+  onStop,
+  stopping,
+}: {
+  id: string;
+  agent: AgentInfo | undefined;
+  local: LocalAgent | undefined;
+  onStop: () => void;
+  stopping: boolean;
+}) {
+  const exited = local && !local.alive;
+  const short = a?.alive
+    ? "на связи"
+    : exited
+      ? "процесс завершился"
+      : local && !a
+        ? "запускается"
+        : "нет связи";
+  const state = a?.alive
+    ? "на связи"
+    : exited
+      ? `процесс завершился, код ${local.exit_code}`
+      : local && !a
+        ? "запускается"
+        : `нет связи · ${Math.round(a?.seen_s_ago ?? 0)} с`;
   return (
-    <li className={styles.card} aria-label={`Агент ${a.id}: ${a.alive ? "на связи" : "нет связи"}`}>
+    <li className={styles.card} aria-label={`Агент ${id}: ${short}`}>
       <span className={styles.cardHead}>
-        <span className={styles.task}>{a.id}</span>
-        <span className={styles.chip} data-phase={a.alive ? "running" : "killed"}>
+        <span className={styles.task}>{id}</span>
+        <span
+          className={styles.chip}
+          data-phase={a?.alive ? "running" : local && !exited ? "waiting" : "killed"}
+        >
           <span className={styles.chipDot} />
-          {a.alive ? "на связи" : `нет связи · ${Math.round(a.seen_s_ago)} с`}
+          {state}
         </span>
       </span>
       <dl className={styles.facts}>
         <dt>Среда</dt>
-        <dd>{a.runtime}</dd>
-        <dt>Отдаёт</dt>
-        <dd>{formatResources(a.capacity)}</dd>
-        <dt>Контейнеры</dt>
-        <dd>
-          {a.running.length} из {a.max_containers}
-        </dd>
+        <dd>{a?.runtime ?? local?.runtime}</dd>
+        {a && (
+          <>
+            <dt>Отдаёт</dt>
+            <dd>{formatResources(a.capacity)}</dd>
+            <dt>Контейнеры</dt>
+            <dd>
+              {a.running.length} из {a.max_containers}
+            </dd>
+          </>
+        )}
+        {local && (
+          <>
+            <dt>Процесс</dt>
+            <dd>на этой машине · pid {local.pid}</dd>
+          </>
+        )}
       </dl>
+      {local && (
+        <>
+          <details className={styles.details}>
+            <summary>Журнал процесса</summary>
+            <pre className={styles.console}>{local.log.join("\n") || "пусто"}</pre>
+          </details>
+          <Button
+            variant="secondary"
+            disabled={stopping}
+            onClick={onStop}
+            aria-label={`Остановить агента ${id}`}
+          >
+            {stopping ? "Останавливаю…" : exited ? "Убрать" : "Остановить"}
+          </Button>
+        </>
+      )}
     </li>
+  );
+}
+
+type AgentRuntime = NonNullable<LocalAgentStart["runtime"]>;
+
+const RUNTIMES = [
+  { value: "docker", label: "Docker" },
+  { value: "podman", label: "Podman" },
+  { value: "fake", label: "Без контейнеров" },
+] as const;
+
+/** Запуск агента процессом рядом с сервером: перед запуском сервер проверяет среду (`agent check`). */
+function LocalAgentForm({
+  taken,
+  start,
+}: {
+  taken: string[];
+  start: ReturnType<typeof useLocalAgentControl>["start"];
+}) {
+  const free = ["laptop", ...Array.from({ length: 8 }, (_, i) => `local-${i + 1}`)].find(
+    (n) => !taken.includes(n),
+  );
+  const [id, setId] = useState("");
+  const [runtime, setRuntime] = useState<AgentRuntime>("docker");
+  const [auto, setAuto] = useState(true);
+  const [capacity, setCapacity] = useState<Record<string, number>>({ cpu: 4, ram_mb: 8192 });
+  const name = id || free || "";
+  const submit = () =>
+    start.mutate({ id: name, runtime, ...(auto ? {} : capacity) }, { onSuccess: () => setId("") });
+  return (
+    <form
+      className={styles.controls}
+      aria-label="Запустить агента на этой машине"
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+    >
+      <span className={styles.caption}>Запустить агента на этой машине</span>
+      <div className={styles.row}>
+        <input
+          className={styles.input}
+          aria-label="Id нового агента"
+          placeholder={free}
+          value={id}
+          onChange={(e) => setId(e.target.value.trim())}
+        />
+        <Segmented
+          label="Среда агента"
+          options={[...RUNTIMES]}
+          value={runtime}
+          onChange={(v) => setRuntime(v as AgentRuntime)}
+        />
+      </div>
+      <Switch
+        checked={auto}
+        onChange={setAuto}
+        label="Ёмкость автоматически"
+        hint="машина минус одно ядро и 2 ГБ памяти"
+      />
+      {!auto && <ResourceFields value={capacity} onChange={setCapacity} of="агента" />}
+      <Button disabled={!name || start.isPending} onClick={submit}>
+        {start.isPending ? "Проверяю и запускаю…" : `Запустить ${name}`}
+      </Button>
+      {start.isError && (
+        <pre role="alert" className={styles.console}>
+          {start.error.message}
+        </pre>
+      )}
+    </form>
   );
 }
 

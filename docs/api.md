@@ -54,6 +54,8 @@ What-if занимает места в очереди сразу под все �
 | 403 | `FORBIDDEN` | агентский API выключен (нет `EXPSCHED_AGENT_TOKEN`) или токен неверный |
 | 405 | `METHOD_NOT_ALLOWED` | путь есть, метод не тот |
 | 409 | `RUN_IN_PROGRESS` | прогон на агентах ещё идёт: результата пока нет |
+| 409 | `AGENT_RUNNING` | локальный агент с этим id уже идёт или их уже `EXPSCHED_LOCAL_AGENTS` (8) |
+| 422 | `AGENT_NOT_READY` | проверка локального агента не прошла; в сообщении — вывод `agent check` |
 | 409 | `EVENT_GAP` | агент пропустил номер события; дослать с указанного |
 | 413 | `INPUT_TOO_LARGE` | тело больше лимита |
 | 422 | `SCHEMA_INVALID` | тело не соответствует схеме; подробности в `diagnostics` |
@@ -181,6 +183,16 @@ EXPSCHED_CORS_ORIGINS=http://localhost:5173 make api
 ```
 
 `alive` — опрашивал не дольше `heartbeat_timeout_s` назад; `running` — идущие попытки прогонов этого сервера.
+
+## `GET|POST /v1/local-agents`, `DELETE /v1/local-agents/{id}`
+
+Агенты на машине сервера, которых он запускает сам (только при `EXPSCHED_AGENT_TOKEN`, иначе 403):
+`POST` `{"id": "laptop", "runtime": "docker|podman|fake", "cpu"?: 4, "ram_mb"?: 8192, "gpu"?: 0}` — сначала
+`agent check --no-hello` с теми же параметрами (не прошла — 422 `AGENT_NOT_READY` с её выводом), затем процесс агента;
+201 — `{id, runtime, pid, alive, exit_code, log}`. Тот же id уже идёт или агентов уже `EXPSCHED_LOCAL_AGENTS`
+(8) — 409 `AGENT_RUNNING`. `GET` — все, с хвостом журнала процесса; `DELETE` — SIGTERM и ожидание (204, нет
+такого — 404). Каталоги агентов — `EXPSCHED_LOCAL_AGENTS_DIR` (рядом с каталогом прогонов, `.expsched-local-agents/<id>`:
+журнал состояния и `agent.log`). Сервер останавливает своих агентов, когда останавливается сам.
 
 ## `GET /v1/live`
 

@@ -1,7 +1,17 @@
 import { QueryClient, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { allEvents, api, ApiError, type ExplainFilter } from "./client";
-import type { InputEvent, Intervention, Live, Policy, PolicyName, Problem, Run, RunAction } from "./types";
+import type {
+  InputEvent,
+  Intervention,
+  Live,
+  LocalAgentStart,
+  Policy,
+  PolicyName,
+  Problem,
+  Run,
+  RunAction,
+} from "./types";
 
 export const keys = {
   policies: ["policies"] as const,
@@ -15,6 +25,7 @@ export const keys = {
   live: (runId: string) => ["live", runId] as const,
   agents: ["agents"] as const,
   liveRuns: ["live-runs"] as const,
+  localAgents: ["local-agents"] as const,
   liveEvents: (runId: string) => ["live", runId, "events"] as const,
   logs: (runId: string, task: string, attempt: number) => ["live", runId, "logs", task, attempt] as const,
 };
@@ -126,6 +137,30 @@ export const useLiveEvents = (runId: string | undefined, running: boolean) =>
 /** Агенты, представившиеся серверу; на связи ли — меняется, поэтому раз в 3 с. */
 export const useAgents = () =>
   useQuery({ queryKey: keys.agents, queryFn: ({ signal }) => api.agents(signal), refetchInterval: 3000 });
+
+/** Агенты, которых сервер запустил на своей машине: идут ли и хвост журнала процесса; раз в 3 с. */
+export const useLocalAgents = () =>
+  useQuery({
+    queryKey: keys.localAgents,
+    queryFn: ({ signal }) => api.localAgents(signal),
+    refetchInterval: 3000,
+  });
+
+/** Запуск и остановка локального агента; после — списки агентов перечитываются сразу, а не через 3 с. */
+export const useLocalAgentControl = () => {
+  const client = useQueryClient();
+  const refresh = () => {
+    void client.invalidateQueries({ queryKey: keys.localAgents });
+    void client.invalidateQueries({ queryKey: keys.agents });
+  };
+  return {
+    start: useMutation({
+      mutationFn: (agent: LocalAgentStart) => api.startLocalAgent(agent),
+      onSettled: refresh,
+    }),
+    stop: useMutation({ mutationFn: (id: string) => api.stopLocalAgent(id), onSettled: refresh }),
+  };
+};
 
 /** Прогоны на агентах, которые помнит сервер; раз в 3 с. */
 export const useLiveRuns = () =>

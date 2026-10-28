@@ -6,6 +6,8 @@ import type {
   InputEvent,
   Intervention,
   JournalRecord,
+  LocalAgent,
+  LocalAgentStart,
   LiveRun,
   Logs,
   Agents,
@@ -40,7 +42,7 @@ export class ApiError extends Error {
 }
 
 interface Options {
-  method?: "GET" | "POST";
+  method?: "GET" | "POST" | "DELETE";
   query?: Record<string, string | number | undefined>;
   body?: unknown;
   signal?: AbortSignal;
@@ -66,6 +68,7 @@ export async function request<T>(
     if (signal?.aborted) throw error;
     throw new ApiError(0, "NETWORK", "API недоступен: запустите make api");
   }
+  if (response.status === 204) return undefined as T; // без тела: удаление удалось
   let data: unknown;
   try {
     data = await response.json();
@@ -118,6 +121,12 @@ export const api = {
   agents: (signal?: AbortSignal) => request<Agents>("/v1/agents", { signal }),
   liveRuns: (signal?: AbortSignal) =>
     request<{ runs: LiveRun[] }>("/v1/live", { signal }).then((r) => r.runs),
+  localAgents: (signal?: AbortSignal) =>
+    request<{ agents: LocalAgent[] }>("/v1/local-agents", { signal }).then((r) => r.agents),
+  startLocalAgent: (agent: LocalAgentStart) =>
+    request<LocalAgent>("/v1/local-agents", { method: "POST", body: agent }),
+  stopLocalAgent: (id: string) =>
+    request<undefined>(`/v1/local-agents/${encodeURIComponent(id)}`, { method: "DELETE" }),
   logs: (runId: string, task: string, attempt: number, signal?: AbortSignal) =>
     request<Logs>(`/v1/runs/${runId}/containers/${encodeURIComponent(task)}/${attempt}/logs`, { signal }),
   replay: (runId: string) => request<Replay>(`/v1/runs/${runId}/replay`, { method: "POST" }),
