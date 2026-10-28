@@ -191,7 +191,7 @@ EXPSCHED_CORS_ORIGINS=http://localhost:5173 make api
 `agent check --no-hello` с теми же параметрами (не прошла — 422 `AGENT_NOT_READY` с её выводом), затем процесс агента;
 201 — `{id, runtime, pid, alive, exit_code, log}`. Тот же id уже идёт или агентов уже `EXPSCHED_LOCAL_AGENTS`
 (8) — 409 `AGENT_RUNNING`. `GET` — все, с хвостом журнала процесса; `DELETE` — SIGTERM и ожидание (204, нет
-такого — 404). Каталоги агентов — `EXPSCHED_LOCAL_AGENTS_DIR` (рядом с каталогом прогонов, `.expsched-local-agents/<id>`:
+такого — 404). Каталоги агентов — `EXPSCHED_LOCAL_AGENTS_DIR` (в каталоге прогонов, `.local-agents/<id>`:
 журнал состояния и `agent.log`). Сервер останавливает своих агентов, когда останавливается сам.
 
 ## `GET /v1/live`

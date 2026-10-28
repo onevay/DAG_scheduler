@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import time
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -23,6 +23,7 @@ from expsched.emulate.agents import AgentRegistry
 from expsched.emulate.shadow import compare
 from expsched.engine.events import Crash, Finish
 from expsched.engine.executor import External
+from expsched.estimate import Estimate
 from expsched.pipeline import RunResult, conclude, prepare
 
 Status = Literal["running", "done", "cancelled"]
@@ -53,6 +54,7 @@ class Emulation:
         policy: PolicyIn,
         registry: AgentRegistry,
         clock: Callable[[], float] = time.monotonic,
+        history: Mapping[str, Estimate] | None = None,  # оценки по прошлым прогонам, по ключу задачи
     ) -> None:
         missing = sorted(w.id for w in problem.cluster.workers if not w.agent)
         if missing:
@@ -72,7 +74,7 @@ class Emulation:
         self.result: RunResult | None = None
         self.status: Status = "running"
         self.started = clock()
-        prepared = prepare(problem, policy)
+        prepared = prepare(problem, policy, history)
         if isinstance(prepared, RunResult):  # строгая проверка не пропустила вход
             self.result, self.status = prepared, "done"
             return

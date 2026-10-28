@@ -797,6 +797,8 @@ export interface components {
       source: "estimate" | "history" | "similar" | "kind";
       /** Spread */
       spread: number;
+      /** Work */
+      work: number;
     };
     /** EventIn */
     EventIn: {

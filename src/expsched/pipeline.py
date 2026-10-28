@@ -71,7 +71,9 @@ def run(problem: ProblemIn, policy: PolicyIn | None = None) -> RunResult:
     return conclude(prepared, sim)
 
 
-def prepare(problem: ProblemIn, policy: PolicyIn | None = None) -> Prepared | RunResult:
+def prepare(
+    problem: ProblemIn, policy: PolicyIn | None = None, history: Mapping[str, Estimate] | None = None
+) -> Prepared | RunResult:
     """Проверка и карантин входа; RunResult — вход не прошёл строгую проверку (INFEASIBLE)."""
     config = policy or problem.policy
     base = {
@@ -79,7 +81,7 @@ def prepare(problem: ProblemIn, policy: PolicyIn | None = None) -> Prepared | Ru
         "input_hash": input_hash(problem, config),
         "policy": config.name,
     }
-    resolved, estimates = resolve(problem)
+    resolved, estimates = resolve(problem, history)
     validated, diagnostics = validate_problem(to_domain(resolved), config.validation_mode)
     found = [d.to_dict() for d in diagnostics]
     result: dict[str, Any]

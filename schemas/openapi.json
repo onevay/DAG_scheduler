@@ -932,6 +932,10 @@
           "spread": {
             "title": "Spread",
             "type": "number"
+          },
+          "work": {
+            "title": "Work",
+            "type": "integer"
           }
         },
         "required": [
@@ -939,6 +943,7 @@
           "spread",
           "mean",
           "p80",
+          "work",
           "source"
         ],
         "title": "EstimateOut",

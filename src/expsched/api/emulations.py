@@ -20,6 +20,7 @@ from fastapi import APIRouter, Path, Request
 from pydantic import TypeAdapter, ValidationError
 
 from expsched.api.errors import error_response
+from expsched.api.history import History
 from expsched.api.models import (
     Action,
     CancelAction,
@@ -53,6 +54,7 @@ class Emulations:
     def __init__(self, registry: AgentRegistry, store: RunStore, tick_s: float = 0.1) -> None:
         self.registry = registry
         self.store = store
+        self.history = History(store.root / ".estimates.json")  # с точкой: хранилище прогонов её не трогает
         self.tick_s = tick_s
         self.limit = int(os.environ.get("EXPSCHED_EMULATIONS", "1"))
         self.max_s = float(os.environ.get("EXPSCHED_EMULATION_MAX_S", "3600"))
@@ -64,7 +66,7 @@ class Emulations:
     def start(self, problem: ProblemIn, policy: PolicyIn) -> str:
         """Новый прогон на агентах; ValueError — вход для него не годится (узел без агента)."""
         run_id = secrets.token_hex(8)
-        emulation = Emulation(run_id, problem, policy, self.registry)
+        emulation = Emulation(run_id, problem, policy, self.registry, history=self.history.estimates(problem))
         stored = problem.model_copy(update={"policy": policy}).model_dump(mode="json")
         item = Live(emulation, stored)
         self.live[run_id] = item
@@ -83,6 +85,7 @@ class Emulations:
                 await asyncio.sleep(self.tick_s)
             if emulation.status == "done" and emulation.result is not None:
                 await asyncio.to_thread(self.store.save, run_id, item.problem, emulation.result)
+                await asyncio.to_thread(self.history.record, item.problem, emulation.result.result)
         except Exception:
             log.exception("run %s on agents failed", run_id)
             emulation.cancel()

@@ -134,6 +134,6 @@ def test_server_starts_a_real_agent_that_says_hello_and_stops_it(tmp_path):
             time.sleep(0.2)
         assert httpx.delete(f"{url}/v1/local-agents/local", timeout=30).status_code == 204
         assert httpx.get(f"{url}/v1/local-agents").json() == {"agents": []}
-        assert (tmp_path / ".expsched-local-agents" / "local" / "agent.log").exists()
+        assert (tmp_path / "runs" / ".local-agents" / "local" / "agent.log").exists()
     finally:
         server.kill()

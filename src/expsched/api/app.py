@@ -60,6 +60,7 @@ from expsched.contract.limits import MAX_BODY_BYTES, InputTooLarge
 from expsched.contract.whatif import apply, deltas
 from expsched.emulate.agents import AgentRegistry
 from expsched.emulate.replay import replay
+from expsched.estimate.history import pin
 from expsched.pipeline import input_hash
 from expsched.policies.registry import implemented_policies
 from expsched.validation import Code, has_errors, validate
@@ -267,7 +268,7 @@ async def replay_run(request: Request, run_id: RunId) -> Any:
     def load_and_replay() -> dict[str, Any]:
         problem = ProblemIn.model_validate(store.problem(run_id))
         events, _ = store.events(run_id, 0, 10**9)
-        return replay(problem, events)
+        return replay(pin(problem, store.result(run_id).get("estimates")), events)
 
     return await asyncio.to_thread(load_and_replay)
 
@@ -383,11 +384,7 @@ def create_app(
     app.state.agents = AgentRegistry()
     app.state.emulations = Emulations(app.state.agents, app.state.store)
     app.state.local_agents = LocalAgents(
-        FilePath(
-            os.environ.get(
-                "EXPSCHED_LOCAL_AGENTS_DIR", app.state.store.root.parent / ".expsched-local-agents"
-            )
-        )
+        FilePath(os.environ.get("EXPSCHED_LOCAL_AGENTS_DIR", app.state.store.root / ".local-agents"))
     )
     app.include_router(router)
     app.include_router(agents.listing)

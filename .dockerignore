@@ -23,4 +23,3 @@ ui/web/playwright-report
 .audit-requirements.txt
 .expsched-agent
 containers/gravesentinel
-.expsched-local-agents

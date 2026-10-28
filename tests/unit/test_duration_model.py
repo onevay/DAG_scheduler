@@ -35,7 +35,7 @@ def test_lognormal_mean_quantile_and_residual_life():
     known = Estimate(10, 0, "estimate")
     assert (known.mean, known.quantile(0.8), known.residual(12), known.work()) == (10, 10, 12, 10)
     assert Estimate(10, 0.5, "kind").to_dict() == {
-        "median": 10, "spread": 0.5, "mean": 11.331, "p80": 15.232, "source": "kind"
+        "median": 10, "spread": 0.5, "mean": 11.331, "p80": 15.232, "work": 12, "source": "kind"
     }  # fmt: skip
 
 

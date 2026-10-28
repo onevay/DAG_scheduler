@@ -60,12 +60,13 @@ class Estimate:
         """Работа для движка: округлённое вверх среднее."""
         return max(1, math.ceil(self.mean - 1e-9))
 
-    def to_dict(self) -> dict[str, float | str]:
+    def to_dict(self) -> dict[str, float | int | str]:
         return {
             "median": round(self.median, 3),
             "spread": round(self.spread, 3),
             "mean": round(self.mean, 3),
             "p80": round(self.quantile(0.8), 3),
+            "work": self.work(),
             "source": self.source,
         }
 

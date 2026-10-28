@@ -281,8 +281,9 @@ class EstimateOut(Strict):
 
     median: float
     spread: float
-    mean: float  # её работа в этом прогоне (округлённая вверх) — по нему решает политика
+    mean: float
     p80: float
+    work: int  # работа задачи в этом прогоне — округлённое вверх среднее: по ней решает политика
     source: Literal["estimate", "history", "similar", "kind"]
 
 
