@@ -769,6 +769,35 @@ export interface components {
       diagnostics?: components["schemas"]["DiagnosticOut"][] | null;
       error: components["schemas"]["ErrorInfo"];
     };
+    /**
+     * EstimateIn
+     * @description Работа задачи, когда точно она неизвестна: логнормальное с медианой и разбросом (σ логарифма).
+     */
+    EstimateIn: {
+      /** Median */
+      median: number;
+      /** Spread */
+      spread?: number | null;
+    };
+    /**
+     * EstimateOut
+     * @description Оценка работы задачи без длительности: логнормальное и откуда оно взято.
+     */
+    EstimateOut: {
+      /** Mean */
+      mean: number;
+      /** Median */
+      median: number;
+      /** P80 */
+      p80: number;
+      /**
+       * Source
+       * @enum {string}
+       */
+      source: "estimate" | "history" | "similar" | "kind";
+      /** Spread */
+      spread: number;
+    };
     /** EventIn */
     EventIn: {
       task?: components["schemas"]["TaskIn"] | null;
@@ -995,6 +1024,13 @@ export interface components {
     LiveOut: {
       /** Containers */
       containers: components["schemas"]["ContainerOut"][];
+      /**
+       * Estimates
+       * @default {}
+       */
+      estimates?: {
+        [key: string]: components["schemas"]["EstimateOut"];
+      };
       /** Now */
       now: number;
       /** Run Id */
@@ -1380,6 +1416,10 @@ export interface components {
       attempts: components["schemas"]["AttemptOut"][];
       /** Diagnostics */
       diagnostics: components["schemas"]["DiagnosticOut"][];
+      /** Estimates */
+      estimates?: {
+        [key: string]: components["schemas"]["EstimateOut"];
+      } | null;
       explain: components["schemas"]["ExplainOut"] | null;
       /** Input Hash */
       input_hash: string;
@@ -1461,6 +1501,23 @@ export interface components {
     RunsOut: {
       /** Runs */
       runs: components["schemas"]["RunListItem"][];
+    };
+    /**
+     * ScalingIn
+     * @description Как длительность задачи зависит от числа её CPU/GPU: закон Амдала (доля последовательной части)
+     *     или степенной (`n^-alpha`). Нужен, чтобы переносить наблюдения, сделанные при другом числе.
+     */
+    ScalingIn: {
+      /** Alpha */
+      alpha?: number | null;
+      /**
+       * Law
+       * @default amdahl
+       * @enum {string}
+       */
+      law?: "amdahl" | "power";
+      /** Serial */
+      serial?: number | null;
     };
     /** ScenarioInfo */
     ScenarioInfo: {
@@ -1717,7 +1774,9 @@ export interface components {
        */
       dependencies?: string[];
       /** Duration */
-      duration: number;
+      duration?: number | null;
+      /** Estimate */
+      estimate?: number | components["schemas"]["EstimateIn"] | null;
       /** Id */
       id: string;
       /**
@@ -1753,6 +1812,7 @@ export interface components {
       resources?: {
         [key: string]: number;
       };
+      scaling?: components["schemas"]["ScalingIn"] | null;
     };
     /** TaskOut */
     TaskOut: {
@@ -1926,6 +1986,11 @@ export interface components {
       resources: {
         [key: string]: number;
       };
+      /**
+       * Speed
+       * @default 1
+       */
+      speed?: number;
     };
     /** WorkerLive */
     WorkerLive: {

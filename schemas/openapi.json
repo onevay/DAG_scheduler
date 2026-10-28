@@ -873,6 +873,77 @@
         "title": "ErrorOut",
         "type": "object"
       },
+      "EstimateIn": {
+        "additionalProperties": false,
+        "description": "Работа задачи, когда точно она неизвестна: логнормальное с медианой и разбросом (σ логарифма).",
+        "properties": {
+          "median": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 10000000.0,
+            "title": "Median",
+            "type": "number"
+          },
+          "spread": {
+            "anyOf": [
+              {
+                "maximum": 3.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spread"
+          }
+        },
+        "required": [
+          "median"
+        ],
+        "title": "EstimateIn",
+        "type": "object"
+      },
+      "EstimateOut": {
+        "additionalProperties": false,
+        "description": "Оценка работы задачи без длительности: логнормальное и откуда оно взято.",
+        "properties": {
+          "mean": {
+            "title": "Mean",
+            "type": "number"
+          },
+          "median": {
+            "title": "Median",
+            "type": "number"
+          },
+          "p80": {
+            "title": "P80",
+            "type": "number"
+          },
+          "source": {
+            "enum": [
+              "estimate",
+              "history",
+              "similar",
+              "kind"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "spread": {
+            "title": "Spread",
+            "type": "number"
+          }
+        },
+        "required": [
+          "median",
+          "spread",
+          "mean",
+          "p80",
+          "source"
+        ],
+        "title": "EstimateOut",
+        "type": "object"
+      },
       "EventIn": {
         "additionalProperties": false,
         "properties": {
@@ -1491,6 +1562,14 @@
             },
             "title": "Containers",
             "type": "array"
+          },
+          "estimates": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/EstimateOut"
+            },
+            "default": {},
+            "title": "Estimates",
+            "type": "object"
           },
           "now": {
             "title": "Now",
@@ -2434,6 +2513,20 @@
             "title": "Diagnostics",
             "type": "array"
           },
+          "estimates": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/EstimateOut"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimates"
+          },
           "explain": {
             "anyOf": [
               {
@@ -2714,6 +2807,49 @@
           "runs"
         ],
         "title": "RunsOut",
+        "type": "object"
+      },
+      "ScalingIn": {
+        "additionalProperties": false,
+        "description": "Как длительность задачи зависит от числа её CPU/GPU: закон Амдала (доля последовательной части)\nили степенной (`n^-alpha`). Нужен, чтобы переносить наблюдения, сделанные при другом числе.",
+        "properties": {
+          "alpha": {
+            "anyOf": [
+              {
+                "maximum": 1.5,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha"
+          },
+          "law": {
+            "default": "amdahl",
+            "enum": [
+              "amdahl",
+              "power"
+            ],
+            "title": "Law",
+            "type": "string"
+          },
+          "serial": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serial"
+          }
+        },
+        "title": "ScalingIn",
         "type": "object"
       },
       "ScenarioInfo": {
@@ -3390,9 +3526,32 @@
             "type": "array"
           },
           "duration": {
-            "minimum": 1.0,
-            "title": "Duration",
-            "type": "integer"
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration"
+          },
+          "estimate": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 10000000.0,
+                "type": "number"
+              },
+              {
+                "$ref": "#/components/schemas/EstimateIn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimate"
           },
           "id": {
             "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
@@ -3446,11 +3605,20 @@
             },
             "title": "Resources",
             "type": "object"
+          },
+          "scaling": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScalingIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
-          "id",
-          "duration"
+          "id"
         ],
         "title": "TaskIn",
         "type": "object"
@@ -3972,6 +4140,13 @@
             },
             "title": "Resources",
             "type": "object"
+          },
+          "speed": {
+            "default": 1.0,
+            "exclusiveMinimum": 0.0,
+            "maximum": 100.0,
+            "title": "Speed",
+            "type": "number"
           }
         },
         "required": [

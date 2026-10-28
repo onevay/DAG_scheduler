@@ -6,7 +6,7 @@ import math
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from expsched.domain.models import Problem, Task
+from expsched.domain.models import Problem, Task, time_for
 from expsched.domain.resources import Resources
 from expsched.verify.attempts import Attempt, attempts_from_log, down_intervals
 
@@ -56,9 +56,9 @@ def _check_attempt(
         exact
         and a.outcome == "DONE"
         and a.end is not None
-        and a.end - a.start != task.duration - a.resume_from
+        and a.end - a.start != (expected := _time(problem, a.worker, task.duration - a.resume_from))
     ):
-        out.append(f"I1 {name}: worked {a.end - a.start}, expected {task.duration - a.resume_from}")
+        out.append(f"I1 {name}: worked {a.end - a.start}, expected {expected}")
     for dep in sorted(set(task.deps)):
         if dep not in finished or finished[dep] > a.start:
             out.append(f"I2 {name}: starts at {a.start} before {dep} has finished")
@@ -144,3 +144,9 @@ def _check_capacity(
         if is_start and not load.fits(capacity):
             out.append(f"I3 {worker} t={t}: load {load!r} exceeds {capacity!r}")
     return out
+
+
+def _time(problem: Problem, worker: str, work: int) -> int:
+    """Время работы на узле его скорости (узел вне входа — эталонной)."""
+    w = problem.workers.get(worker)
+    return time_for(work, w.speed if w else 1)

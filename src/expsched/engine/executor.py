@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from expsched.domain.models import Task
+from expsched.domain.models import Task, work_in
 from expsched.domain.snapshot import RunInfo
 
 
@@ -30,8 +30,8 @@ class Simulated:
         return run.end_pred
 
     def saved(self, task: Task, key: str, run: RunInfo, now: int) -> int:
-        elapsed = now - run.start
-        return task.ckpt * (elapsed // task.ckpt) if task.ckpt else 0
+        done = work_in(now - run.start, run.speed)
+        return task.ckpt * (done // task.ckpt) if task.ckpt else 0
 
 
 class External:
@@ -48,4 +48,4 @@ class External:
         return None
 
     def saved(self, task: Task, key: str, run: RunInfo, now: int) -> int:
-        return min(self.checkpoints.get((key, run.attempt), 0), run.end_pred - run.start)
+        return min(self.checkpoints.get((key, run.attempt), 0), run.work or run.end_pred - run.start)

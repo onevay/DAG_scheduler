@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from expsched.analysis.analyze import analyze
 from expsched.contract.io_models import load, to_domain
 from expsched.domain.models import Problem
+from expsched.estimate import resolve
 from expsched.validation.deadlines import deadline_certificates
 from expsched.validation.diagnostics import Diagnostic, has_errors
 from expsched.validation.events import validate_events
@@ -26,7 +27,7 @@ def validate(raw: bytes, mode: ValidationMode) -> tuple[Problem | None, list[Dia
         parsed = load(raw)
     except ValidationError as error:
         return None, schema_diagnostics(error)
-    return validate_problem(to_domain(parsed), mode)
+    return validate_problem(to_domain(resolve(parsed)[0]), mode)
 
 
 def validate_problem(problem: Problem, mode: ValidationMode) -> tuple[Problem | None, list[Diagnostic]]:

@@ -23,7 +23,9 @@ class RunInfo:
     worker: str
     start: int
     attempt: int
-    end_pred: int  # прогнозное окончание: start + остаток работы; у прогона на агентах может быть в прошлом
+    end_pred: int  # прогнозное окончание: start + время остатка; у прогона на агентах может быть в прошлом
+    work: int = 0  # остаток работы к началу попытки; 0 — не задан (тогда end_pred - start)
+    speed: float = 1.0  # скорость узла попытки
 
 
 @dataclass(frozen=True)
@@ -46,6 +48,7 @@ class Snapshot:
     analysis: Analysis  # ранние сроки и границы — на момент последнего пересчёта
     ready_since: Mapping[str, int]
     preempt_count: Mapping[str, int]
+    speed: Mapping[str, float] = field(default_factory=dict)  # скорость узла; нет — эталонная, 1
 
 
 Action = Literal["START", "PREEMPT", "RESERVE"]

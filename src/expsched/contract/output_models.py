@@ -276,6 +276,16 @@ class ShadowOut(Strict):
     tasks: dict[str, ShadowTask]
 
 
+class EstimateOut(Strict):
+    """Оценка работы задачи без длительности: логнормальное и откуда оно взято."""
+
+    median: float
+    spread: float
+    mean: float  # её работа в этом прогоне (округлённая вверх) — по нему решает политика
+    p80: float
+    source: Literal["estimate", "history", "similar", "kind"]
+
+
 class ResultOut(Strict):
     schema_version: Literal["1.1"]
     input_hash: Hash  # вход вместе с действующей политикой
@@ -290,6 +300,7 @@ class ResultOut(Strict):
     violations: list[str]  # нарушения, найденные проверкой расписания
     replans: list[ReplanRecord] | None  # None — прогноз не строился (вход больше max_forecast_tasks)
     shadow: ShadowOut | None = None  # только у прогона в режиме shadow
+    estimates: dict[str, EstimateOut] | None = None  # только если у задач нет длительности
 
 
 def dump_result_schema() -> str:

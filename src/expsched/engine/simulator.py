@@ -28,7 +28,7 @@ from collections.abc import Iterable
 from dataclasses import replace
 from typing import Any
 
-from expsched.domain.models import Event, EvType, Problem, Task
+from expsched.domain.models import Event, EvType, Problem, Task, time_for, work_in
 from expsched.domain.resources import Resources
 from expsched.domain.snapshot import Decision, Policy, RunInfo
 from expsched.domain.states import FINAL_STATUSES, TaskStatus
@@ -221,7 +221,7 @@ class Simulator:
         """
         s = self.state
         task, run = s.tasks[key], s.run.pop(key)
-        elapsed = self.t - run.start
+        done = min(work_in(self.t - run.start, run.speed), run.work or self.t - run.start)
         saved = self.executor.saved(task, key, run, self.t)
         s.rem[key] -= saved
         s.free[run.worker] = s.free[run.worker] + task.resources
@@ -234,7 +234,7 @@ class Simulator:
             worker=run.worker,
             cause=cause,
             saved=saved,
-            lost=max(0, elapsed - saved),
+            lost=max(0, done - saved),
             remaining=s.rem[key],
             **({"reason": dict(reason)} if reason is not None else {}),
         )
@@ -414,8 +414,9 @@ class Simulator:
         s.wait_code.pop(key, None)
         s.reserved.pop(key, None)
         s.attempt[key] += 1
-        end = self.t + s.rem[key]
-        s.run[key] = RunInfo(worker, self.t, s.attempt[key], end)
+        speed = s.problem.workers[worker].speed
+        end = self.t + time_for(s.rem[key], speed)
+        s.run[key] = RunInfo(worker, self.t, s.attempt[key], end, s.rem[key], speed)
         finish = self.executor.finish_at(task, s.run[key])
         if finish is not None:
             self.queue.push(finish, Finish(key, s.attempt[key]))

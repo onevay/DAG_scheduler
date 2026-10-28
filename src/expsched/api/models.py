@@ -13,6 +13,7 @@ from expsched.contract.output_models import (
     ChainLink,
     Decomposition,
     DiagnosticOut,
+    EstimateOut,
     EventRecord,
     IdleInterval,
     MetricsOut,
@@ -265,6 +266,7 @@ class LiveOut(Strict):
     workers: dict[str, WorkerLive]
     containers: list[ContainerOut]
     shadow: ShadowOut | None = None  # режим shadow: план рядом с фактом на сейчас
+    estimates: dict[str, EstimateOut] = {}  # задачи без длительности: их оценки
 
 
 class CheckpointAction(Strict):

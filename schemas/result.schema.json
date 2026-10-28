@@ -254,6 +254,47 @@
       "title": "DiagnosticOut",
       "type": "object"
     },
+    "EstimateOut": {
+      "additionalProperties": false,
+      "description": "Оценка работы задачи без длительности: логнормальное и откуда оно взято.",
+      "properties": {
+        "mean": {
+          "title": "Mean",
+          "type": "number"
+        },
+        "median": {
+          "title": "Median",
+          "type": "number"
+        },
+        "p80": {
+          "title": "P80",
+          "type": "number"
+        },
+        "source": {
+          "enum": [
+            "estimate",
+            "history",
+            "similar",
+            "kind"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "spread": {
+          "title": "Spread",
+          "type": "number"
+        }
+      },
+      "required": [
+        "median",
+        "spread",
+        "mean",
+        "p80",
+        "source"
+      ],
+      "title": "EstimateOut",
+      "type": "object"
+    },
     "ExplainOut": {
       "additionalProperties": false,
       "properties": {
@@ -885,6 +926,21 @@
       },
       "title": "Diagnostics",
       "type": "array"
+    },
+    "estimates": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/EstimateOut"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Estimates"
     },
     "explain": {
       "anyOf": [

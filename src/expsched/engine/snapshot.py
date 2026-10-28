@@ -34,4 +34,5 @@ def build_snapshot(state: SimState, now: int) -> Snapshot:
         analysis=state.analysis,
         ready_since=MappingProxyType(state.ready_since),
         preempt_count=MappingProxyType(state.preempt_count),
+        speed=MappingProxyType({k: w.speed for k, w in state.problem.workers.items()}),
     )

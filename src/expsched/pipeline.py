@@ -3,16 +3,17 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, field, replace
 from typing import Any
 
 from expsched.analysis import analyze
 from expsched.contract.hashing import canonical_hash
 from expsched.contract.io_models import PolicyIn, ProblemIn, to_domain
-from expsched.domain.models import Problem, Task
+from expsched.domain.models import Problem, Task, time_for
 from expsched.domain.states import TaskStatus
 from expsched.engine.executor import Executor
 from expsched.engine.simulator import Simulator
+from expsched.estimate import Estimate, resolve
 from expsched.explain.chain import critical_chain, decompose
 from expsched.explain.idle import idle_by_code, idle_intervals
 from expsched.explain.waits import wait_intervals
@@ -47,6 +48,7 @@ class Prepared:
     diagnostics: list[dict[str, Any]]
     plan: Quarantine
     forecast: bool
+    estimates: dict[str, Estimate] = field(default_factory=dict)  # задачи без длительности: чем их заменили
 
     def simulator(self, executor: Executor | None = None) -> Simulator:
         policy = make_policy(self.config, self.problem.seed)
@@ -77,7 +79,8 @@ def prepare(problem: ProblemIn, policy: PolicyIn | None = None) -> Prepared | Ru
         "input_hash": input_hash(problem, config),
         "policy": config.name,
     }
-    validated, diagnostics = validate_problem(to_domain(problem), config.validation_mode)
+    resolved, estimates = resolve(problem)
+    validated, diagnostics = validate_problem(to_domain(resolved), config.validation_mode)
     found = [d.to_dict() for d in diagnostics]
     result: dict[str, Any]
     if validated is None:
@@ -97,7 +100,7 @@ def prepare(problem: ProblemIn, policy: PolicyIn | None = None) -> Prepared | Ru
 
     plan = quarantine(validated, diagnostics)
     forecast = 0 < len(plan.problem.all_tasks()) <= config.max_forecast_tasks
-    return Prepared(problem, config, base, validated, found, plan, forecast)
+    return Prepared(resolved, config, base, validated, found, plan, forecast, estimates)
 
 
 def conclude(prepared: Prepared, sim: Simulator, exact: bool = True) -> RunResult:
@@ -107,6 +110,9 @@ def conclude(prepared: Prepared, sim: Simulator, exact: bool = True) -> RunResul
     log = sim.run_all()  # у законченного прогона событий нет: только итоговая диагностика
     status = {**plan.excluded, **sim.state.status}
     planned = {k: t for k, t in sim.state.tasks.items() if status[k] is not TaskStatus.INFEASIBLE}
+    fastest = max((w.speed for w in plan.problem.workers.values()), default=1)
+    if fastest > 1:  # граница должна остаться границей и на узлах быстрее эталона
+        planned = {k: replace(t, duration=time_for(t.duration, fastest)) for k, t in planned.items()}
     lower_bound = analyze(replace(plan.problem, tasks=planned)).lb if planned else None
     scores = metrics(plan.problem, log, lower_bound, config.objective)
     result = {
@@ -121,6 +127,8 @@ def conclude(prepared: Prepared, sim: Simulator, exact: bool = True) -> RunResul
         "diagnostics": prepared.diagnostics,
         "violations": verify(plan.problem, log, config.max_preemptions_per_task, exact),
     }
+    if prepared.estimates:
+        result["estimates"] = {k: e.to_dict() for k, e in sorted(prepared.estimates.items())}
     return RunResult(result, log)
 
 

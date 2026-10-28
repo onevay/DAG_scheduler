@@ -23,7 +23,9 @@ export function CheckStrip({
 
   const edges = draft.tasks.reduce((n, t) => n + (t.dependencies?.length ?? 0), 0);
   const main = mainResource(clusterResources(draft.cluster.workers));
-  const total = main ? draft.tasks.reduce((n, t) => n + t.duration * (t.resources?.[main] ?? 0), 0) : 0;
+  const total = main
+    ? draft.tasks.reduce((n, t) => n + (t.duration ?? 0) * (t.resources?.[main] ?? 0), 0)
+    : 0;
   const timeUnit = draft.time_unit === "minute" ? "мин" : draft.time_unit === "second" ? "с" : "ч";
   const data = validation.data;
   const errors = data?.diagnostics.filter((d) => d.level === "error") ?? [];

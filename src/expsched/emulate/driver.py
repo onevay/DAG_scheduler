@@ -210,7 +210,7 @@ class Emulation:
                 "worker": r["worker"],
                 "container": spec.model_dump() if spec else None,
                 "limits": dict(task.resources.items()),
-                "work": run.end_pred - run.start,
+                "work": run.work or run.end_pred - run.start,  # работа, не время: узлы бывают быстрее
                 "resume_from": r["resume_from"],
                 "checkpoint_interval": task.ckpt,
                 "time_scale_ms": self.scale_ms,

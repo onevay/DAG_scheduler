@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal
 
-from expsched.domain.models import Problem
+from expsched.domain.models import Problem, time_for
 from expsched.domain.states import PriorityClass
 from expsched.verify.attempts import attempts_from_log, down_intervals
 
@@ -47,19 +47,28 @@ def metrics(
 
     outages = down_intervals(log)
     alive = {w.id: makespan - _downtime(outages.get(w.id, []), makespan) for w in problem.workers.values()}
+    speed = {w.id: w.speed for w in problem.workers.values()}
+    # Полезное время задачи — время, за которое её работа сделана: законченная попытка целиком, у прерванных —
+    # то, что ушло на сохранённую работу (на узле своей скорости)
+    worked: dict[str, int] = {}
+    for a in attempts:
+        if a.end is None or a.task not in finish:
+            continue
+        useful = a.end - a.start if a.outcome == "DONE" else time_for(a.saved, speed.get(a.worker, 1))
+        worked[a.task] = worked.get(a.task, 0) + useful
     lost_time = [
-        (a.end - a.start - a.saved, tasks[a.task].resources)
+        (a.end - a.start - time_for(a.saved, speed.get(a.worker, 1)), tasks[a.task].resources)
         for a in attempts
         if a.outcome in ("INT", "PRE") and a.end is not None and a.task in tasks
     ]
     utilization: dict[str, float | None] = {}
     lost: dict[str, int] = {}
     for resource in sorted({r for w in problem.workers.values() for r in w.capacity}):
-        useful = sum(tasks[k].duration * tasks[k].resources.get(resource) for k in finish)
+        useful = sum(worked.get(k, 0) * tasks[k].resources.get(resource) for k in finish)
         capacity = sum(w.capacity.get(resource) * alive[w.id] for w in problem.workers.values())
         utilization[resource] = round(useful / capacity, 4) if capacity else None
         lost[resource] = sum(time * need.get(resource) for time, need in lost_time)
-    waits = [finish[k] - ready[k] - tasks[k].duration for k in finish if k in ready]
+    waits = [finish[k] - ready[k] - worked.get(k, 0) for k in finish if k in ready]
     return {
         "makespan": makespan,
         "lower_bound": lower_bound,

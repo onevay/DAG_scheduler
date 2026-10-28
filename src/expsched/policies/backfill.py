@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
+from expsched.domain.models import time_for
 from expsched.domain.resources import Resources
 from expsched.domain.snapshot import Decision, Snapshot
 from expsched.policies.base import best_fit
@@ -74,7 +75,9 @@ def release_profile(
         if run.worker == worker
     ]
     profile += [
-        (snapshot.t + snapshot.rem[k], snapshot.tasks[k].resources) for k, w in started if w == worker
+        (snapshot.t + time_for(snapshot.rem[k], snapshot.speed.get(w, 1)), snapshot.tasks[k].resources)
+        for k, w in started
+        if w == worker
     ]
     return sorted(profile, key=lambda p: p[0])
 

@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from enum import StrEnum
 
@@ -20,6 +21,18 @@ class EvType(StrEnum):
     WORKER_DOWN = "worker_down"
     WORKER_UP = "worker_up"
     SUBMIT = "submit_task"
+
+
+def time_for(work: int, speed: float) -> int:
+    """Время, за которое узел со скоростью `speed` сделает `work` единиц работы (округление вверх)."""
+    if speed == 1 or work <= 0:
+        return max(work, 0)
+    return max(1, math.ceil(work / speed - 1e-9))
+
+
+def work_in(elapsed: int, speed: float) -> int:
+    """Работа, сделанная узлом со скоростью `speed` за `elapsed` единиц времени (с округлением вниз)."""
+    return elapsed if speed == 1 else math.floor(elapsed * speed + 1e-9)
 
 
 @dataclass(frozen=True)
@@ -60,6 +73,7 @@ class Worker:
     id: str
     capacity: Resources
     labels: Labels = ()
+    speed: float = 1.0  # работа идёт в `speed` раз быстрее эталона: время = ceil(работа / speed)
 
 
 @dataclass(frozen=True)

@@ -108,6 +108,9 @@ def view(run_id: str, emulation: Emulation) -> dict[str, Any]:
         },
         "containers": [asdict(c) for _, c in sorted(emulation.containers.items())],
         "shadow": emulation.shadow() if hasattr(emulation, "sim") else None,
+        "estimates": {k: e.to_dict() for k, e in sorted(emulation.prepared.estimates.items())}
+        if hasattr(emulation, "prepared")
+        else {},
     }
 
 

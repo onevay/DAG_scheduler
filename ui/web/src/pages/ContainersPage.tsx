@@ -402,7 +402,8 @@ function LiveRun({ runId, live }: { runId: string; live: Live }) {
     ...(problem.data?.tasks ?? []),
     ...(problem.data?.events ?? []).flatMap((e) => e.task ?? []),
   ];
-  const durations = new Map(tasks.map((t) => [t.id, t.duration]));
+  // Без длительности — оценка сервера (её работа в прогоне)
+  const durations = new Map(tasks.map((t) => [t.id, t.duration ?? live.estimates?.[t.id]?.mean]));
   const limits = new Map<string, Resources | undefined>(tasks.map((t) => [t.id, t.resources]));
   const key = (c: Container) => `${c.task}#${c.attempt}`;
   const shown = live.containers.filter((c) => filter === "all" || phase(c) === filter);

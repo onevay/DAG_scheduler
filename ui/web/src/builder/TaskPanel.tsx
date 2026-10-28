@@ -99,7 +99,7 @@ export function TaskPanel({
         <Stepper
           label="Длительность"
           unit={unit}
-          value={task.duration}
+          value={task.duration ?? 1}
           min={1}
           onChange={(duration) => update({ duration })}
           less="Короче"
@@ -140,7 +140,7 @@ export function TaskPanel({
         <input
           type="range"
           min={0}
-          max={Math.max(1, task.duration)}
+          max={Math.max(1, task.duration ?? 1)}
           value={task.checkpoint_interval ?? 0}
           onChange={(e) => update({ checkpoint_interval: Number(e.target.value) || null })}
           aria-label="Интервал чекпоинта"

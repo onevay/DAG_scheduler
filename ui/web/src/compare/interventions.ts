@@ -53,13 +53,13 @@ export function suggest(problem: Problem): Intervention[] {
     out.push({ kind: "add_worker", worker: { id, resources: { ...largest(workers).resources } } });
   }
   const longest = [...problem.tasks]
-    .filter((t) => !t.checkpoint_interval && t.duration > 1)
-    .sort((a, b) => b.duration - a.duration)[0];
+    .filter((t) => !t.checkpoint_interval && (t.duration ?? 0) > 1)
+    .sort((a, b) => (b.duration ?? 0) - (a.duration ?? 0))[0];
   if (longest)
     out.push({
       kind: "set_checkpoint",
       task: longest.id,
-      checkpoint_interval: Math.max(1, Math.ceil(longest.duration / 4)),
+      checkpoint_interval: Math.max(1, Math.ceil((longest.duration ?? 4) / 4)),
     });
   return out.slice(0, 4);
 }
