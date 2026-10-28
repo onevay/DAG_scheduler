@@ -1,8 +1,9 @@
 import { type ReactNode, useEffect, useId, useState } from "react";
 
-import type { Task, TaskKind } from "../api/types";
+import type { Task, TaskKind, Validation } from "../api/types";
 import { useDraft } from "../draft/DraftContext";
 import { Chip, NumberField, Stepper, Switch } from "../ui/controls";
+import { DurationFields, ownEstimate } from "./DurationFields";
 import styles from "./TaskPanel.module.css";
 import { ResourceFields } from "../ui/ResourceFields";
 import { fits } from "../ui/resources";
@@ -33,9 +34,12 @@ const formatConstraints = (c: Record<string, string> | undefined) =>
 export function TaskPanel({
   selected,
   onSelect,
+  estimates,
 }: {
   selected: string | null;
   onSelect: (id: string | null) => void;
+  /** Оценки задач без длительности из проверки черновика. */
+  estimates?: Validation["estimates"];
 }) {
   const { draft, dispatch } = useDraft();
   const eventIndex = (draft.events ?? []).findIndex(
@@ -95,17 +99,13 @@ export function TaskPanel({
         </div>
       </Field>
 
-      <div className={styles.pair}>
-        <Stepper
-          label="Длительность"
-          unit={unit}
-          value={task.duration ?? 1}
-          min={1}
-          onChange={(duration) => update({ duration })}
-          less="Короче"
-          more="Дольше"
-        />
-      </div>
+      <DurationFields
+        task={task}
+        unit={unit}
+        estimate={estimates?.[task.id]}
+        agents={draft.mode === "emulate" || draft.mode === "shadow"}
+        update={update}
+      />
       <ResourceFields value={task.resources} onChange={(resources) => update({ resources })} of="задачи" />
       <p className={styles.hint}>
         {placed > 0
@@ -140,7 +140,7 @@ export function TaskPanel({
         <input
           type="range"
           min={0}
-          max={Math.max(1, task.duration ?? 1)}
+          max={Math.max(1, task.duration ?? ownEstimate(task).median ?? 1)}
           value={task.checkpoint_interval ?? 0}
           onChange={(e) => update({ checkpoint_interval: Number(e.target.value) || null })}
           aria-label="Интервал чекпоинта"

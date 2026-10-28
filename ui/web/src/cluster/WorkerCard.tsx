@@ -5,6 +5,7 @@ import { useDraft } from "../draft/DraftContext";
 import { Icon } from "../shell/Icon";
 import styles from "./Cluster.module.css";
 import { defaultOutage, type Outage } from "./timeline";
+import { NumberField } from "../ui/controls";
 import { ResourceFields } from "../ui/ResourceFields";
 
 /** Узел кластера: ядра, память и GPU (GPU ещё и слотами), метки для ограничений задач, отказ «одной кнопкой». */
@@ -61,6 +62,14 @@ export function WorkerCard({
       </div>
 
       <ResourceFields value={worker.resources} onChange={(resources) => update({ resources })} of="узла" />
+      <NumberField
+        label="Скорость, × эталона"
+        value={worker.speed ?? 1}
+        step={0.1}
+        max={100}
+        hint="во сколько раз узел быстрее эталона: задача с работой W идёт на нём W / скорость"
+        onChange={(speed) => update({ speed: speed && speed > 0 ? speed : 1 })}
+      />
       {gpu > 0 && (
         <div className={styles.slots} aria-hidden="true">
           {Array.from({ length: Math.max(4, gpu) }, (_, i) => (

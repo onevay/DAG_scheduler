@@ -93,8 +93,13 @@ EXPSCHED_CORS_ORIGINS=http://localhost:5173 make api
 {"valid": false,
  "diagnostics": [{"code": "E012", "level": "error", "detail": {"cycle": ["a", "b", "c", "a"], "component_size": 3},
                   "hint": "Цикл: a → b → c → a. ..."}],
- "analysis": {"lower_bound": 4, "critical_path": ["free", "report"]}}
+ "analysis": {"lower_bound": 4, "critical_path": ["free", "report"]},
+ "estimates": {}}
 ```
+
+`estimates` — оценки работы задач без длительности, с которыми пойдёт прогон (медиана, разброс, среднее, p80,
+работа и источник: `estimate`, `history`, `similar`, `kind`); история прогонов на агентах учитывается, как при
+запуске. Пусто, если у всех задач есть длительность.
 
 `analysis` — нижняя граница makespan и критический путь той части входа, которую можно планировать: задачи
 с ошибками и их потомки не учитываются, поданные событиями задачи входят с моментом подачи как release_time.

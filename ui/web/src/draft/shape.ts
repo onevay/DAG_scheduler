@@ -16,8 +16,10 @@ const EVENT_TYPES = new Set(["worker_down", "worker_up", "submit_task"]);
 function taskIssue(t: unknown): string | null {
   if (!isObject(t)) return "не объект";
   if (!isText(t.id)) return "нет id";
-  if (!isNumber(t.duration)) return "duration — не число";
+  if (!optional(t.duration, isNumber)) return "duration — не число"; // нет — неизвестна, есть оценка
   const checks: [string, boolean][] = [
+    ["estimate", optional(t.estimate, (e) => isNumber(e) || (isObject(e) && isNumber(e.median)))],
+    ["scaling", optional(t.scaling, (c) => isObject(c) && optional(c.law, isText))],
     ["kind", optional(t.kind, isText)],
     ["resources", optional(t.resources, (r) => isMap(r, isNumber))],
     ["dependencies", optional(t.dependencies, (d) => Array.isArray(d) && d.every(isText))],
@@ -38,6 +40,7 @@ function workerIssue(w: unknown): string | null {
   if (!isText(w.id)) return "нет id";
   if (!isMap(w.resources, isNumber)) return "resources — не набор чисел";
   if (!optional(w.labels, (l) => isMap(l, isText))) return "labels — не набор строк";
+  if (!optional(w.speed, isNumber)) return "speed — не число";
   return null;
 }
 

@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from typing import Literal
 
 from pydantic import ValidationError
 
 from expsched.analysis.analyze import analyze
-from expsched.contract.io_models import load, to_domain
+from expsched.contract.io_models import ProblemIn, load, to_domain
 from expsched.domain.models import Problem
-from expsched.estimate import resolve
+from expsched.estimate import Estimate, resolve
 from expsched.validation.deadlines import deadline_certificates
 from expsched.validation.diagnostics import Diagnostic, has_errors
 from expsched.validation.events import validate_events
@@ -23,11 +24,20 @@ ValidationMode = Literal["strict", "lenient"]
 
 def validate(raw: bytes, mode: ValidationMode) -> tuple[Problem | None, list[Diagnostic]]:
     """Проверка сырого входа. Слишком большой вход даёт исключение InputTooLarge, а не диагностику."""
+    problem, diagnostics, _ = check(raw, mode)
+    return problem, diagnostics
+
+
+def check(
+    raw: bytes, mode: ValidationMode, history: Callable[[ProblemIn], Mapping[str, Estimate]] | None = None
+) -> tuple[Problem | None, list[Diagnostic], dict[str, Estimate]]:
+    """Как `validate`, и ещё оценки работы задач без длительности — с ними пойдёт прогон."""
     try:
         parsed = load(raw)
     except ValidationError as error:
-        return None, schema_diagnostics(error)
-    return validate_problem(to_domain(resolve(parsed)[0]), mode)
+        return None, schema_diagnostics(error), {}
+    resolved, estimates = resolve(parsed, history(parsed) if history else None)
+    return *validate_problem(to_domain(resolved), mode), estimates
 
 
 def validate_problem(problem: Problem, mode: ValidationMode) -> tuple[Problem | None, list[Diagnostic]]:

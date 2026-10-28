@@ -165,6 +165,15 @@
   transform-origin: 50% 50%;
 }
 
+/* Где задача закончится скорее всего: от ожидаемой работы до квантиля 0,8 */
+.band {
+  fill: none;
+  stroke: var(--color-accent-soft);
+  stroke-width: 6;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+}
+
 .arc[data-phase="killed"] {
   stroke: var(--color-warning);
 }

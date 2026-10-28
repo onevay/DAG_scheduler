@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
@@ -22,16 +22,19 @@ const DRAFT: Draft = {
 };
 
 let latest: Draft = DRAFT;
+let dispatch: ReturnType<typeof useDraft>["dispatch"] = () => {};
 function Spy() {
-  latest = useDraft().draft;
+  ({ draft: latest, dispatch } = useDraft());
   return null;
 }
 
-function Harness({ start }: { start: string }) {
+type Estimates = Parameters<typeof TaskPanel>[0]["estimates"];
+
+function Harness({ start, estimates }: { start: string; estimates?: Estimates }) {
   const [selected, setSelected] = useState<string | null>(start);
   return (
     <DraftProvider initial={DRAFT}>
-      <TaskPanel selected={selected} onSelect={setSelected} />
+      <TaskPanel selected={selected} onSelect={setSelected} estimates={estimates} />
       <Spy />
     </DraftProvider>
   );
@@ -92,6 +95,30 @@ describe("TaskPanel", () => {
     await userEvent.clear(time);
     await userEvent.type(time, "8");
     expect(latest.events?.[0]).toMatchObject({ time: 8, task: { id: "urgent", duration: 2 } });
+  });
+
+  it("turns the duration into an estimate with a scaling law and shows where it comes from", async () => {
+    const estimates = {
+      train: { median: 6, spread: 0.6, mean: 7.2, p80: 9, work: 8, source: "estimate" as const },
+    };
+    render(<Harness start="train" estimates={estimates} />);
+    await userEvent.click(screen.getByRole("radio", { name: "неизвестна" }));
+    expect(task("train")?.duration).toBeNull();
+    expect(screen.getByText(/только на агентах/)).toBeInTheDocument(); // черновик в режиме симуляции
+    act(() => dispatch({ type: "replace", draft: { ...latest, mode: "emulate" } }));
+    await userEvent.type(screen.getByLabelText("Оценка, медиана, ч"), "6");
+    await userEvent.type(screen.getByLabelText("Разброс σ"), "0.6");
+    expect(task("train")?.estimate).toEqual({ median: 6, spread: 0.6 });
+    expect(screen.getByLabelText("Оценка до запуска")).toHaveTextContent(
+      "≈ 7.2 ч в среднем, до 9 ч с вероятностью 80 % · ваша оценка",
+    );
+    await userEvent.click(screen.getByRole("radio", { name: "Амдал" }));
+    const serial = screen.getByLabelText("Последовательная доля");
+    await userEvent.clear(serial);
+    await userEvent.type(serial, "0.25");
+    expect(task("train")?.scaling).toEqual({ law: "amdahl", serial: 0.25 });
+    await userEvent.click(screen.getByRole("radio", { name: "известна" }));
+    expect(task("train")).toMatchObject({ duration: 6, estimate: null });
   });
 
   it("asks to pick a task when nothing is selected", () => {

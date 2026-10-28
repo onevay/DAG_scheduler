@@ -65,6 +65,7 @@ class ValidationOut(Strict):
     valid: bool
     diagnostics: list[DiagnosticOut]
     analysis: InputAnalysis | None  # планируемой части входа; None — планировать нечего
+    estimates: dict[str, EstimateOut] = {}  # задачи без длительности: с какой оценкой пойдёт прогон
 
 
 class ScenarioInfo(Strict):

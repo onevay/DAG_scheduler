@@ -4,7 +4,8 @@ import { ApiError } from "../api/client";
 import { useReplay, useRun, useRunEvents, useRunProblem } from "../api/hooks";
 import type { Problem, Result } from "../api/types";
 import { PlanVsFact } from "../containers/PlanVsFact";
-import { replanRows, taskRows } from "../run/results";
+import { SOURCES } from "../builder/DurationFields";
+import { estimateRows, estimateSummary, replanRows, taskRows } from "../run/results";
 import { Schedule } from "../run/Schedule";
 import { Button, ButtonLink } from "../ui/controls";
 import { StatusChip } from "../ui/data";
@@ -46,6 +47,7 @@ export function RunPage() {
       <Schedule key={runId} runId={runId} result={result} problem={problem.data} unit={unit} />
       <TaskTable result={result} />
       <ReplanTable result={result} unit={unit} />
+      <EstimateTable result={result} problem={problem.data} unit={unit} />
       {result.shadow && <PlanVsFact shadow={result.shadow} unit={unit} />}
       <ReplayCheck runId={runId} unit={unit} />
     </>
@@ -225,6 +227,54 @@ function ReplanTable({ result, unit }: { result: Result; unit: string }) {
                 <td>{r.shifted || "—"}</td>
                 <td>{r.added || "—"}</td>
                 <td>{r.dropped || "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+const pct = (x: number) => `${x > 0 ? "+" : ""}${Math.round(x * 100)}%`;
+
+/** Оценки задач без длительности против факта: насколько ошиблась модель и попала ли в квантиль 0,8. */
+function EstimateTable({ result, problem, unit }: { result: Result; problem: Problem; unit: string }) {
+  const rows = estimateRows(result, problem);
+  if (rows.length === 0) return null;
+  const summary = estimateSummary(rows);
+  return (
+    <section aria-labelledby="run-estimates" className={styles.section}>
+      <h2 id="run-estimates" className={styles.h2}>
+        Оценка против факта
+      </h2>
+      {summary.mean !== null && (
+        <p className={styles.note}>
+          Средняя ошибка оценки — {Math.round(summary.mean * 100)}%; в квантиль 0,8 уложились {summary.within}{" "}
+          из {summary.seen}.
+        </p>
+      )}
+      <div className={styles.scroll} tabIndex={0} role="region" aria-label="Таблица оценок">
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th scope="col">Задача</th>
+              <th scope="col">Откуда оценка</th>
+              <th scope="col">Ожидали, {unit}</th>
+              <th scope="col">p80, {unit}</th>
+              <th scope="col">Факт, {unit}</th>
+              <th scope="col">Ошибка</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.task}>
+                <th scope="row">{r.task}</th>
+                <td>{SOURCES[r.source as keyof typeof SOURCES] ?? r.source}</td>
+                <td>≈ {Math.round(r.mean * 10) / 10}</td>
+                <td>{Math.round(r.p80 * 10) / 10}</td>
+                <td>{r.actual === null ? "не закончена" : Math.round(r.actual * 10) / 10}</td>
+                <td>{r.error === null ? "—" : pct(r.error)}</td>
               </tr>
             ))}
           </tbody>

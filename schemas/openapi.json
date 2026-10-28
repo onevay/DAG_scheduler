@@ -3891,6 +3891,14 @@
             "title": "Diagnostics",
             "type": "array"
           },
+          "estimates": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/EstimateOut"
+            },
+            "default": {},
+            "title": "Estimates",
+            "type": "object"
+          },
           "valid": {
             "title": "Valid",
             "type": "boolean"

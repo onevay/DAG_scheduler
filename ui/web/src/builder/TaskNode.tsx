@@ -1,5 +1,6 @@
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
 
+import { durationText } from "./DurationFields";
 import type { Task } from "../api/types";
 import styles from "./Canvas.module.css";
 import { formatResources } from "../ui/resources";
@@ -24,7 +25,7 @@ export function TaskNode({ data, selected }: NodeProps<TaskFlowNode>) {
         <span className={styles.kind} style={{ background: `var(--kind-${task.kind ?? "other"})` }} />
       </span>
       <span className={styles.nodeMeta}>
-        {task.duration} {unit} · {formatResources(task.resources)}
+        {durationText(task)} {unit} · {formatResources(task.resources)}
       </span>
       <Handle type="source" position={Position.Right} className={styles.handle} />
     </div>

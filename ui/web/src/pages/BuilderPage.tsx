@@ -43,7 +43,7 @@ export function BuilderPage() {
           />
           <CheckStrip validation={validation} onSelect={setSelected} />
         </div>
-        <TaskPanel selected={selected} onSelect={setSelected} />
+        <TaskPanel selected={selected} onSelect={setSelected} estimates={validation.data?.estimates} />
       </div>
       <PolicySettings />
     </>

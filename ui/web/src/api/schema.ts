@@ -1902,6 +1902,13 @@ export interface components {
       analysis: components["schemas"]["InputAnalysis"] | null;
       /** Diagnostics */
       diagnostics: components["schemas"]["DiagnosticOut"][];
+      /**
+       * Estimates
+       * @default {}
+       */
+      estimates?: {
+        [key: string]: components["schemas"]["EstimateOut"];
+      };
       /** Valid */
       valid: boolean;
     };

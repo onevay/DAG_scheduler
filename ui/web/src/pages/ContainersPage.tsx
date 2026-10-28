@@ -17,6 +17,7 @@ import type { AgentInfo, Container, Live, LocalAgent, LocalAgentStart } from "..
 import {
   attemptLog,
   counts,
+  expectation,
   FILTERS,
   type Filter,
   type Mode,
@@ -31,6 +32,7 @@ import {
 } from "../containers/containers";
 import styles from "../containers/Containers.module.css";
 import { PlanVsFact } from "../containers/PlanVsFact";
+import { SOURCES } from "../builder/DurationFields";
 import { useDraft } from "../draft/DraftContext";
 import { Button, Segmented, Switch } from "../ui/controls";
 import { Section } from "../ui/data";
@@ -402,12 +404,24 @@ function LiveRun({ runId, live }: { runId: string; live: Live }) {
     ...(problem.data?.tasks ?? []),
     ...(problem.data?.events ?? []).flatMap((e) => e.task ?? []),
   ];
-  // Без длительности — оценка сервера (её работа в прогоне)
-  const durations = new Map(tasks.map((t) => [t.id, t.duration ?? live.estimates?.[t.id]?.mean]));
+  const durations = new Map(tasks.map((t) => [t.id, t.duration]));
+  // Без длительности — оценка сервера, уточнённая по ходу попытки
+  const expect = (c: Container) =>
+    expectation(events.data ?? [], c, durations.get(c.task), live.estimates?.[c.task]);
+  const workText = (c: Container) => {
+    const e = expect(c);
+    return e ? `${e.approx ? "≈ " : ""}${Math.round(e.expected)}` : "?";
+  };
+  // Закончившейся попытке с оценкой ожидание уже не нужно: сколько ждали — для сравнения
+  const caption = (c: Container) =>
+    c.state === "exited" && !c.detail && expect(c)?.approx
+      ? `закончена · ждали ${workText(c)} ${unit} работы`
+      : `${c.progress} из ${workText(c)} ${unit} работы сохранено`;
   const limits = new Map<string, Resources | undefined>(tasks.map((t) => [t.id, t.resources]));
   const key = (c: Container) => `${c.task}#${c.attempt}`;
   const shown = live.containers.filter((c) => filter === "all" || phase(c) === filter);
   const selected = live.containers.find((c) => key(c) === picked) ?? shown.at(-1);
+  const guess = selected && expect(selected);
   const n = counts(live.containers);
   const running = live.status === "running";
 
@@ -440,14 +454,19 @@ function LiveRun({ runId, live }: { runId: string; live: Live }) {
         </div>
         <div className={styles.cards}>
           {shown.map((c) => {
-            const done = share(c, durations.get(c.task));
+            const e = expect(c);
+            const done = share(c, e?.expected);
+            // Кольцо — до p80: дуга — сделанное, полоса в конце — где задача закончится скорее всего
+            const scale = e && e.p80 > 0 ? e.p80 : 1;
+            const made = c.state === "exited" && !c.detail ? 1 : Math.min(1, c.progress / scale);
+            const pct = `${e?.approx && done < 1 ? "≈" : ""}${Math.round(done * 100)}%`;
             return (
               <button
                 key={key(c)}
                 type="button"
                 className={`${styles.card} motion-lift`}
                 aria-pressed={selected !== undefined && key(selected) === key(c)}
-                aria-label={`${c.task}, попытка ${c.attempt} на ${c.worker}: ${stateLabel(c)}, ${Math.round(done * 100)}%`}
+                aria-label={`${c.task}, попытка ${c.attempt} на ${c.worker}: ${stateLabel(c)}, ${pct}`}
                 onClick={() => setPicked(key(c))}
               >
                 <span className={styles.cardHead}>
@@ -461,6 +480,17 @@ function LiveRun({ runId, live }: { runId: string; live: Live }) {
                 </span>
                 <svg className={styles.ring} viewBox="0 0 64 64" aria-hidden="true">
                   <circle cx="32" cy="32" r="26" className={styles.track} />
+                  {e?.approx && e.p80 > e.expected && phase(c) !== "done" && (
+                    <circle
+                      cx="32"
+                      cy="32"
+                      r="26"
+                      className={styles.band}
+                      data-testid="p80-band"
+                      strokeDasharray={`${RING * (1 - e.expected / e.p80)} ${RING}`}
+                      strokeDashoffset={-RING * (e.expected / e.p80)}
+                    />
+                  )}
                   <circle
                     cx="32"
                     cy="32"
@@ -468,15 +498,15 @@ function LiveRun({ runId, live }: { runId: string; live: Live }) {
                     className={styles.arc}
                     data-phase={phase(c)}
                     strokeDasharray={RING}
-                    strokeDashoffset={RING * (1 - done)}
+                    strokeDashoffset={RING * (1 - (e?.approx ? made : done))}
                   />
                   <text x="32" y="36" textAnchor="middle" className={styles.pct}>
-                    {Math.round(done * 100)}%
+                    {pct}
                   </text>
                 </svg>
                 <span className={styles.task}>{c.task}</span>
                 <span className={styles.caption}>
-                  {c.progress} из {durations.get(c.task) ?? "?"} {unit} работы сохранено · fence {c.attempt}
+                  {caption(c)} · fence {c.attempt}
                 </span>
               </button>
             );
@@ -496,8 +526,17 @@ function LiveRun({ runId, live }: { runId: string; live: Live }) {
             </dd>
             <dt>Чекпоинт</dt>
             <dd>
-              {selected.progress} из {durations.get(selected.task) ?? "?"} {unit}
+              {selected.progress} из {workText(selected)} {unit}
             </dd>
+            {guess?.approx && (
+              <>
+                <dt>Оценка</dt>
+                <dd>
+                  ≈ {Math.round(guess.expected)} {unit}, до {guess.p80} {unit} с вероятностью 80 % ·{" "}
+                  {SOURCES[live.estimates?.[selected.task]?.source ?? "kind"]}
+                </dd>
+              </>
+            )}
             <dt>Fence</dt>
             <dd>{selected.attempt}</dd>
             <dt>Контейнер</dt>

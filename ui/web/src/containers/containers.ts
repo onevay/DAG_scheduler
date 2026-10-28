@@ -75,8 +75,42 @@ export function attemptLog(events: readonly JournalRecord[], c: Container, unit:
     else if (r.type === "FINISH") out.push(`${r.t} ${unit} · закончилась`);
     else if (r.type === "INTERRUPTED")
       out.push(`${r.t} ${unit} · прервана (${r.cause}): сохранено ${r.saved}, потеряно ${r.lost}`);
+    else if (r.type === "ESTIMATE")
+      out.push(
+        `${r.t} ${unit} · уточнение: работа попытки ≈ ${r.work} ${unit}, окончание к ${r.end} ${unit}`,
+      );
   }
   return out;
+}
+
+/** Квантиль 0,8 логнормального по его среднему и σ логарифма — как у сервера. */
+export const p80Work = (work: number, spread: number) =>
+  Math.max(work, Math.ceil(work * Math.exp(0.8416 * spread - (spread * spread) / 2)));
+
+export type Expectation = { expected: number; p80: number; approx: boolean };
+
+type Prior = { mean: number; p80: number } | undefined;
+
+/** Сколько всего работы ждут от задачи попытки `c`: длительность, если известна, иначе оценка с последним
+ * уточнением этой попытки (оно считает работу от её стартовой позиции). */
+export function expectation(
+  events: readonly JournalRecord[],
+  c: Container,
+  duration: number | null | undefined,
+  prior: Prior,
+): Expectation | undefined {
+  if (duration !== null && duration !== undefined)
+    return { expected: duration, p80: duration, approx: false };
+  let resume = 0;
+  let last: { work: number; spread: number } | undefined;
+  for (const r of events) {
+    if (!("task" in r) || r.task !== c.task || !("attempt" in r) || r.attempt !== c.attempt) continue;
+    if (r.type === "START") resume = r.resume_from;
+    else if (r.type === "ESTIMATE") last = r;
+  }
+  if (last)
+    return { expected: resume + last.work, p80: resume + p80Work(last.work, last.spread), approx: true };
+  return prior && { expected: prior.mean, p80: prior.p80, approx: true };
 }
 
 /** Узлы без агента: прогон на агентах для такого входа не запустится. */

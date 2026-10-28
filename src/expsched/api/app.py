@@ -33,6 +33,7 @@ from starlette.exceptions import HTTPException
 from expsched.api import agents, emulations
 from expsched.api.emulations import Emulations
 from expsched.api.errors import error_response
+from expsched.api.history import History
 from expsched.api.local_agents import LocalAgents
 from expsched.api.models import (
     ErrorCode,
@@ -63,8 +64,9 @@ from expsched.emulate.replay import replay
 from expsched.estimate.history import pinned
 from expsched.pipeline import input_hash
 from expsched.policies.registry import implemented_policies
-from expsched.validation import Code, has_errors, validate
+from expsched.validation import Code, has_errors
 from expsched.validation.schema import schema_diagnostics
+from expsched.validation.validate import check
 
 SCHEMA_CODES = frozenset({Code.E001, Code.E070})  # вход не разобран: остальные проверки не выполнялись
 ERRORS: dict[int | str, dict[str, Any]] = {
@@ -96,17 +98,23 @@ async def check_problem(request: Request, mode: Literal["strict", "lenient"] = "
         body = await _read_body(request)
     except InputTooLarge as error:
         return error_response(413, "INPUT_TOO_LARGE", str(error))
-    return await asyncio.to_thread(_check, body, mode)
+    history = request.app.state.emulations.history
+    return await asyncio.to_thread(_check, body, mode, history)
 
 
-def _check(body: bytes, mode: Literal["strict", "lenient"]) -> Any:
+def _check(body: bytes, mode: Literal["strict", "lenient"], history: History | None = None) -> Any:
     """Проверка и анализ графа — секунды работы процессора на большом входе, поэтому в отдельном потоке."""
-    problem, diagnostics = validate(body, mode)
+    problem, diagnostics, estimates = check(body, mode, history.estimates if history else None)
     found = [d.to_dict() for d in diagnostics]
     if any(d.code in SCHEMA_CODES for d in diagnostics):
         return error_response(422, "SCHEMA_INVALID", "input does not match the schema", found)
     analysis = input_analysis(problem, diagnostics) if problem is not None else None
-    return {"valid": not has_errors(diagnostics), "diagnostics": found, "analysis": analysis}
+    return {
+        "valid": not has_errors(diagnostics),
+        "diagnostics": found,
+        "analysis": analysis,
+        "estimates": {k: e.to_dict() for k, e in estimates.items()},
+    }
 
 
 @router.get("/scenarios", response_model=ScenariosOut)
