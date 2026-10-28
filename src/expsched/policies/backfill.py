@@ -5,9 +5,9 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from expsched.domain.models import time_for
+from expsched.domain.models import p80_work, time_for
 from expsched.domain.resources import Resources
-from expsched.domain.snapshot import Decision, Snapshot
+from expsched.domain.snapshot import Decision, RunInfo, Snapshot
 from expsched.policies.base import best_fit
 from expsched.policies.priority import PriorityPolicy, queue_reason
 
@@ -69,13 +69,18 @@ def release_profile(
 ) -> list[tuple[int, Resources]]:
     """Когда и сколько освободится на узле: выполняющиеся задачи и стартовавшие в эту эпоху, по времени."""
     # Попытка на агенте может идти дольше прогноза: раньше «сейчас» она уже не освободит узел
+    # Неизвестная работа берётся по квантилю 0,8: резерв, обещанный раньше, чем узел освободится, хуже
     profile = [
-        (max(run.end_pred, snapshot.t), snapshot.tasks[k].resources)
+        (max(_p80_end(snapshot, k, run), snapshot.t), snapshot.tasks[k].resources)
         for k, run in snapshot.running.items()
         if run.worker == worker
     ]
     profile += [
-        (snapshot.t + time_for(snapshot.rem[k], snapshot.speed.get(w, 1)), snapshot.tasks[k].resources)
+        (
+            snapshot.t
+            + time_for(p80_work(snapshot.rem[k], snapshot.tasks[k].spread), snapshot.speed.get(w, 1)),
+            snapshot.tasks[k].resources,
+        )
         for k, w in started
         if w == worker
     ]
@@ -116,3 +121,10 @@ def _not_delaying(
     if not (ends_in_time or need.fits(held.extra)):
         allowed[held.worker] = Resources()
     return allowed
+
+
+def _p80_end(snapshot: Snapshot, key: str, run: RunInfo) -> int:
+    spread = snapshot.tasks[key].spread
+    if spread == 0:
+        return run.end_pred
+    return run.start + time_for(p80_work(run.work or run.end_pred - run.start, spread), run.speed)

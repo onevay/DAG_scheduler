@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import math
 import time
 from collections import deque
 from collections.abc import Callable, Mapping
@@ -17,11 +18,11 @@ from typing import Any, Literal
 
 from expsched.contract.agent import AgentEvent, Usage
 from expsched.contract.io_models import ContainerSpec, PolicyIn, ProblemIn
-from expsched.domain.models import Event, EvType
+from expsched.domain.models import Event, EvType, work_in
 from expsched.domain.states import FINAL_STATUSES
 from expsched.emulate.agents import AgentRegistry
 from expsched.emulate.shadow import compare
-from expsched.engine.events import Crash, Finish
+from expsched.engine.events import Crash, Finish, Reestimate
 from expsched.engine.executor import External
 from expsched.estimate import Estimate
 from expsched.pipeline import RunResult, conclude, prepare
@@ -102,6 +103,7 @@ class Emulation:
             if alive != self.sim.state.up[worker] and now >= self.sim.t:
                 kind = EvType.WORKER_UP if alive else EvType.WORKER_DOWN
                 self.sim.inject(now, Event(now, kind, worker=worker))
+        self._overdue(now)
         records = self.sim.advance(now)
         for r in records:
             if r["type"] == "START":
@@ -138,6 +140,8 @@ class Emulation:
         now = max(self.now(), self.sim.t)
         if event.type == "checkpoint" and event.progress is not None:
             self.executor.checkpoint(event.task, event.attempt, event.progress - c.resume_from)
+            if event.total is not None:
+                self._learn(c, event.progress, event.total, now)
         elif event.type == "exited" and event.exit_code == 0:
             self.sim.inject(now, Finish(event.task, event.attempt))
         elif event.type in ("exited", "lost", "rejected"):
@@ -156,6 +160,40 @@ class Emulation:
             c.usage = usage.model_dump()
         if lines:
             self.logs.setdefault((task, attempt), deque(maxlen=LOG_LINES)).extend(lines)
+
+    def _learn(self, c: Container, progress: int, total: int, now: int) -> None:
+        """Задача сообщила всю свою работу: оценка смешивается с ней в лог-пространстве с весом доли
+        сделанного — чем дальше задача, тем больше веры ей; неизвестное сужается в той же мере."""
+        run = self.sim.state.run.get(c.task)
+        if run is None or run.attempt != c.attempt or total <= progress:
+            return
+        believed = c.resume_from + (run.work or run.end_pred - run.start)
+        share = progress / total
+        blended = math.exp((1 - share) * math.log(believed) + share * math.log(total))
+        work = max(progress + 1, round(blended)) - c.resume_from
+        if work != believed - c.resume_from:
+            spread = self.sim.state.tasks[c.task].spread * (1 - share)
+            self.sim.inject(now, Reestimate(c.task, c.attempt, work, spread))
+
+    def _overdue(self, now: int) -> None:
+        """Попытка дошла до ожидаемого конца, а не закончилась: ждать её столько, сколько обещает условное
+        ожидание при уже сделанной работе; у задачи с известной длительностью — ещё половину прошедшего."""
+        if now < self.sim.t:
+            return
+        for key, run in sorted(self.sim.state.run.items()):
+            c = self.containers.get((key, run.attempt))
+            if c is None or now < run.end_pred or c.state not in ("started", "checkpoint"):
+                continue
+            work = run.work or run.end_pred - run.start
+            done = c.resume_from + work_in(now - run.start, run.speed)
+            spread = self.sim.state.tasks[key].spread
+            if spread > 0:
+                believed = c.resume_from + work
+                expected = Estimate(believed * math.exp(-(spread**2) / 2), spread, "kind").residual(done)
+                total = max(done + 1, math.ceil(expected - 1e-9))
+            else:
+                total = done + max(1, math.ceil((done - c.resume_from) / 2))
+            self.sim.inject(now, Reestimate(key, run.attempt, total - c.resume_from, spread))
 
     def checkpoint(self, task: str) -> None:
         run = self.sim.state.run.get(task)

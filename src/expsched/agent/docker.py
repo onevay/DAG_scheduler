@@ -11,11 +11,10 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Literal
 
-from expsched.agent.runtime import State
+from expsched.agent.runtime import WORKLOAD_IMAGE, State
 from expsched.contract.agent import StartCommand, Usage
 
 Run = Callable[[Sequence[str]], "subprocess.CompletedProcess[str]"]
-WORKLOAD_IMAGE = "expsched-workload:local"
 
 
 def run_cli(args: Sequence[str]) -> subprocess.CompletedProcess[str]:
@@ -65,10 +64,11 @@ class DockerRuntime:
             "EXPSCHED_TIME_SCALE_MS": str(command.time_scale_ms),
             "EXPSCHED_CHECKPOINT_INTERVAL": str(command.checkpoint_interval or 0),
         }
-        if command.container:
+        if command.container and command.container.image != self.workload_image:
             env.update(command.container.env)
             image, tail = command.container.image, list(command.container.command)
         else:
+            env.update(command.container.env if command.container else {})
             args += ["--network", "none"]
             image, tail = self.workload_image, []
         for key, value in sorted(env.items()):

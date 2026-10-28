@@ -85,15 +85,14 @@ def estimates(history: Mapping[str, Sequence[Observation]], problem: ProblemIn) 
     return out
 
 
-def pin(problem: ProblemIn, recorded: Mapping[str, Mapping[str, Any]] | None) -> ProblemIn:
-    """Вход с работой, которую задачи без длительности получили в прогоне (`estimates[*].work`): проигрывание
-    повторяет те же решения, даже если история с тех пор изменилась."""
-    if not recorded:
-        return problem
-
-    def fixed(t: TaskIn) -> TaskIn:
-        work = recorded.get(t.id, {}).get("work")
-        return t.model_copy(update={"duration": int(work)}) if t.duration is None and work else t
-
-    events = [e.model_copy(update={"task": fixed(e.task)}) if e.task else e for e in problem.events]
-    return problem.model_copy(update={"tasks": [fixed(t) for t in problem.tasks], "events": events})
+def pinned(problem: ProblemIn, recorded: Mapping[str, Mapping[str, Any]] | None) -> dict[str, Estimate]:
+    """Оценки, которые задачи без длительности получили в прогоне (`estimates` результата), с той же работой
+    и тем же разбросом: проигрывание повторяет те же решения, даже если история с тех пор изменилась."""
+    out: dict[str, Estimate] = {}
+    for t in problem.all_tasks():
+        rec = (recorded or {}).get(t.id)
+        if t.duration is None and rec:
+            out[key(t)] = Estimate(
+                float(rec["median"]), float(rec["spread"]), rec["source"], int(rec["work"])
+            )
+    return out

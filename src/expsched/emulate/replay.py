@@ -15,16 +15,20 @@ from typing import Any
 
 from expsched.contract.io_models import ProblemIn
 from expsched.domain.models import Event, EvType
-from expsched.engine.events import Crash, Finish, Payload
+from expsched.engine.events import Crash, Finish, Payload, Reestimate
 from expsched.engine.executor import External
+from expsched.estimate import Estimate
 from expsched.pipeline import RunResult, prepare
 
 DECISIONS = ("START", "RESERVE", "REPLAN")
 
 
-def replay(problem: ProblemIn, log: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
-    """`problem` — вход прогона вместе с его политикой, `log` — его журнал целиком."""
-    prepared = prepare(problem, problem.policy)
+def replay(
+    problem: ProblemIn, log: Sequence[Mapping[str, Any]], history: Mapping[str, Estimate] | None = None
+) -> dict[str, Any]:
+    """`problem` — вход прогона вместе с его политикой, `log` — его журнал целиком, `history` — оценки, с
+    которыми прогон шёл (`pinned`)."""
+    prepared = prepare(problem, problem.policy, history)
     if isinstance(prepared, RunResult):
         expected = decisions(log)
         return _verdict(expected, [], same_journal=not log)
@@ -88,6 +92,8 @@ def _fact(r: Mapping[str, Any]) -> Payload | None:
         return Finish(r["task"], r["attempt"])
     if r["type"] == "INTERRUPTED" and r["cause"] in ("FAILED", "OOM"):
         return Crash(r["task"], r["attempt"], r["cause"], (r.get("reason") or {}).get("detail"))
+    if r["type"] == "ESTIMATE":
+        return Reestimate(r["task"], r["attempt"], r["work"], r["spread"])
     if r["type"] in ("WORKER_DOWN", "WORKER_UP"):
         return Event(r["t"], EvType(r["type"].lower()), worker=r["worker"])
     return None

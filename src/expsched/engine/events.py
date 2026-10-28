@@ -34,13 +34,23 @@ class Crash:
 
 
 @dataclass(frozen=True)
+class Reestimate:
+    """Новая оценка работы идущей попытки (от её начала) и разброс того, что осталось неизвестным."""
+
+    task: str
+    attempt: int
+    work: int
+    spread: float
+
+
+@dataclass(frozen=True)
 class Release:
     """Наступил release_time задачи: в этот момент она может стать готовой."""
 
     task: str
 
 
-Payload = Finish | Crash | Release | Event
+Payload = Finish | Crash | Reestimate | Release | Event
 
 _EVENT_CLASS = {
     EvType.WORKER_DOWN: EvClass.WORKER_DOWN,
@@ -50,7 +60,7 @@ _EVENT_CLASS = {
 
 
 def event_class(payload: Payload) -> EvClass:
-    if isinstance(payload, Finish | Crash):
+    if isinstance(payload, Finish | Crash | Reestimate):
         return EvClass.FINISH
     if isinstance(payload, Release):
         return EvClass.QUEUE

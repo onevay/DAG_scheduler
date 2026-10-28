@@ -38,6 +38,7 @@ class Estimate:
     median: float
     spread: float  # σ логарифма; 0 — работа известна точно
     source: Source
+    fixed: int | None = None  # работа, которую задача уже получила в прогоне (для проигрывания)
 
     @property
     def mean(self) -> float:
@@ -57,8 +58,8 @@ class Estimate:
         return self.mean * NORMAL.cdf((mu + sigma**2 - math.log(done)) / sigma) / tail
 
     def work(self) -> int:
-        """Работа для движка: округлённое вверх среднее."""
-        return max(1, math.ceil(self.mean - 1e-9))
+        """Работа для движка: округлённое вверх среднее (или закреплённая)."""
+        return self.fixed if self.fixed is not None else max(1, math.ceil(self.mean - 1e-9))
 
     def to_dict(self) -> dict[str, float | int | str]:
         return {
@@ -92,16 +93,20 @@ def rescale(work: float, task: TaskIn, n_seen: int) -> float:
 
 
 def key(task: TaskIn) -> str:
-    """Чем задача узнаётся в истории: образ и команда её контейнера, иначе id и вид."""
+    """Чем задача узнаётся в истории: id и вид, а с контейнером — ещё его образ и команда (другой образ —
+    другая задача). Один образ у разных задач — частый случай (встроенная нагрузка): id есть всегда."""
+    base = f"task:{task.id}:{task.kind}"
     if task.container:
-        return f"image:{task.container.image} {' '.join(task.container.command)}".strip()
-    return f"task:{task.id}:{task.kind}"
+        return f"{base} image:{task.container.image} {' '.join(task.container.command)}".strip()
+    return base
 
 
 def estimate_for(
     task: TaskIn, similar: Mapping[str, list[int]], history: Mapping[str, Estimate] | None = None
 ) -> Estimate:
     spread = KIND[task.kind][1]
+    if history and key(task) in history and history[key(task)].fixed is not None:
+        return history[key(task)]  # закреплённая — сильнее всего: проигрывание повторяет прогон
     if isinstance(task.estimate, EstimateIn):
         return Estimate(
             task.estimate.median,

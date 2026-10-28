@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from expsched.domain.models import time_for
 from expsched.domain.snapshot import Decision, Snapshot
 from expsched.domain.states import TaskStatus
 from expsched.policies.backfill import BackfillPolicy
@@ -34,11 +35,20 @@ class CpSatPolicy:
         self.fallback = BackfillPolicy()
         self._plan: Plan | None = None
         self._world: World | None = None
+        self._ends: dict[str, int] = {}  # окончания идущих попыток, с которыми план считался
+        self._rem: dict[str, int] = {}  # остатки работы задач на момент плана
 
     def decide(self, snapshot: Snapshot) -> list[Decision]:
         world: World = (frozenset(snapshot.tasks), frozenset(w for w, up in snapshot.up.items() if up))
-        if self._plan is None or world != self._world or self._stale(snapshot, self._plan):
+        if (
+            self._plan is None
+            or world != self._world
+            or self._stale(snapshot, self._plan)
+            or self._moved(snapshot)
+        ):
             self._world = world
+            self._ends = {k: run.end_pred for k, run in snapshot.running.items()}
+            self._rem = dict(snapshot.rem)
             planned = plan_input(snapshot)
             self._plan = (
                 solve(planned, self.objective, self.time_limit, self.seed)
@@ -59,6 +69,20 @@ class CpSatPolicy:
             elif start > snapshot.t:
                 out.append(Decision("RESERVE", key, worker, {"code": "PLAN", "t_res": start}))
         return out
+
+    def _moved(self, snapshot: Snapshot) -> bool:
+        """Оценка работы попытки разошлась с планом (прогон на агентах): шедшая при плане кончится не тогда
+        или уже кончилась раньше, стартовавшая по плану — не через свой остаток. В симуляции окончания точно
+        такие, как в плане."""
+        if any(k not in snapshot.running and snapshot.t < end for k, end in self._ends.items()):
+            return True
+        for k, run in snapshot.running.items():
+            if k in self._ends:
+                if run.end_pred != self._ends[k]:
+                    return True
+            elif k in self._rem and run.end_pred != run.start + time_for(self._rem[k], run.speed):
+                return True
+        return False
 
     @staticmethod
     def _stale(snapshot: Snapshot, plan: Plan) -> bool:

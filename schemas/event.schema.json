@@ -116,6 +116,63 @@
       "title": "DiagnosticRecord",
       "type": "object"
     },
+    "EstimateRecord": {
+      "additionalProperties": false,
+      "description": "Новая оценка работы идущей попытки на агенте: по её прогрессу или потому, что она идёт дольше\nожидаемого.",
+      "properties": {
+        "attempt": {
+          "minimum": 1,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "end": {
+          "minimum": 0,
+          "title": "End",
+          "type": "integer"
+        },
+        "seq": {
+          "minimum": 0,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "spread": {
+          "minimum": 0,
+          "title": "Spread",
+          "type": "number"
+        },
+        "t": {
+          "minimum": 0,
+          "title": "T",
+          "type": "integer"
+        },
+        "task": {
+          "title": "Task",
+          "type": "string"
+        },
+        "type": {
+          "const": "ESTIMATE",
+          "title": "Type",
+          "type": "string"
+        },
+        "work": {
+          "minimum": 1,
+          "title": "Work",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "seq",
+        "t",
+        "type",
+        "task",
+        "attempt",
+        "work",
+        "spread",
+        "end"
+      ],
+      "title": "EstimateRecord",
+      "type": "object"
+    },
     "FinishRecord": {
       "additionalProperties": false,
       "properties": {
@@ -660,6 +717,7 @@
     "mapping": {
       "BLOCKED": "#/$defs/BlockedRecord",
       "DIAGNOSTIC": "#/$defs/DiagnosticRecord",
+      "ESTIMATE": "#/$defs/EstimateRecord",
       "FINISH": "#/$defs/FinishRecord",
       "INTERRUPTED": "#/$defs/InterruptedRecord",
       "READY": "#/$defs/ReadyRecord",
@@ -694,6 +752,9 @@
     },
     {
       "$ref": "#/$defs/InterruptedRecord"
+    },
+    {
+      "$ref": "#/$defs/EstimateRecord"
     },
     {
       "$ref": "#/$defs/BlockedRecord"

@@ -37,6 +37,8 @@ export function describe(r: JournalRecord, unit: string): string {
       return `${r.task}: ${r.code}`;
     case "READY":
       return `${r.task} готова к старту`;
+    case "ESTIMATE":
+      return `${r.task}: работа попытки ≈ ${r.work} ${unit}, окончание к ${r.end} ${unit}`;
   }
 }
 

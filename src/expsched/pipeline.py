@@ -82,7 +82,9 @@ def prepare(
         "policy": config.name,
     }
     resolved, estimates = resolve(problem, history)
-    validated, diagnostics = validate_problem(to_domain(resolved), config.validation_mode)
+    validated, diagnostics = validate_problem(
+        _with_spread(to_domain(resolved), estimates), config.validation_mode
+    )
     found = [d.to_dict() for d in diagnostics]
     result: dict[str, Any]
     if validated is None:
@@ -172,3 +174,15 @@ def _task_summaries(
             "waits": waits.get(key, []),
         }
     return out
+
+
+def _with_spread(problem: Problem, estimates: Mapping[str, Estimate]) -> Problem:
+    """Задачам без длительности — разброс их оценки: по нему политики берут осторожное окончание."""
+    if not estimates:
+        return problem
+
+    def spread(t: Task) -> Task:
+        return replace(t, spread=estimates[t.id].spread) if t.id in estimates else t
+
+    events = [replace(e, task=spread(e.task)) if e.task else e for e in problem.events]
+    return replace(problem, tasks={k: spread(t) for k, t in problem.tasks.items()}, events=events)

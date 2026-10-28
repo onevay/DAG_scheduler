@@ -32,11 +32,11 @@ from pydantic import BaseModel
 
 from expsched.agent.config import Backoff, Settings, configure_logging, settings
 from expsched.agent.core import Agent
-from expsched.agent.docker import WORKLOAD_IMAGE, DockerRuntime, Run, run_cli
+from expsched.agent.docker import DockerRuntime, Run, run_cli
 from expsched.agent.gravesentinel import client as gs
 from expsched.agent.gravesentinel.runtime import WORKLOAD_IMAGE as GS_WORKLOAD_IMAGE
 from expsched.agent.gravesentinel.runtime import GravesentinelRuntime
-from expsched.agent.runtime import FakeRuntime, Runtime
+from expsched.agent.runtime import WORKLOAD_IMAGE, FakeRuntime, Runtime
 from expsched.contract.agent import EventsAck, HelloAck, PollReply
 
 log = logging.getLogger("expsched.agent")

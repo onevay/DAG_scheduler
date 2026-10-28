@@ -128,14 +128,16 @@ NEEDS: dict[str, str] = {
 
 class AgentEvent(AttemptRef):
     """Что случилось с попыткой. accepted/rejected — ответ на команду start; started — контейнер запущен;
-    checkpoint — сохранено `progress` единиц работы; exited — контейнер завершился с `exit_code`; oom — убит
-    за превышение памяти; killed — остановлен командой stop; lost — агент потерял контейнер (`detail`)."""
+    checkpoint — сохранено `progress` единиц работы (из `total`, если задача знает всю); exited — контейнер
+    завершился с `exit_code`; oom — убит за превышение памяти; killed — остановлен командой stop; lost — агент
+    потерял контейнер (`detail`)."""
 
     seq: Annotated[int, Field(ge=0)]
     at: Annotated[str, Field(max_length=40)]  # время агента, ISO 8601 UTC — только для показа
     type: EventType
     container_id: Annotated[str, Field(max_length=128)] | None = None
     progress: Annotated[int, Field(ge=0)] | None = None
+    total: Annotated[int, Field(ge=1)] | None = None  # checkpoint: вся работа задачи, если её знает задача
     exit_code: int | None = None
     detail: Note | None = None
 

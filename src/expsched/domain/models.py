@@ -30,6 +30,17 @@ def time_for(work: int, speed: float) -> int:
     return max(1, math.ceil(work / speed - 1e-9))
 
 
+Z80 = 0.8416212335729143  # квантиль 0,8 стандартного нормального
+
+
+def p80_work(work: int, spread: float) -> int:
+    """Работа, которую задача не превысит с вероятностью 0,8: логнормальная со средним `work` и разбросом
+    `spread` (σ логарифма); не меньше самой `work`."""
+    if spread == 0:
+        return work
+    return max(work, math.ceil(work * math.exp(spread * Z80 - spread**2 / 2) - 1e-9))
+
+
 def work_in(elapsed: int, speed: float) -> int:
     """Работа, сделанная узлом со скоростью `speed` за `elapsed` единиц времени (с округлением вниз)."""
     return elapsed if speed == 1 else math.floor(elapsed * speed + 1e-9)
@@ -49,6 +60,7 @@ class Task:
     ckpt: int | None = None  # интервал чекпоинта; None — чекпоинтов нет
     max_retries: int = 2  # сколько раз задачу можно перезапустить после отказа узла
     constraints: Labels = ()  # метки, которые обязаны быть у узла
+    spread: float = 0.0  # неопределённость работы (σ логарифма); 0 — длительность известна
 
     def __post_init__(self) -> None:
         if self.duration < 1:  # с нулевой длительностью симуляция может не завершиться

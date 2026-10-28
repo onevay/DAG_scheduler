@@ -10,6 +10,7 @@ from typing import Literal, Protocol
 from expsched.contract.agent import StartCommand, Usage
 
 Status = Literal["running", "exited", "oom", "missing"]
+WORKLOAD_IMAGE = "expsched-workload:local"  # образ встроенной нагрузки: `make workload-image`
 
 
 @dataclass(frozen=True)
@@ -47,12 +48,33 @@ def read_progress(checkpoint_dir: Path) -> int | None:
         return None
 
 
-def write_progress(checkpoint_dir: Path, progress: int) -> None:
+def read_total(checkpoint_dir: Path) -> int | None:
+    """Вся работа задачи из `checkpoint.json`, если задача её сообщает (`total`); иначе None."""
+    try:
+        total = json.loads((checkpoint_dir / "checkpoint.json").read_text(encoding="utf-8")).get("total")
+    except (FileNotFoundError, ValueError, AttributeError):
+        return None
+    return int(total) if isinstance(total, int) and total > 0 else None
+
+
+def write_progress(checkpoint_dir: Path, progress: int, total: int | None = None) -> None:
     """Атомарно: читатель видит либо прежний чекпоинт, либо новый."""
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     tmp = checkpoint_dir / "checkpoint.json.tmp"
-    tmp.write_text(json.dumps({"progress": progress}), encoding="utf-8")
+    body = {"progress": progress} if total is None else {"progress": progress, "total": total}
+    tmp.write_text(json.dumps(body), encoding="utf-8")
     tmp.replace(checkpoint_dir / "checkpoint.json")
+
+
+def true_total(command: StartCommand) -> int:
+    """Вся работа встроенной нагрузки: `EXPSCHED_TOTAL` из окружения задачи — её настоящая работа, которой не
+    знает планировщик (так задаётся задача с неизвестной длительностью); иначе — то, что он прислал."""
+    env = command.container.env if command.container else {}
+    return (
+        int(env["EXPSCHED_TOTAL"])
+        if env.get("EXPSCHED_TOTAL", "").isdigit()
+        else command.resume_from + command.work
+    )
 
 
 @dataclass
@@ -69,6 +91,7 @@ class FakeRuntime:
     пишутся в каталог задачи, как у встроенной нагрузки. `fail`, `oom`, `vanish` — сбои для тестов."""
 
     name: Literal["fake"] = "fake"
+    workload_image = WORKLOAD_IMAGE  # «запускает» встроенную нагрузку и с этим образом
 
     def __init__(self) -> None:
         self.containers: dict[str, _FakeContainer] = {}
@@ -76,7 +99,7 @@ class FakeRuntime:
 
     def start(self, command: StartCommand, checkpoint_dir: Path) -> str:
         self.started += 1
-        total = command.resume_from + command.work
+        total = true_total(command)
         self.containers[command.key] = _FakeContainer(
             command,
             checkpoint_dir,
@@ -92,7 +115,7 @@ class FakeRuntime:
     def checkpoint(self, key: str) -> None:
         c = self.containers.get(key)
         if c and c.state.status == "running":
-            write_progress(c.checkpoint_dir, int(c.done))
+            write_progress(c.checkpoint_dir, int(c.done), true_total(c.command))
 
     def inspect(self, key: str) -> State:
         c = self.containers.get(key)
@@ -105,14 +128,14 @@ class FakeRuntime:
         for c in self.containers.values():
             if c.state.status != "running":
                 continue
-            total = c.command.resume_from + c.command.work
+            total = true_total(c.command)
             before = c.done
             c.done = min(total, c.done + ms / c.command.time_scale_ms)
             step = c.command.checkpoint_interval
             if step:  # последний пройденный чекпоинт; в момент окончания чекпоинт уже не нужен
                 mark = (min(int(c.done), total - 1)) // step * step
                 if mark > int(before) // step * step:
-                    write_progress(c.checkpoint_dir, mark)
+                    write_progress(c.checkpoint_dir, mark, total)
                     c.lines.append(f"checkpoint: {mark} units")
             if c.done >= total:
                 c.state = State("exited", 0)

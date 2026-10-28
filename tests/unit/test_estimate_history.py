@@ -8,7 +8,8 @@ from test_emulation import Loop, laptop
 from expsched.api.history import LIMIT, History
 from expsched.contract.io_models import ProblemIn, TaskIn
 from expsched.emulate.replay import replay
-from expsched.estimate.history import Observation, estimates, fit, observe, pin
+from expsched.estimate import Estimate, resolve
+from expsched.estimate.history import Observation, estimates, fit, observe, pinned
 
 
 def problem(tasks, mode="emulate", scale=100, workers=None):
@@ -50,7 +51,9 @@ def test_observed_work_counts_saved_work_and_the_speed_of_the_last_node():
     seen = observe(p, result)
     assert seen == {
         "task:train:train": [Observation(8 + 10 * 2, 4, "model")],
-        "image:lab/train:3 python t.py": [Observation(5 * 2 * 100, 1, "ms")],  # своя задача — в мс стены
+        "task:own:train image:lab/train:3 python t.py": [
+            Observation(5 * 2 * 100, 1, "ms")
+        ],  # своя задача — в мс стены
     }
 
 
@@ -93,10 +96,15 @@ def test_history_file_keeps_the_latest_observations_and_skips_simulations(tmp_pa
     assert history.load() == {}
 
 
-def test_pin_gives_tasks_the_work_they_had_in_the_run():
-    p = problem([{"id": "a"}, {"id": "b", "duration": 4}])
-    pinned = pin(p, {"a": {"work": 17}})
-    assert [t.duration for t in pinned.tasks] == [17, 4] and pin(p, None) is p
+def test_pinned_estimates_keep_the_work_and_spread_of_the_run():
+    p = problem([{"id": "a", "estimate": 10}, {"id": "b", "duration": 4}])
+    recorded = {
+        "a": {"median": 10.0, "spread": 0.5, "mean": 11.331, "p80": 15.2, "work": 17, "source": "estimate"}
+    }
+    pins = pinned(p, recorded)
+    assert pins == {"task:a:other": Estimate(10.0, 0.5, "estimate", 17)} and pinned(p, None) == {}
+    _, found = resolve(p, pins)  # закреплённая сильнее оценки во входе
+    assert found["a"].work() == 17 and found["a"].spread == 0.5
 
 
 def test_second_run_learns_from_the_first_and_replay_keeps_the_old_work(tmp_path):
@@ -117,6 +125,6 @@ def test_second_run_learns_from_the_first_and_replay_keeps_the_old_work(tmp_path
 
     # история изменилась, а проигрывание первого прогона — с той работой, что была у задач тогда
     stored = run.result.result
-    same = replay(pin(first, stored["estimates"]), run.result.events)
+    same = replay(first, run.result.events, pinned(first, stored["estimates"]))
     assert same["same"] and same["same_journal"]
     json.dumps(stored["estimates"])  # результат сериализуется как есть

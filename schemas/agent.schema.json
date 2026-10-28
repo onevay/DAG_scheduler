@@ -2,7 +2,7 @@
   "$defs": {
     "AgentEvent": {
       "additionalProperties": false,
-      "description": "Что случилось с попыткой. accepted/rejected — ответ на команду start; started — контейнер запущен;\ncheckpoint — сохранено `progress` единиц работы; exited — контейнер завершился с `exit_code`; oom — убит\nза превышение памяти; killed — остановлен командой stop; lost — агент потерял контейнер (`detail`).",
+      "description": "Что случилось с попыткой. accepted/rejected — ответ на команду start; started — контейнер запущен;\ncheckpoint — сохранено `progress` единиц работы (из `total`, если задача знает всю); exited — контейнер\nзавершился с `exit_code`; oom — убит за превышение памяти; killed — остановлен командой stop; lost — агент\nпотерял контейнер (`detail`).",
       "properties": {
         "at": {
           "maxLength": 40,
@@ -79,6 +79,19 @@
           "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
           "title": "Task",
           "type": "string"
+        },
+        "total": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Total"
         },
         "type": {
           "enum": [

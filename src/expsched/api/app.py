@@ -60,7 +60,7 @@ from expsched.contract.limits import MAX_BODY_BYTES, InputTooLarge
 from expsched.contract.whatif import apply, deltas
 from expsched.emulate.agents import AgentRegistry
 from expsched.emulate.replay import replay
-from expsched.estimate.history import pin
+from expsched.estimate.history import pinned
 from expsched.pipeline import input_hash
 from expsched.policies.registry import implemented_policies
 from expsched.validation import Code, has_errors, validate
@@ -268,7 +268,7 @@ async def replay_run(request: Request, run_id: RunId) -> Any:
     def load_and_replay() -> dict[str, Any]:
         problem = ProblemIn.model_validate(store.problem(run_id))
         events, _ = store.events(run_id, 0, 10**9)
-        return replay(pin(problem, store.result(run_id).get("estimates")), events)
+        return replay(problem, events, pinned(problem, store.result(run_id).get("estimates")))
 
     return await asyncio.to_thread(load_and_replay)
 

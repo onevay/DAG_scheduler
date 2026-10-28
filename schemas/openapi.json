@@ -22,7 +22,7 @@
       },
       "AgentEvent": {
         "additionalProperties": false,
-        "description": "Что случилось с попыткой. accepted/rejected — ответ на команду start; started — контейнер запущен;\ncheckpoint — сохранено `progress` единиц работы; exited — контейнер завершился с `exit_code`; oom — убит\nза превышение памяти; killed — остановлен командой stop; lost — агент потерял контейнер (`detail`).",
+        "description": "Что случилось с попыткой. accepted/rejected — ответ на команду start; started — контейнер запущен;\ncheckpoint — сохранено `progress` единиц работы (из `total`, если задача знает всю); exited — контейнер\nзавершился с `exit_code`; oom — убит за превышение памяти; killed — остановлен командой stop; lost — агент\nпотерял контейнер (`detail`).",
         "properties": {
           "at": {
             "maxLength": 40,
@@ -95,6 +95,18 @@
             "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
             "title": "Task",
             "type": "string"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
           },
           "type": {
             "enum": [
@@ -949,6 +961,63 @@
         "title": "EstimateOut",
         "type": "object"
       },
+      "EstimateRecord": {
+        "additionalProperties": false,
+        "description": "Новая оценка работы идущей попытки на агенте: по её прогрессу или потому, что она идёт дольше\nожидаемого.",
+        "properties": {
+          "attempt": {
+            "minimum": 1.0,
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "end": {
+            "minimum": 0.0,
+            "title": "End",
+            "type": "integer"
+          },
+          "seq": {
+            "minimum": 0.0,
+            "title": "Seq",
+            "type": "integer"
+          },
+          "spread": {
+            "minimum": 0.0,
+            "title": "Spread",
+            "type": "number"
+          },
+          "t": {
+            "minimum": 0.0,
+            "title": "T",
+            "type": "integer"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          },
+          "type": {
+            "const": "ESTIMATE",
+            "title": "Type",
+            "type": "string"
+          },
+          "work": {
+            "minimum": 1.0,
+            "title": "Work",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "seq",
+          "t",
+          "type",
+          "task",
+          "attempt",
+          "work",
+          "spread",
+          "end"
+        ],
+        "title": "EstimateRecord",
+        "type": "object"
+      },
       "EventIn": {
         "additionalProperties": false,
         "properties": {
@@ -1053,6 +1122,7 @@
                 "mapping": {
                   "BLOCKED": "#/components/schemas/BlockedRecord",
                   "DIAGNOSTIC": "#/components/schemas/DiagnosticRecord",
+                  "ESTIMATE": "#/components/schemas/EstimateRecord",
                   "FINISH": "#/components/schemas/FinishRecord",
                   "INTERRUPTED": "#/components/schemas/InterruptedRecord",
                   "READY": "#/components/schemas/ReadyRecord",
@@ -1087,6 +1157,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/InterruptedRecord"
+                },
+                {
+                  "$ref": "#/components/schemas/EstimateRecord"
                 },
                 {
                   "$ref": "#/components/schemas/BlockedRecord"

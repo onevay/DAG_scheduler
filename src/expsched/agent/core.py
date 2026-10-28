@@ -19,7 +19,7 @@ from typing import Any
 
 from pydantic import TypeAdapter
 
-from expsched.agent.runtime import Runtime, read_progress
+from expsched.agent.runtime import Runtime, read_progress, read_total
 from expsched.contract.agent import (
     MAX_LOG_LINE,
     MAX_LOG_LINES,
@@ -175,14 +175,17 @@ class Agent:
                 continue
             progress = read_progress(self._dir(attempt.command))
             if progress is not None and progress > attempt.progress:
-                self._emit(attempt, "checkpoint", progress=progress)
+                self._emit(
+                    attempt, "checkpoint", progress=progress, total=read_total(self._dir(attempt.command))
+                )
             state = self.runtime.inspect(key)
             if state.status == "exited":
-                work = (
-                    attempt.command.resume_from + attempt.command.work
-                    if state.exit_code == 0
-                    else attempt.progress
+                # Сделана вся работа: та, что знает сама задача (`total`), иначе присланная планировщиком
+                whole = (
+                    read_total(self._dir(attempt.command))
+                    or attempt.command.resume_from + attempt.command.work
                 )
+                work = whole if state.exit_code == 0 else attempt.progress
                 tail = self._tail(key) if state.exit_code != 0 else None
                 self._emit(attempt, "exited", exit_code=state.exit_code, progress=work, detail=tail)
                 self.runtime.stop(key)
@@ -242,7 +245,8 @@ class Agent:
         self._emit(attempt, "started", container_id=container_id, detail=elsewhere)
 
     def _refusal(self, command: StartCommand) -> str | None:
-        if command.container and command.container.image not in self.allowed_images:
+        builtin = getattr(self.runtime, "workload_image", None)  # встроенная нагрузка разрешена всегда
+        if command.container and command.container.image not in {*self.allowed_images, builtin}:
             return f"image {command.container.image!r} is not allowed on this agent"
         busy = [a.command for a in self.attempts.values() if not a.done and a.command.key != command.key]
         if len(busy) >= self.max_containers:

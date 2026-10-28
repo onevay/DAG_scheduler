@@ -82,6 +82,18 @@ class InterruptedRecord(Record):
     reason: Detail | None = None  # причина вытеснения от политики или подробности сбоя
 
 
+class EstimateRecord(Record):
+    """Новая оценка работы идущей попытки на агенте: по её прогрессу или потому, что она идёт дольше
+    ожидаемого."""
+
+    type: Literal["ESTIMATE"]
+    task: str
+    attempt: Annotated[int, Field(ge=1)]
+    work: Annotated[int, Field(ge=1)]  # работа попытки от её начала
+    spread: Annotated[float, Field(ge=0)]  # что осталось неизвестным (σ логарифма)
+    end: Time  # новый прогноз окончания
+
+
 class BlockedRecord(Record):
     type: Literal["BLOCKED"]
     task: str
@@ -138,6 +150,7 @@ EventRecord = Annotated[
     | FinishRecord
     | WorkerRecord
     | InterruptedRecord
+    | EstimateRecord
     | BlockedRecord
     | DiagnosticRecord
     | ReserveRecord

@@ -33,7 +33,7 @@ from expsched.domain.resources import Resources
 from expsched.domain.snapshot import Decision, Policy, RunInfo
 from expsched.domain.states import FINAL_STATUSES, TaskStatus
 from expsched.engine.errors import InvalidDecision
-from expsched.engine.events import Crash, EventQueue, Finish, Payload, Release
+from expsched.engine.events import Crash, EventQueue, Finish, Payload, Reestimate, Release
 from expsched.engine.executor import Executor, Simulated
 from expsched.engine.journal import Journal
 from expsched.engine.snapshot import build_snapshot
@@ -176,6 +176,8 @@ class Simulator:
             if run is not None and run.attempt == payload.attempt:
                 reason = {"detail": payload.detail} if payload.detail else None
                 self._interrupt(payload.task, cause=payload.cause, reason=reason)
+        elif isinstance(payload, Reestimate):
+            self._reestimate(payload)
         elif isinstance(payload, Release):
             self._try_ready(payload.task)
         else:
@@ -428,6 +430,29 @@ class Simulator:
             attempt=s.attempt[key],
             resume_from=task.duration - s.rem[key],
             reason=dict(decision.reason),
+        )
+
+    def _reestimate(self, fact: Reestimate) -> None:
+        """Попытка идёт иначе, чем ждали: её работа — `fact.work` от её начала. Прогноз окончания, остаток и
+        длительность задачи (из неё считается позиция следующей попытки) меняются согласованно."""
+        s = self.state
+        run = s.run.get(fact.task)
+        if run is None or run.attempt != fact.attempt:
+            return  # попытка уже закончилась или прервана
+        task = s.tasks[fact.task]
+        old = run.work or run.end_pred - run.start
+        s.tasks[fact.task] = replace(task, duration=task.duration + fact.work - old, spread=fact.spread)
+        s.rem[fact.task] = fact.work
+        s.run[fact.task] = replace(run, end_pred=run.start + time_for(fact.work, run.speed), work=fact.work)
+        s.analysis = None
+        self.journal.append(
+            "ESTIMATE",
+            self.t,
+            task=fact.task,
+            attempt=fact.attempt,
+            work=fact.work,
+            spread=round(fact.spread, 3),
+            end=s.run[fact.task].end_pred,
         )
 
     def _finalize(self) -> None:

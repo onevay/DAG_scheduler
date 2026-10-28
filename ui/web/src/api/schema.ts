@@ -450,8 +450,9 @@ export interface components {
     /**
      * AgentEvent
      * @description Что случилось с попыткой. accepted/rejected — ответ на команду start; started — контейнер запущен;
-     *     checkpoint — сохранено `progress` единиц работы; exited — контейнер завершился с `exit_code`; oom — убит
-     *     за превышение памяти; killed — остановлен командой stop; lost — агент потерял контейнер (`detail`).
+     *     checkpoint — сохранено `progress` единиц работы (из `total`, если задача знает всю); exited — контейнер
+     *     завершился с `exit_code`; oom — убит за превышение памяти; killed — остановлен командой stop; lost — агент
+     *     потерял контейнер (`detail`).
      */
     AgentEvent: {
       /** At */
@@ -472,6 +473,8 @@ export interface components {
       seq: number;
       /** Task */
       task: string;
+      /** Total */
+      total?: number | null;
       /**
        * Type
        * @enum {string}
@@ -800,6 +803,32 @@ export interface components {
       /** Work */
       work: number;
     };
+    /**
+     * EstimateRecord
+     * @description Новая оценка работы идущей попытки на агенте: по её прогрессу или потому, что она идёт дольше
+     *     ожидаемого.
+     */
+    EstimateRecord: {
+      /** Attempt */
+      attempt: number;
+      /** End */
+      end: number;
+      /** Seq */
+      seq: number;
+      /** Spread */
+      spread: number;
+      /** T */
+      t: number;
+      /** Task */
+      task: string;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "ESTIMATE";
+      /** Work */
+      work: number;
+    };
     /** EventIn */
     EventIn: {
       task?: components["schemas"]["TaskIn"] | null;
@@ -841,6 +870,7 @@ export interface components {
         | components["schemas"]["FinishRecord"]
         | components["schemas"]["WorkerRecord"]
         | components["schemas"]["InterruptedRecord"]
+        | components["schemas"]["EstimateRecord"]
         | components["schemas"]["BlockedRecord"]
         | components["schemas"]["DiagnosticRecord"]
         | components["schemas"]["ReserveRecord"]
