@@ -2049,6 +2049,8 @@
                 "fifo_skip",
                 "priority",
                 "priority_backfill",
+                "heft",
+                "peft",
                 "cpsat"
               ],
               "type": "string"
@@ -2105,6 +2107,8 @@
               "fifo_skip",
               "priority",
               "priority_backfill",
+              "heft",
+              "peft",
               "cpsat"
             ],
             "title": "Name",
@@ -2636,6 +2640,8 @@
               "fifo_skip",
               "priority",
               "priority_backfill",
+              "heft",
+              "peft",
               "cpsat"
             ],
             "title": "Policy",
@@ -2758,6 +2764,8 @@
               "fifo_skip",
               "priority",
               "priority_backfill",
+              "heft",
+              "peft",
               "cpsat"
             ],
             "title": "Policy",
@@ -2947,6 +2955,8 @@
               "fifo_skip",
               "priority",
               "priority_backfill",
+              "heft",
+              "peft",
               "cpsat"
             ],
             "title": "Policy",

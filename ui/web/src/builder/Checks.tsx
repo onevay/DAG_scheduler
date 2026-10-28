@@ -96,6 +96,8 @@ const POLICY_LABELS: Record<string, string> = {
   fifo_skip: "FIFO с пропуском",
   priority: "По приоритету",
   priority_backfill: "Приоритет + backfill",
+  heft: "HEFT",
+  peft: "PEFT",
   cpsat: "CP-SAT",
 };
 

@@ -93,22 +93,37 @@ def reservation(
     """Самый ранний момент, когда задача поместится на допустимый работающий узел; при равенстве — узел
     с меньшим id. None — допустимых работающих узлов нет или задача не поместится, даже когда они опустеют.
     """
-    need = snapshot.tasks[task_id].resources
     best: Reservation | None = None
     for worker in snapshot.eligible[task_id]:
         if not snapshot.up[worker]:
             continue
-        available = free[worker]
-        profile = release_profile(snapshot, worker, started)
-        for i, (t, released) in enumerate(profile):
-            available = available + released
-            if i + 1 < len(profile) and profile[i + 1][0] == t:
-                continue  # всё, что освобождается в один момент, учитывается вместе
-            if need.fits(available):
-                if best is None or t < best.t:
-                    best = Reservation(task_id, worker, t, available - need)
-                break
+        found = earliest(snapshot, task_id, worker, free, started)
+        if found is not None and (best is None or found[0] < best.t):
+            best = Reservation(task_id, worker, found[0], found[1])
     return best
+
+
+def earliest(
+    snapshot: Snapshot,
+    task_id: str,
+    worker: str,
+    free: Mapping[str, Resources],
+    started: Sequence[tuple[str, str]],
+) -> tuple[int, Resources] | None:
+    """Самый ранний момент, когда задача поместится на узел (сейчас — если помещается уже), и что тогда
+    останется свободным; None — не поместится, даже когда узел опустеет."""
+    need = snapshot.tasks[task_id].resources
+    available = free[worker]
+    if need.fits(available):
+        return snapshot.t, available - need
+    profile = release_profile(snapshot, worker, started)
+    for i, (t, released) in enumerate(profile):
+        available = available + released
+        if i + 1 < len(profile) and profile[i + 1][0] == t:
+            continue  # всё, что освобождается в один момент, учитывается вместе
+        if need.fits(available):
+            return t, available - need
+    return None
 
 
 def _not_delaying(

@@ -128,12 +128,11 @@ def test_interrupt_on_a_fast_worker_saves_work_at_its_speed():
     assert result["violations"] == [] and result["status"] == "OK"
 
 
-def test_every_example_journal_is_unchanged_with_reference_speed():
+def test_examples_before_the_speed_model_keep_the_reference_speed():
     for path in sorted(SCENARIOS.glob("*.json")):
         p = load(path.read_bytes())
-        assert all(w.speed == 1 for w in p.cluster.workers), path.stem
-    # журналы примеров сверяются с эталонами в их собственных тестах; здесь — что ни один пример не
-    # задаёт скорость и потому идёт прежним путём
+        assert all(w.speed == 1 for w in p.cluster.workers) or path.stem == "ml_hetero", path.stem
+    # их журналы сверяются с эталонами в их собственных тестах; разные скорости — только у примера ml_hetero
 
 
 def test_run_on_agents_with_unknown_durations_goes_to_the_end(tmp_path):

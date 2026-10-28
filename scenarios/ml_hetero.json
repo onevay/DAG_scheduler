@@ -1,0 +1,37 @@
+{
+  "name": "ml_hetero",
+  "time_unit": "hour",
+  "cluster": {
+    "workers": [
+      {"id": "a100", "resources": {"cpu": 32, "ram_mb": 262144, "gpu": 4}, "speed": 2.0},
+      {"id": "v100", "resources": {"cpu": 32, "ram_mb": 131072, "gpu": 4}},
+      {"id": "cpu-1", "resources": {"cpu": 16, "ram_mb": 65536}}
+    ]
+  },
+  "tasks": [
+    {"id": "ingest", "kind": "data", "duration": 6, "resources": {"cpu": 8, "ram_mb": 16384},
+     "scaling": {"law": "amdahl", "serial": 0.5}},
+    {"id": "tokenize", "kind": "data", "duration": 4, "resources": {"cpu": 8, "ram_mb": 16384},
+     "dependencies": ["ingest"]},
+    {"id": "pretrain", "kind": "train", "duration": 24, "resources": {"gpu": 4, "cpu": 16, "ram_mb": 131072},
+     "dependencies": ["tokenize"], "checkpoint_interval": 4, "scaling": {"law": "amdahl", "serial": 0.08}},
+    {"id": "finetune_code", "kind": "train", "duration": 10, "resources": {"gpu": 2, "cpu": 8, "ram_mb": 65536},
+     "dependencies": ["pretrain"], "checkpoint_interval": 2, "scaling": {"law": "power", "alpha": 0.85}},
+    {"id": "finetune_chat", "kind": "train", "duration": 10, "resources": {"gpu": 2, "cpu": 8, "ram_mb": 65536},
+     "dependencies": ["pretrain"], "checkpoint_interval": 2, "scaling": {"law": "power", "alpha": 0.85}},
+    {"id": "distill", "kind": "train", "duration": 8, "resources": {"gpu": 2, "cpu": 8, "ram_mb": 32768},
+     "dependencies": ["pretrain"]},
+    {"id": "eval_code", "kind": "eval", "duration": 3, "resources": {"gpu": 1, "cpu": 4, "ram_mb": 16384},
+     "dependencies": ["finetune_code"]},
+    {"id": "eval_chat", "kind": "eval", "duration": 3, "resources": {"gpu": 1, "cpu": 4, "ram_mb": 16384},
+     "dependencies": ["finetune_chat"]},
+    {"id": "eval_distill", "kind": "eval", "duration": 2, "resources": {"gpu": 1, "cpu": 4, "ram_mb": 16384},
+     "dependencies": ["distill"]},
+    {"id": "sweep_lr", "kind": "train", "duration": 8, "resources": {"gpu": 1, "cpu": 4, "ram_mb": 16384}},
+    {"id": "sweep_wd", "kind": "train", "duration": 8, "resources": {"gpu": 1, "cpu": 4, "ram_mb": 16384}},
+    {"id": "sweep_bs", "kind": "train", "duration": 8, "resources": {"gpu": 1, "cpu": 4, "ram_mb": 16384}},
+    {"id": "report", "kind": "other", "duration": 1, "resources": {"cpu": 2, "ram_mb": 4096},
+     "dependencies": ["eval_code", "eval_chat", "eval_distill", "sweep_lr", "sweep_wd", "sweep_bs"]}
+  ],
+  "policy": {"name": "heft"}
+}

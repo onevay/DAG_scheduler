@@ -177,6 +177,8 @@
             "fifo_skip",
             "priority",
             "priority_backfill",
+            "heft",
+            "peft",
             "cpsat"
           ],
           "title": "Name",

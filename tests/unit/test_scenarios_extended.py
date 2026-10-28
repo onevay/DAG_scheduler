@@ -42,6 +42,7 @@ def statuses(result):
         ("laptop", "OK"),
         ("criu_pairs", "OK"),
         ("two_machines", "OK"),
+        ("ml_hetero", "OK"),
     ],
 )
 @pytest.mark.parametrize("policy", POLICIES)

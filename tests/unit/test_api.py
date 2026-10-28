@@ -50,7 +50,7 @@ def with_tasks(tasks):
 
 def test_policies_lists_implemented_ones_and_defaults(client):
     body = client.get("/v1/policies").json()
-    expected = ["fifo", "fifo_skip", "priority", "priority_backfill"]
+    expected = ["fifo", "fifo_skip", "heft", "peft", "priority", "priority_backfill"]
     assert body["policies"] == sorted(
         [*expected, "cpsat"] if importlib.util.find_spec("ortools") else expected
     )

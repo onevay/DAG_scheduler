@@ -9,6 +9,7 @@ from expsched.contract.io_models import PolicyIn
 from expsched.domain.snapshot import Policy
 from expsched.policies.backfill import BackfillPolicy
 from expsched.policies.fifo import FifoPolicy
+from expsched.policies.heft import HeftPolicy, PeftPolicy
 from expsched.policies.preemption import PreemptivePolicy
 from expsched.policies.priority import PriorityPolicy
 
@@ -24,6 +25,8 @@ _FACTORIES: dict[str, Callable[[PolicyIn, int], Policy]] = {
     "fifo_skip": lambda config, seed: FifoPolicy(skip=True),
     "priority": lambda config, seed: PriorityPolicy(aging=config.aging),
     "priority_backfill": lambda config, seed: BackfillPolicy(aging=config.aging),
+    "heft": lambda config, seed: HeftPolicy(),
+    "peft": lambda config, seed: PeftPolicy(),
 }
 if importlib.util.find_spec("ortools") is not None:
     _FACTORIES["cpsat"] = _cpsat
