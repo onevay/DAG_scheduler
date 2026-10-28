@@ -179,6 +179,7 @@
             "priority_backfill",
             "heft",
             "peft",
+            "las",
             "cpsat"
           ],
           "title": "Name",
@@ -202,6 +203,11 @@
           ],
           "title": "Preemption",
           "type": "string"
+        },
+        "robust": {
+          "default": false,
+          "title": "Robust",
+          "type": "boolean"
         },
         "time_limit": {
           "default": 5.0,
@@ -529,6 +535,7 @@
         "name": "priority_backfill",
         "objective": "lexicographic",
         "preemption": "deadline_only",
+        "robust": false,
         "time_limit": 5.0,
         "validation_mode": "lenient"
       }

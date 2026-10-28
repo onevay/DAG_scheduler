@@ -98,6 +98,7 @@ const POLICY_LABELS: Record<string, string> = {
   priority_backfill: "Приоритет + backfill",
   heft: "HEFT",
   peft: "PEFT",
+  las: "LAS (Tiresias)",
   cpsat: "CP-SAT",
 };
 

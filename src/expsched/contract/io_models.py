@@ -16,7 +16,7 @@ ResMap = dict[
     Annotated[int, Field(ge=0)],
 ]
 Id = Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")]
-PolicyName = Literal["fifo", "fifo_skip", "priority", "priority_backfill", "heft", "peft", "cpsat"]
+PolicyName = Literal["fifo", "fifo_skip", "priority", "priority_backfill", "heft", "peft", "las", "cpsat"]
 
 
 class Strict(BaseModel):
@@ -106,6 +106,8 @@ class PolicyIn(Strict):
     # Только для cpsat: бюджет решателя на одно решение в детерминированном времени (условных секундах).
     # Бюджет, а не часы, делает журнал воспроизводимым на любой машине.
     time_limit: Annotated[float, Field(gt=0, le=300)] = 5.0
+    # Только для cpsat: неизвестную работу задач планировать по квантилю 0,8, а не по среднему — осторожнее
+    robust: bool = False
     validation_mode: Literal["strict", "lenient"] = "lenient"
 
 

@@ -1199,7 +1199,9 @@ export interface components {
     PoliciesOut: {
       defaults: components["schemas"]["PolicyIn"];
       /** Policies */
-      policies: ("fifo" | "fifo_skip" | "priority" | "priority_backfill" | "heft" | "peft" | "cpsat")[];
+      policies: (
+        "fifo" | "fifo_skip" | "priority" | "priority_backfill" | "heft" | "peft" | "las" | "cpsat"
+      )[];
     };
     /** PolicyIn */
     PolicyIn: {
@@ -1228,7 +1230,7 @@ export interface components {
        * @default priority_backfill
        * @enum {string}
        */
-      name?: "fifo" | "fifo_skip" | "priority" | "priority_backfill" | "heft" | "peft" | "cpsat";
+      name?: "fifo" | "fifo_skip" | "priority" | "priority_backfill" | "heft" | "peft" | "las" | "cpsat";
       /**
        * Objective
        * @default lexicographic
@@ -1241,6 +1243,11 @@ export interface components {
        * @enum {string}
        */
       preemption?: "never" | "deadline_only" | "priority";
+      /**
+       * Robust
+       * @default false
+       */
+      robust?: boolean;
       /**
        * Time Limit
        * @default 5
@@ -1315,6 +1322,7 @@ export interface components {
        *       "name": "priority_backfill",
        *       "objective": "lexicographic",
        *       "preemption": "deadline_only",
+       *       "robust": false,
        *       "time_limit": 5,
        *       "validation_mode": "lenient"
        *     }
@@ -1460,7 +1468,7 @@ export interface components {
        * Policy
        * @enum {string}
        */
-      policy: "fifo" | "fifo_skip" | "priority" | "priority_backfill" | "heft" | "peft" | "cpsat";
+      policy: "fifo" | "fifo_skip" | "priority" | "priority_backfill" | "heft" | "peft" | "las" | "cpsat";
       /** Replans */
       replans: components["schemas"]["ReplanRecord"][] | null;
       /** Result Hash */
@@ -1495,7 +1503,7 @@ export interface components {
        * Policy
        * @enum {string}
        */
-      policy: "fifo" | "fifo_skip" | "priority" | "priority_backfill" | "heft" | "peft" | "cpsat";
+      policy: "fifo" | "fifo_skip" | "priority" | "priority_backfill" | "heft" | "peft" | "las" | "cpsat";
       /** Run Id */
       run_id: string;
       /**
@@ -1561,7 +1569,7 @@ export interface components {
        * Policy
        * @enum {string}
        */
-      policy: "fifo" | "fifo_skip" | "priority" | "priority_backfill" | "heft" | "peft" | "cpsat";
+      policy: "fifo" | "fifo_skip" | "priority" | "priority_backfill" | "heft" | "peft" | "las" | "cpsat";
       /** Tasks */
       tasks: number;
       /** Time Unit */

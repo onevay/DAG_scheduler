@@ -71,7 +71,7 @@ def release_profile(
     # Попытка на агенте может идти дольше прогноза: раньше «сейчас» она уже не освободит узел
     # Неизвестная работа берётся по квантилю 0,8: резерв, обещанный раньше, чем узел освободится, хуже
     profile = [
-        (max(_p80_end(snapshot, k, run), snapshot.t), snapshot.tasks[k].resources)
+        (max(p80_end(snapshot, k, run), snapshot.t), snapshot.tasks[k].resources)
         for k, run in snapshot.running.items()
         if run.worker == worker
     ]
@@ -138,7 +138,8 @@ def _not_delaying(
     return allowed
 
 
-def _p80_end(snapshot: Snapshot, key: str, run: RunInfo) -> int:
+def p80_end(snapshot: Snapshot, key: str, run: RunInfo) -> int:
+    """Осторожное окончание идущей попытки: при неизвестной работе — по её квантилю 0,8."""
     spread = snapshot.tasks[key].spread
     if spread == 0:
         return run.end_pred

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from expsched.domain.models import time_for
+from expsched.domain.models import p80_work, time_for
 from expsched.domain.snapshot import Decision, Snapshot
 from expsched.domain.states import TaskStatus
-from expsched.policies.backfill import BackfillPolicy
+from expsched.policies.backfill import BackfillPolicy, p80_end
 from expsched.policies.cpsat.model import Busy, Plan, PlanInput, PlanTask, solve
 
 # Больше незавершённых задач — решения принимает priority_backfill: на ~120 задачах решение с бюджетом 5
@@ -28,10 +28,13 @@ class CpSatPolicy:
 
     name = "cpsat"
 
-    def __init__(self, objective: str = "lexicographic", time_limit: float = 5.0, seed: int = 0) -> None:
+    def __init__(
+        self, objective: str = "lexicographic", time_limit: float = 5.0, seed: int = 0, robust: bool = False
+    ) -> None:
         self.objective = objective
         self.time_limit = time_limit
         self.seed = seed
+        self.robust = robust  # неизвестную работу — по квантилю 0,8, а не по среднему
         self.fallback = BackfillPolicy()
         self._plan: Plan | None = None
         self._world: World | None = None
@@ -49,7 +52,7 @@ class CpSatPolicy:
             self._world = world
             self._ends = {k: run.end_pred for k, run in snapshot.running.items()}
             self._rem = dict(snapshot.rem)
-            planned = plan_input(snapshot)
+            planned = plan_input(snapshot, self.robust)
             self._plan = (
                 solve(planned, self.objective, self.time_limit, self.seed)
                 if len(planned.tasks) <= MAX_TASKS
@@ -103,13 +106,17 @@ class CpSatPolicy:
         return False
 
 
-def plan_input(snapshot: Snapshot) -> PlanInput:
+def plan_input(snapshot: Snapshot, robust: bool = False) -> PlanInput:
     """Что планировать: незавершённые задачи, которые могут выполниться, — с остатком работы, работающими
     допустимыми узлами и зависимостями, которые сами выполнятся (идут или тоже планируются)."""
     up = {w for w, ok in snapshot.up.items() if ok}
     busy = {
         # попытка на агенте, идущая дольше прогноза, закончится не раньше «сейчас»
-        k: Busy(run.worker, max(run.end_pred, snapshot.t), snapshot.tasks[k].resources)
+        k: Busy(
+            run.worker,
+            max(p80_end(snapshot, k, run) if robust else run.end_pred, snapshot.t),
+            snapshot.tasks[k].resources,
+        )
         for k, run in snapshot.running.items()
     }
     waiting = {
@@ -129,15 +136,20 @@ def plan_input(snapshot: Snapshot) -> PlanInput:
             if not all(will_finish(d) for d in snapshot.tasks[k].deps):
                 waiting.discard(k)
                 changed = True
+
+    def work(k: str) -> int:
+        return p80_work(snapshot.rem[k], snapshot.tasks[k].spread) if robust else snapshot.rem[k]
+
     tasks = {
         k: PlanTask(
-            duration=snapshot.rem[k],
+            duration=work(k),
             resources=snapshot.tasks[k].resources,
             workers=tuple(w for w in snapshot.eligible[k] if w in up),
             release=max(snapshot.t, snapshot.tasks[k].release),
             deps=tuple(d for d in snapshot.tasks[k].deps if d in waiting or d in busy),
             deadline=snapshot.tasks[k].deadline,
             cls=int(snapshot.tasks[k].cls),
+            on={w: time_for(work(k), snapshot.speed.get(w, 1)) for w in snapshot.eligible[k] if w in up},
         )
         for k in sorted(waiting)
     }

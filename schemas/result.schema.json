@@ -980,6 +980,7 @@
         "priority_backfill",
         "heft",
         "peft",
+        "las",
         "cpsat"
       ],
       "title": "Policy",

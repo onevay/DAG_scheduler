@@ -14,7 +14,7 @@ lexicographic решается стадиями (каждая следующая
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from ortools.sat.python import cp_model
 
@@ -34,6 +34,14 @@ class PlanTask:
     deps: tuple[str, ...] = ()  # незавершённые зависимости: планируемые или идущие задачи
     deadline: int | None = None
     cls: int = 1
+    on: Mapping[str, int] = field(default_factory=dict)  # длительность на узле, если узлы разной скорости
+
+    def time(self, worker: str) -> int:
+        return self.on.get(worker, self.duration)
+
+    @property
+    def uniform(self) -> bool:
+        return all(self.time(w) == self.duration for w in self.workers)
 
 
 @dataclass(frozen=True)
@@ -67,7 +75,7 @@ def solve(
     model = cp_model.CpModel()
     busy_end = [b.end for b in plan.busy.values()]
     horizon = max([plan.now, *busy_end, *(t.release for t in plan.tasks.values())]) + sum(
-        t.duration for t in plan.tasks.values()
+        max([t.duration, *(t.time(w) for w in t.workers)]) for t in plan.tasks.values()
     )
     start: dict[str, cp_model.IntVar] = {}
     end: dict[str, cp_model.IntVar] = {}
@@ -79,15 +87,19 @@ def solve(
             interval = model.new_fixed_size_interval_var(plan.now, b.end - plan.now, f"busy_{key}")
             on_worker[b.worker].append((interval, b.resources))
     for key, task in sorted(plan.tasks.items()):
+        shortest = min([task.time(w) for w in task.workers] or [task.duration])
         start[key] = model.new_int_var(task.release, horizon, f"start_{key}")
-        end[key] = model.new_int_var(task.release + task.duration, horizon, f"end_{key}")
-        model.add(end[key] == start[key] + task.duration)
+        end[key] = model.new_int_var(task.release + shortest, horizon, f"end_{key}")
+        if task.uniform:  # узлы одной скорости: модель — как без скоростей
+            model.add(end[key] == start[key] + task.duration)
         picks[key] = []
         for worker in sorted(task.workers):
             picked = model.new_bool_var(f"on_{key}_{worker}")
             interval = model.new_optional_fixed_size_interval_var(
-                start[key], task.duration, picked, f"run_{key}_{worker}"
+                start[key], task.time(worker), picked, f"run_{key}_{worker}"
             )
+            if not task.uniform:  # окончание — по длительности на выбранном узле
+                model.add(end[key] == start[key] + task.time(worker)).only_enforce_if(picked)
             picks[key].append((worker, picked))
             on_worker[worker].append((interval, task.resources))
         model.add_exactly_one(p for _, p in picks[key])
@@ -171,27 +183,30 @@ def compact(plan: PlanInput, starts: Mapping[str, tuple[str, int]]) -> dict[str,
         ready = max(
             [
                 task.release,
-                *(placed[d][1] + plan.tasks[d].duration for d in task.deps if d in placed),
+                *(placed[d][1] + plan.tasks[d].time(placed[d][0]) for d in task.deps if d in placed),
                 *(plan.busy[d].end for d in task.deps if d in plan.busy),
             ]
         )
         load = [
-            (s, s + plan.tasks[k].duration, plan.tasks[k].resources)
+            (s, s + plan.tasks[k].time(w), plan.tasks[k].resources)
             for k, (w, s) in placed.items()
             if w == worker
         ]
         load += [(plan.now, b.end, b.resources) for b in plan.busy.values() if b.worker == worker]
         candidates = sorted({ready, *(end for _, end, _ in load if end > ready)})
         start = next(
-            (t for t in candidates if t <= planned and _room(plan.capacity[worker], load, task, t)), planned
+            (t for t in candidates if t <= planned and _room(plan.capacity[worker], load, task, t, worker)),
+            planned,
         )
         placed[key] = (worker, start)
     return placed
 
 
-def _room(capacity: Resources, load: list[tuple[int, int, Resources]], task: PlanTask, t: int) -> bool:
-    """Хватает ли ресурсов на [t, t + duration): загрузка растёт только в стартах, их и проверяем."""
-    for x in [t, *(s for s, _, _ in load if t < s < t + task.duration)]:
+def _room(
+    capacity: Resources, load: list[tuple[int, int, Resources]], task: PlanTask, t: int, worker: str
+) -> bool:
+    """Хватает ли ресурсов на [t, t + длительность на узле): загрузка растёт только в стартах."""
+    for x in [t, *(s for s, _, _ in load if t < s < t + task.time(worker))]:
         used = task.resources
         for s, e, need in load:
             if s <= x < e:
@@ -203,7 +218,7 @@ def _room(capacity: Resources, load: list[tuple[int, int, Resources]], task: Pla
 
 def score(plan: PlanInput, starts: Mapping[str, tuple[str, int]], objective: str) -> list[int]:
     """Оценка плана по цели, как `metrics.score`; дедлайны идущих задач в неё не входят."""
-    ends = {k: s + plan.tasks[k].duration for k, (_, s) in starts.items()}
+    ends = {k: s + plan.tasks[k].time(w) for k, (w, s) in starts.items()}
     makespan = max([plan.now, *ends.values(), *(b.end for b in plan.busy.values())])
     tardy = {k: max(0, ends[k] - t.deadline) for k, t in plan.tasks.items() if t.deadline is not None}
     weighted = sum(2 ** plan.tasks[k].cls * v for k, v in tardy.items())

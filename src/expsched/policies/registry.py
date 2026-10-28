@@ -10,6 +10,7 @@ from expsched.domain.snapshot import Policy
 from expsched.policies.backfill import BackfillPolicy
 from expsched.policies.fifo import FifoPolicy
 from expsched.policies.heft import HeftPolicy, PeftPolicy
+from expsched.policies.las import LasPolicy
 from expsched.policies.preemption import PreemptivePolicy
 from expsched.policies.priority import PriorityPolicy
 
@@ -17,7 +18,7 @@ from expsched.policies.priority import PriorityPolicy
 def _cpsat(config: PolicyIn, seed: int) -> Policy:
     from expsched.policies.cpsat.policy import CpSatPolicy  # ortools — необязательная зависимость
 
-    return CpSatPolicy(config.objective, config.time_limit, seed)
+    return CpSatPolicy(config.objective, config.time_limit, seed, config.robust)
 
 
 _FACTORIES: dict[str, Callable[[PolicyIn, int], Policy]] = {
@@ -27,6 +28,7 @@ _FACTORIES: dict[str, Callable[[PolicyIn, int], Policy]] = {
     "priority_backfill": lambda config, seed: BackfillPolicy(aging=config.aging),
     "heft": lambda config, seed: HeftPolicy(),
     "peft": lambda config, seed: PeftPolicy(),
+    "las": lambda config, seed: LasPolicy(aging=config.aging),
 }
 if importlib.util.find_spec("ortools") is not None:
     _FACTORIES["cpsat"] = _cpsat
