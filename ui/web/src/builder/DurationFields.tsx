@@ -143,7 +143,7 @@ export function DurationFields({
             label="Показатель α"
             value={task.scaling?.alpha}
             step={0.05}
-            max={2}
+            max={1.5}
             onChange={(alpha) => update({ scaling: { law: "power", alpha } })}
           />
         )}

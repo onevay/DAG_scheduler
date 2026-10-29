@@ -1,8 +1,10 @@
 import { QueryClient, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 
 import { allEvents, api, ApiError, type ExplainFilter } from "./client";
 import type {
   InputEvent,
+  JournalRecord,
   Intervention,
   Live,
   LocalAgentStart,
@@ -125,14 +127,24 @@ export const useLive = (runId: string | undefined) =>
     refetchInterval: (query) => (query.state.data?.status === "running" ? 1000 : false),
   });
 
-/** Журнал идущего прогона: обновляется вместе с его состоянием. */
-export const useLiveEvents = (runId: string | undefined, running: boolean) =>
-  useQuery({
-    queryKey: keys.liveEvents(runId ?? ""),
-    queryFn: ({ signal }) => api.eventsPage(runId as string, 0, 10_000, signal).then((p) => p.events),
+/** Журнал идущего прогона: раз в секунду дочитывается хвост, а когда прогон кончился — ещё раз, чтобы
+ * последние записи (окончания задач) не потерялись между опросами. */
+export function useLiveEvents(runId: string | undefined, running: boolean) {
+  const client = useQueryClient();
+  const key = keys.liveEvents(runId ?? "");
+  const query = useQuery({
+    queryKey: key,
+    queryFn: ({ signal }) =>
+      allEvents(runId as string, signal, 5000, client.getQueryData<JournalRecord[]>(key) ?? []),
     enabled: runId !== undefined,
     refetchInterval: running ? 1000 : false,
   });
+  const { refetch } = query;
+  useEffect(() => {
+    if (!running && runId !== undefined) void refetch();
+  }, [running, runId, refetch]);
+  return query;
+}
 
 /** Агенты, представившиеся серверу; на связи ли — меняется, поэтому раз в 3 с. */
 export const useAgents = () =>

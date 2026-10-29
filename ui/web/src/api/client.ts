@@ -137,9 +137,15 @@ export const api = {
 };
 
 /** Весь журнал прогона, страница за страницей. */
-export async function allEvents(runId: string, signal?: AbortSignal, page = 5000): Promise<JournalRecord[]> {
-  const records: JournalRecord[] = [];
-  let fromSeq: number | null | undefined = 0;
+export async function allEvents(
+  runId: string,
+  signal?: AbortSignal,
+  page = 5000,
+  known: readonly JournalRecord[] = [],
+): Promise<JournalRecord[]> {
+  // Журнал только дописывается: прочитанное раньше не перечитывается
+  const records: JournalRecord[] = [...known];
+  let fromSeq: number | null | undefined = known.length;
   while (fromSeq !== null && fromSeq !== undefined) {
     const next: EventsPage = await api.eventsPage(runId, fromSeq, page, signal);
     records.push(...next.events);

@@ -1,0 +1,84 @@
+name: release
+# Выпуск по тегу v1.2.3: проверка версии, wheel и sdist, образы сервера и встроенной нагрузки в GHCR, Release
+# с заметками из раздела версии в CHANGELOG.md. Тег ставит человек: git tag v1.0.0 && git push origin v1.0.0
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write  # Release
+  packages: write  # образы в ghcr.io
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.2
+      - name: Версия тега совпадает с версией проекта и разделом CHANGELOG
+        id: version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          project="$(uv run --no-project python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          test "$tag" = "$project" || { echo "tag $tag, pyproject $project"; exit 1; }
+          grep -q "^## \[$tag\]" CHANGELOG.md || { echo "CHANGELOG.md has no section $tag"; exit 1; }
+          echo "version=$tag" >> "$GITHUB_OUTPUT"
+      - run: uv sync --locked --all-extras
+      - run: make lint types test
+      - run: uv build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+
+  images:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Сервер и встроенная нагрузка
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          owner="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          for spec in "expsched:Dockerfile" "expsched-workload:containers/workload/Containerfile"; do
+            name="${spec%%:*}" file="${spec#*:}"
+            image="ghcr.io/${owner}/${name}"
+            docker build -f "$file" -t "$image:$VERSION" -t "$image:latest" \
+              --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+              --label "org.opencontainers.image.version=$VERSION" .
+            docker push "$image:$VERSION"
+            docker push "$image:latest"
+          done
+
+  release:
+    needs: [build, images]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v7
+        with:
+          name: dist
+          path: dist/
+      - name: Заметки — раздел версии из CHANGELOG.md
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          awk -v v="$VERSION" '
+            /^## \[/ { if (on) exit; on = index($0, "[" v "]") > 0; next }
+            on' CHANGELOG.md > notes.md
+          test -s notes.md
+      - name: Release с wheel, sdist и скриптом установки агента
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          gh release create "v$VERSION" --title "expsched $VERSION" --notes-file notes.md \
+            dist/* scripts/install-agent.sh

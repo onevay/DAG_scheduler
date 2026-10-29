@@ -117,8 +117,6 @@ def test_runs_on_agents_are_refused_when_they_cannot_go(client, monkeypatch):
     replay = {**laptop(), "mode": "replay"}
     assert client.post("/v1/runs", json={"problem": replay}).status_code == 400
     assert client.get("/v1/runs/0123456789abcdef/containers").status_code == 404
-    monkeypatch.delenv("EXPSCHED_AGENT_TOKEN")
-    assert client.post("/v1/runs", json={"problem": laptop()}).json()["error"]["code"] == "FORBIDDEN"
 
 
 @pytest.mark.slow

@@ -133,7 +133,8 @@ def _check_capacity(
     """Заметающая прямая: в один момент окончания учитываются раньше стартов (интервалы полуоткрытые)."""
     points: list[tuple[int, int, Resources]] = []
     for a in attempts:
-        if a.worker == worker and (a.end is None or a.end >= a.start):  # обратный интервал уже нарушает I1
+        # обратный интервал уже нарушает I1; пустой (оборван в момент старта) ничего не занимает
+        if a.worker == worker and (a.end is None or a.end > a.start):
             points.append((a.start, 1, tasks[a.task].resources))
             if a.end is not None:
                 points.append((a.end, 0, tasks[a.task].resources))

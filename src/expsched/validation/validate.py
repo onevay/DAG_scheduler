@@ -11,6 +11,7 @@ from expsched.analysis.analyze import analyze
 from expsched.contract.io_models import ProblemIn, load, to_domain
 from expsched.domain.models import Problem
 from expsched.estimate import Estimate, resolve
+from expsched.validation.chaos import chaos_diagnostics
 from expsched.validation.deadlines import deadline_certificates
 from expsched.validation.diagnostics import Diagnostic, has_errors
 from expsched.validation.events import validate_events
@@ -37,7 +38,8 @@ def check(
     except ValidationError as error:
         return None, schema_diagnostics(error), {}
     resolved, estimates = resolve(parsed, history(parsed) if history else None)
-    return *validate_problem(to_domain(resolved), mode), estimates
+    problem, diagnostics = validate_problem(to_domain(resolved), mode)
+    return problem, [*diagnostics, *chaos_diagnostics(parsed)], estimates
 
 
 def validate_problem(problem: Problem, mode: ValidationMode) -> tuple[Problem | None, list[Diagnostic]]:

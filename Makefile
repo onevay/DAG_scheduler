@@ -2,7 +2,7 @@
 RUN := uv run
 WEB := npm --prefix ui/web
 
-.PHONY: setup lint types test perf workload-image test-docker agent-smoke agent-smoke-gs test-all schema run docker api web-install web-dev web-lint web-test web-build web-e2e audit audit-py audit-web
+.PHONY: setup lint types test perf workload-image test-docker agent-smoke agent-smoke-gs test-all schema run docker api web-install web-dev web-lint web-test web-build web-e2e screenshots audit audit-py audit-web
 
 setup:
 	uv sync --all-extras
@@ -76,6 +76,10 @@ web-build:
 # Сквозные проверки в Chromium (ставится сам при первом запуске): сборка и свой API одним сервером на :8010
 web-e2e:
 	$(WEB) run e2e
+
+# Скриншоты экранов для README (docs/img): пример ml_hetero, сравнение, демо сбоев
+screenshots:
+	SCREENSHOTS=1 $(WEB) run e2e -- screenshots --project desktop
 
 # Известные уязвимости зависимостей: Python — по uv.lock (pip-audit), JS — по package-lock.json, от high и выше
 audit: audit-py audit-web

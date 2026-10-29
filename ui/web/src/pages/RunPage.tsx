@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router";
 import { ApiError } from "../api/client";
 import { useReplay, useRun, useRunEvents, useRunProblem } from "../api/hooks";
 import type { Problem, Result } from "../api/types";
+import { Failures } from "../containers/Failures";
 import { PlanVsFact } from "../containers/PlanVsFact";
 import { SOURCES } from "../builder/DurationFields";
 import { estimateRows, estimateSummary, replanRows, taskRows } from "../run/results";
@@ -48,6 +49,7 @@ export function RunPage() {
       <TaskTable result={result} />
       <ReplanTable result={result} unit={unit} />
       <EstimateTable result={result} problem={problem.data} unit={unit} />
+      <RunFailures runId={runId} result={result} unit={unit} />
       {result.shadow && <PlanVsFact shadow={result.shadow} unit={unit} />}
       <ReplayCheck runId={runId} unit={unit} />
     </>
@@ -234,6 +236,12 @@ function ReplanTable({ result, unit }: { result: Result; unit: string }) {
       </div>
     </section>
   );
+}
+
+/** Сбои прогона на агентах: сводка и лента по его журналу. */
+function RunFailures({ runId, result, unit }: { runId: string; result: Result; unit: string }) {
+  const journal = useRunEvents(runId);
+  return <Failures events={journal.data ?? []} unit={unit} done shadow={result.shadow} />;
 }
 
 const pct = (x: number) => `${x > 0 ? "+" : ""}${Math.round(x * 100)}%`;

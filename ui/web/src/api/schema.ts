@@ -217,7 +217,7 @@ export interface paths {
     put?: never;
     /**
      * Actions
-     * @description Чекпоинт задачи сейчас, уронить или вернуть узел, отменить прогон.
+     * @description Чекпоинт задачи сейчас или убить её контейнер, уронить или вернуть узел, отменить прогон.
      */
     post: operations["actions_v1_runs__run_id__actions_post"];
     delete?: never;
@@ -587,6 +587,28 @@ export interface components {
       worker: string;
     };
     /**
+     * ChaosIn
+     * @description Сбои напоказ на агентах: в среднем раз в `crash_every` единиц убивается случайная идущая попытка, раз
+     *     в `node_down_every` падает случайный узел на `node_down_for` единиц. Расписание — по `seed`: прогон с тем
+     *     же seed даёт ту же последовательность сбоев.
+     */
+    ChaosIn: {
+      /** Crash Every */
+      crash_every?: number | null;
+      /** Node Down Every */
+      node_down_every?: number | null;
+      /**
+       * Node Down For
+       * @default 5
+       */
+      node_down_for?: number;
+      /**
+       * Seed
+       * @default 0
+       */
+      seed?: number;
+    };
+    /**
      * CheckpointCommand
      * @description Сохранить чекпоинт сейчас, не дожидаясь интервала.
      */
@@ -762,6 +784,7 @@ export interface components {
         | "RUN_IN_PROGRESS"
         | "AGENT_RUNNING"
         | "AGENT_NOT_READY"
+        | "TASK_NOT_RUNNING"
         | "INTERNAL";
       /** Message */
       message: string;
@@ -1052,6 +1075,26 @@ export interface components {
       /** Worker */
       worker: string;
     };
+    /**
+     * KillCommand
+     * @description Убить контейнер попытки, как убивает его сбой: docker/podman — SIGKILL (код 137), gravesentinel —
+     *     остановка без сохранения. Попытка кончается событием `exited` или `lost`, а не `killed`: это сбой.
+     */
+    KillCommand: {
+      /** Attempt */
+      attempt: number;
+      /** Command Id */
+      command_id: number;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "kill";
+      /** Run Id */
+      run_id: string;
+      /** Task */
+      task: string;
+    };
     /** LiveOut */
     LiveOut: {
       /** Containers */
@@ -1295,10 +1338,12 @@ export interface components {
         | components["schemas"]["StartCommand"]
         | components["schemas"]["StopCommand"]
         | components["schemas"]["CheckpointCommand"]
+        | components["schemas"]["KillCommand"]
       )[];
     };
     /** ProblemIn */
     ProblemIn: {
+      chaos?: components["schemas"]["ChaosIn"] | null;
       cluster: components["schemas"]["ClusterIn"];
       /**
        * Events
@@ -1711,6 +1756,11 @@ export interface components {
       resume_from?: number;
       /** Run Id */
       run_id: string;
+      /**
+       * Speed
+       * @default 1
+       */
+      speed?: number;
       /** Task */
       task: string;
       /** Time Scale Ms */
@@ -2050,6 +2100,8 @@ export interface components {
     };
     /** WorkerRecord */
     WorkerRecord: {
+      /** Reason */
+      reason?: string | null;
       /** Seq */
       seq: number;
       /** T */

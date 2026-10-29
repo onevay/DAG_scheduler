@@ -78,13 +78,11 @@ def test_at_most_limit_agents_run(manager):
         agents.start("c", "fake", {}, "http://x")
 
 
-def test_api_needs_the_token_and_reports_conflicts_and_failed_checks(tmp_path, monkeypatch):
+def test_api_reports_conflicts_and_failed_checks(tmp_path, monkeypatch):
     recorder = Recorder()
     app = create_app(store=RunStore(tmp_path / "runs"))
     app.state.local_agents = LocalAgents(tmp_path / "agents", check=recorder.check, start=recorder.spawn)
-    with TestClient(app) as client:
-        monkeypatch.delenv("EXPSCHED_AGENT_TOKEN", raising=False)
-        assert client.post("/v1/local-agents", json={"id": "box"}).json()["error"]["code"] == "FORBIDDEN"
+    with TestClient(app, client=("127.0.0.1", 50000)) as client:  # агентами управляют только с этой машины
         monkeypatch.setenv("EXPSCHED_AGENT_TOKEN", "t")
         started = client.post("/v1/local-agents", json={"id": "box", "runtime": "fake", "cpu": 2})
         assert started.status_code == 201

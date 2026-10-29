@@ -16,6 +16,7 @@ import asyncio
 import contextlib
 import logging
 import os
+import secrets
 from collections.abc import AsyncIterator, Iterator, Sequence
 from contextlib import asynccontextmanager, nullcontext
 from pathlib import Path as FilePath
@@ -173,18 +174,16 @@ async def create_run(request: Request) -> Any:
             400, "INVALID_REQUEST", "replay a stored run with POST /v1/runs/{run_id}/replay"
         )
     if problem.mode in ("emulate", "shadow"):
-        return _start_emulation(request, problem, policy)
+        return await _start_emulation(request, problem, policy)
     return await _run_and_store(request, problem, policy)
 
 
-def _start_emulation(request: Request, problem: ProblemIn, policy: PolicyIn) -> Any:
-    if not os.environ.get("EXPSCHED_AGENT_TOKEN"):
-        return error_response(403, "FORBIDDEN", "runs on agents need EXPSCHED_AGENT_TOKEN for the agent API")
+async def _start_emulation(request: Request, problem: ProblemIn, policy: PolicyIn) -> Any:
     manager: Emulations = request.app.state.emulations
     if manager.running() >= manager.limit:
         return error_response(503, "RUN_QUEUE_FULL", f"{manager.running()} runs on agents are already going")
     try:
-        run_id = manager.start(problem, policy)
+        run_id = await manager.start(problem, policy)
     except ValueError as error:
         return error_response(422, "INVALID_REQUEST", str(error))
     return JSONResponse({"run_id": run_id, "status": "running"}, status_code=202)
@@ -369,6 +368,11 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        if not os.environ.get("EXPSCHED_AGENT_TOKEN"):
+            log.info(
+                "agent API: no EXPSCHED_AGENT_TOKEN, so only this server's local agents can connect "
+                "(with a token it made up); set EXPSCHED_AGENT_TOKEN for agents on other machines"
+            )
         listener = agent_listener(app, os.environ.get("EXPSCHED_AGENT_LISTEN"))
         task = asyncio.create_task(listener.serve()) if listener else None
         yield
@@ -390,6 +394,7 @@ def create_app(
         int(os.environ.get("EXPSCHED_MAX_RUNS_MB", "2048")) << 20,
     )
     app.state.agents = AgentRegistry()
+    app.state.agent_token = secrets.token_urlsafe(32)  # без EXPSCHED_AGENT_TOKEN — только для своих агентов
     app.state.emulations = Emulations(app.state.agents, app.state.store)
     app.state.local_agents = LocalAgents(
         FilePath(os.environ.get("EXPSCHED_LOCAL_AGENTS_DIR", app.state.store.root / ".local-agents"))

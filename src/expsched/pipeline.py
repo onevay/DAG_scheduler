@@ -107,6 +107,16 @@ def prepare(
     return Prepared(resolved, config, base, validated, found, plan, forecast, estimates)
 
 
+def _done_work(log: list[dict[str, Any]], problem: Problem) -> dict[str, int]:
+    """Работа законченной попытки каждой задачи: её позиция старта плюс время на скорости узла (вниз)."""
+    speed = {k: w.speed for k, w in problem.workers.items()}
+    return {
+        a.task: max(1, int(a.resume_from + (a.end - a.start) * speed.get(a.worker, 1)))
+        for a in attempts_from_log(log)
+        if a.outcome == "DONE" and a.end is not None
+    }
+
+
 def conclude(prepared: Prepared, sim: Simulator, exact: bool = True) -> RunResult:
     """Результат законченного прогона симулятора. `exact=False` — длительности попыток взяты из жизни
     (прогон на агентах): проверка I1 «попытка шла ровно остаток работы» не делается."""
@@ -114,6 +124,11 @@ def conclude(prepared: Prepared, sim: Simulator, exact: bool = True) -> RunResul
     log = sim.run_all()  # у законченного прогона событий нет: только итоговая диагностика
     status = {**plan.excluded, **sim.state.status}
     planned = {k: t for k, t in sim.state.tasks.items() if status[k] is not TaskStatus.INFEASIBLE}
+    if not exact:  # длительности задач меняли уточнения; граница — по работе, сделанной на самом деле
+        planned = {
+            k: replace(t, duration=_done_work(log, plan.problem).get(k, t.duration))
+            for k, t in planned.items()
+        }
     fastest = max((w.speed for w in plan.problem.workers.values()), default=1)
     if fastest > 1:  # граница должна остаться границей и на узлах быстрее эталона
         planned = {k: replace(t, duration=time_for(t.duration, fastest)) for k, t in planned.items()}

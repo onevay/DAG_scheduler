@@ -40,9 +40,10 @@ export type AgentInfo = S["AgentOut"];
 export type LiveRun = S["LiveRunOut"];
 export type LocalAgent = S["LocalAgentOut"];
 export type LocalAgentStart = S["LocalAgentIn"];
-// Тело действия API проверяет сам (в OpenAPI его схемы нет): чекпоинт задачи, уронить или вернуть узел, отмена
+// Тело действия API проверяет сам (в OpenAPI его схемы нет): чекпоинт задачи или убить её контейнер, уронить
+// или вернуть узел, отмена
 export type RunAction =
-  | { kind: "checkpoint"; task: string }
+  | { kind: "checkpoint" | "kill"; task: string }
   | { kind: "worker_down" | "worker_up"; worker: string }
   | { kind: "cancel" };
 export type Replay = S["ReplayOut"];

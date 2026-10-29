@@ -31,6 +31,7 @@ from expsched.contract.agent import (
     EventsBatch,
     Hello,
     HelloAck,
+    KillCommand,
     Poll,
     PollReply,
     StartCommand,
@@ -38,11 +39,12 @@ from expsched.contract.agent import (
     Usage,
 )
 
-VERSION = "0.1.0"
+VERSION = "1.0.0"
 TERMINAL = frozenset({"rejected", "exited", "oom", "killed", "lost"})
 USAGE_EVERY_S = 5  # замер потребления: `docker stats` ждёт около секунды
 LOGS_EVERY_S = 2
 LOG_BYTES = 64 * 1024  # строк журналов на опрос, всех попыток вместе
+COMPACT_AT = 5000  # строк журнала состояния: дальше он переписывается заново, без законченного
 COMMAND: TypeAdapter[Command] = TypeAdapter(Command)
 
 
@@ -70,6 +72,7 @@ class Agent:
         allowed_images: Collection[str] = (),
         now: Callable[[], str] = utc_now,
         clock: Callable[[], float] = time.monotonic,
+        compact_at: int = COMPACT_AT,
     ) -> None:
         self.agent_id = agent_id
         self.runtime = runtime
@@ -79,6 +82,8 @@ class Agent:
         self.now = now
         self.checkpoints = state_dir / "checkpoints"
         self.journal = state_dir / "state.jsonl"
+        self.compact_at = compact_at
+        self.lines = 0  # строк в журнале
         state_dir.mkdir(parents=True, exist_ok=True)
         self.last_command = 0
         self.next_seq = 0
@@ -90,6 +95,8 @@ class Agent:
         self.logs: dict[str, list[str]] = {}
         self.measured = self.read_logs = -float("inf")
         self._replay()
+        if self.lines >= self.compact_at:
+            self.compact()
 
     # ---- обмен с планировщиком ----
 
@@ -134,6 +141,10 @@ class Agent:
                 self._start(self.attempts[command.key])
             elif isinstance(command, StopCommand):
                 self._stop(command.key)
+            elif isinstance(command, KillCommand):
+                attempt = self.attempts.get(command.key)
+                if attempt is not None and not attempt.done:
+                    self.runtime.kill(command.key)  # окончание увидит watch: exited 137 или lost
             elif command.key in self.attempts:
                 self.runtime.checkpoint(command.key)
 
@@ -143,6 +154,30 @@ class Agent:
     def acked(self, ack: EventsAck) -> None:
         self._write({"kind": "ack", "next_event_seq": ack.next_event_seq})
         self.outbox = [e for e in self.outbox if e.seq >= ack.next_event_seq]
+        if self.lines >= self.compact_at:
+            self.compact()
+
+    def compact(self) -> None:
+        """Журнал заново — только то, без чего агент не продолжит после перезапуска: незаконченные попытки
+        (команда, контейнер, сохранённое), неподтверждённые события и номера. Законченные попытки забываются и
+        в памяти: их события планировщик уже принял, а повтор их команд отсекает номер."""
+        self.attempts = {k: a for k, a in self.attempts.items() if not a.done}
+        records: list[dict[str, Any]] = []
+        for key, a in sorted(self.attempts.items()):
+            records.append({"kind": "command", "command": a.command.model_dump(mode="json")})
+            if a.container_id is not None:
+                records.append({"kind": "container", "key": key, "container_id": a.container_id})
+            if a.progress:
+                records.append({"kind": "progress", "key": key, "progress": a.progress})
+        records += [{"kind": "event", "event": e.model_dump(mode="json")} for e in self.outbox]
+        records.append({"kind": "mark", "last_command": self.last_command, "next_event_seq": self.next_seq})
+        tmp = self.journal.with_suffix(".tmp")
+        with tmp.open("w", encoding="utf-8") as f:
+            f.writelines(json.dumps(r, ensure_ascii=False) + "\n" for r in records)
+            f.flush()
+            os.fsync(f.fileno())
+        tmp.replace(self.journal)  # подмена целиком: упавший посреди агент найдёт прежний журнал
+        self.lines = len(records)
 
     def stop_all(self) -> None:
         """Остановить все свои контейнеры: агент уходит и не оставляет работу без присмотра."""
@@ -296,11 +331,13 @@ class Agent:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
             f.flush()
             os.fsync(f.fileno())  # запись переживает падение агента
+        self.lines += 1
 
     def _replay(self) -> None:
         if not self.journal.exists():
             return
         lines = self.journal.read_text(encoding="utf-8").splitlines()
+        self.lines = len(lines)
         for i, line in enumerate(lines):
             try:
                 record = json.loads(line)
@@ -321,3 +358,8 @@ class Agent:
                 self.next_seq = max(self.next_seq, record["next_event_seq"])
             elif record["kind"] == "ack":
                 self.outbox = [e for e in self.outbox if e.seq >= record["next_event_seq"]]
+            elif record["kind"] == "progress":
+                self.attempts[record["key"]].progress = record["progress"]
+            elif record["kind"] == "mark":  # итог уплотнения: номера, до которых дошёл агент
+                self.last_command = max(self.last_command, record["last_command"])
+                self.next_seq = max(self.next_seq, record["next_event_seq"])

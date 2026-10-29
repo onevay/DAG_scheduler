@@ -364,6 +364,46 @@
       "title": "HelloAck",
       "type": "object"
     },
+    "KillCommand": {
+      "additionalProperties": false,
+      "description": "Убить контейнер попытки, как убивает его сбой: docker/podman — SIGKILL (код 137), gravesentinel —\nостановка без сохранения. Попытка кончается событием `exited` или `lost`, а не `killed`: это сбой.",
+      "properties": {
+        "attempt": {
+          "minimum": 1,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "command_id": {
+          "minimum": 1,
+          "title": "Command Id",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "kill",
+          "title": "Kind",
+          "type": "string"
+        },
+        "run_id": {
+          "pattern": "^[0-9a-f]{16}$",
+          "title": "Run Id",
+          "type": "string"
+        },
+        "task": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+          "title": "Task",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "task",
+        "attempt",
+        "kind",
+        "command_id"
+      ],
+      "title": "KillCommand",
+      "type": "object"
+    },
     "Poll": {
       "additionalProperties": false,
       "description": "Опрос команд; заодно — потребление идущих попыток и новые строки их журналов (без гарантии доставки:\nпотерянный опрос теряет и их).",
@@ -422,6 +462,7 @@
             "discriminator": {
               "mapping": {
                 "checkpoint": "#/$defs/CheckpointCommand",
+                "kill": "#/$defs/KillCommand",
                 "start": "#/$defs/StartCommand",
                 "stop": "#/$defs/StopCommand"
               },
@@ -436,6 +477,9 @@
               },
               {
                 "$ref": "#/$defs/CheckpointCommand"
+              },
+              {
+                "$ref": "#/$defs/KillCommand"
               }
             ]
           },
@@ -512,6 +556,12 @@
           "pattern": "^[0-9a-f]{16}$",
           "title": "Run Id",
           "type": "string"
+        },
+        "speed": {
+          "default": 1.0,
+          "exclusiveMinimum": 0,
+          "title": "Speed",
+          "type": "number"
         },
         "task": {
           "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",

@@ -21,6 +21,7 @@ from expsched.contract.io_models import ContainerSpec, PolicyIn, ProblemIn
 from expsched.domain.models import Event, EvType, work_in
 from expsched.domain.states import FINAL_STATUSES
 from expsched.emulate.agents import AgentRegistry
+from expsched.emulate.chaos import Chaos
 from expsched.emulate.shadow import compare
 from expsched.engine.events import Crash, Finish, Reestimate
 from expsched.engine.executor import External
@@ -71,9 +72,14 @@ class Emulation:
         self.containers: dict[tuple[str, int], Container] = {}
         self.dropped: set[str] = set()  # узлы, уроненные вручную: не поднимаются, пока их не вернут
         self.dropped_at: list[tuple[str, int]] = []  # ручные отказы (узел, момент) — для причин shadow
+        self.chaos = Chaos(problem.chaos) if problem.chaos else None
+        self.chaos_down: dict[str, int] = {}  # узлы, уроненные хаосом: до какого момента лежат
+        self.killing: dict[tuple[str, int], str] = {}  # попытки, которым послан kill: причина для журнала
         self.plan: RunResult | None = None
         self.result: RunResult | None = None
         self.status: Status = "running"
+        self.ended: int | None = None
+        self.concluding = False  # всё закончилось, итог считается (сервер считает его вне цикла событий)
         self.started = clock()
         prepared = prepare(problem, policy, history)
         if isinstance(prepared, RunResult):  # строгая проверка не пропустила вход
@@ -91,18 +97,31 @@ class Emulation:
         registry.telemetry[run_id] = self.on_telemetry
 
     def now(self) -> int:
+        """Момент модели; у законченного или отменённого прогона — тот, на котором он кончился."""
+        if self.ended is not None:
+            return self.ended
         return round((self.clock() - self.started) * 1000) // self.scale_ms  # до мс: без хвостов float
 
-    def tick(self) -> list[dict[str, Any]]:
-        """Часы модели дошли до сейчас: отказы и возвраты агентов, эпохи наступивших событий, команды."""
-        if self.status != "running":
+    def tick(self, conclude: bool = True) -> list[dict[str, Any]]:
+        """Часы модели дошли до сейчас: отказы и возвраты агентов, эпохи наступивших событий, команды.
+        Когда всё закончилось — итог (`finish`), а при `conclude=False` только отметка `concluding`."""
+        if self.status != "running" or self.concluding:
             return []
         now = self.now()
+        back = self._strike(now) if now >= self.sim.t else set()
         for worker, agent in sorted(self.agent_of.items()):
-            alive = self.registry.alive(agent, since=self.started) and worker not in self.dropped
+            down = worker in self.dropped or worker in self.chaos_down
+            alive = self.registry.alive(agent, since=self.started) and not down
             if alive != self.sim.state.up[worker] and now >= self.sim.t:
                 kind = EvType.WORKER_UP if alive else EvType.WORKER_DOWN
-                self.sim.inject(now, Event(now, kind, worker=worker))
+                reason = (
+                    f"chaos: узел упал до {self.chaos_down[worker]}"
+                    if worker in self.chaos_down
+                    else "chaos: узел вернулся"
+                    if worker in back
+                    else None
+                )
+                self.sim.inject(now, Event(now, kind, worker=worker, reason=reason))
         self._overdue(now)
         records = self.sim.advance(now)
         for r in records:
@@ -111,12 +130,44 @@ class Emulation:
             elif r["type"] == "INTERRUPTED" and r["cause"] in ("PREEMPT", "WORKER_DOWN"):
                 self._stop(r["task"], r["attempt"], "preempt" if r["cause"] == "PREEMPT" else "worker_down")
         if self._finished():
-            self.result, self.status = conclude(self.prepared, self.sim, exact=False), "done"
-            if self.plan is not None:
-                self.result.result["shadow"] = self.shadow()
-            self.registry.listeners.pop(self.run_id, None)
-            self.registry.telemetry.pop(self.run_id, None)
+            self.ended, self.concluding = now, True
+            if conclude:
+                self.finish()
         return records
+
+    def finish(self) -> None:
+        """Итог законченного прогона: проверка, метрики, объяснения — на большом входе это секунды."""
+        result = conclude(self.prepared, self.sim, exact=False)
+        if self.plan is not None:
+            result.result["shadow"] = self.shadow()
+        self.result, self.status = result, "done"
+        self.registry.listeners.pop(self.run_id, None)
+        self.registry.telemetry.pop(self.run_id, None)
+
+    def _strike(self, now: int) -> set[str]:
+        """Наступившие сбои хаоса: убить идущую попытку, уронить работающий узел. Возвращает узлы, срок
+        падения которых истёк, — они поднимаются в этом же тике."""
+        back = {w for w, until in self.chaos_down.items() if until <= now}
+        for w in back:
+            del self.chaos_down[w]
+        if self.chaos is None:
+            return back
+        for strike in self.chaos.due(now):
+            if strike.kind == "crash":
+                running = sorted(
+                    k
+                    for k, run in self.sim.state.run.items()
+                    if (c := self.containers.get((k, run.attempt))) and c.state in ("started", "checkpoint")
+                )
+                task = strike.choose(running)
+                if task is not None:
+                    self._kill(task, self.sim.state.run[task].attempt, "chaos: контейнер убит")
+            else:
+                up = sorted(w for w, ok in self.sim.state.up.items() if ok and w not in self.chaos_down)
+                worker = strike.choose(up)
+                if worker is not None:
+                    self.chaos_down[worker] = strike.t + self.chaos.down_for  # не ручной: в shadow — сбой
+        return back
 
     def _finished(self) -> bool:
         """Ничего не идёт и не ждёт очереди; узлы лежат при незаконченных задачах — ждать: агент вернётся."""
@@ -128,7 +179,7 @@ class Emulation:
 
     def on_event(self, event: AgentEvent) -> None:
         c = self.containers.get((event.task, event.attempt))
-        if c is None or self.status != "running":
+        if c is None or self.status != "running" or self.concluding:
             return
         c.state = event.type
         if event.type in ("exited", "oom", "killed", "lost", "rejected"):
@@ -147,6 +198,9 @@ class Emulation:
         elif event.type in ("exited", "lost", "rejected"):
             code = f"exit code {event.exit_code}" if event.type == "exited" else None
             detail = "; ".join(d for d in (code, event.detail) if d) or event.type
+            why = self.killing.pop((event.task, event.attempt), None)
+            if why:
+                detail = f"{why} ({detail})"
             self.sim.inject(now, Crash(event.task, event.attempt, "FAILED", detail))
         elif event.type == "oom":
             detail = "; ".join(d for d in ("container exceeded its memory limit", event.detail) if d)
@@ -201,6 +255,21 @@ class Emulation:
             ref = {"run_id": self.run_id, "task": task, "attempt": run.attempt}
             self.registry.send(self.agent_of[run.worker], {**ref, "kind": "checkpoint"})
 
+    def kill(self, task: str) -> bool:
+        """Убить контейнер идущей попытки, как убивает сбой: попытка прервётся и пойдёт на повтор."""
+        run = self.sim.state.run.get(task)
+        if run is None:
+            return False
+        self._kill(task, run.attempt, "kill: вручную")
+        return True
+
+    def _kill(self, task: str, attempt: int, reason: str) -> None:
+        c = self.containers.get((task, attempt))
+        if c is None or (task, attempt) in self.killing:
+            return
+        self.killing[(task, attempt)] = reason
+        self.registry.send(c.agent, {"run_id": self.run_id, "task": task, "attempt": attempt, "kind": "kill"})
+
     def drop(self, worker: str) -> None:
         """Уронить узел вручную: его попытки прерываются, контейнеры останавливаются."""
         self.dropped.add(worker)
@@ -229,12 +298,15 @@ class Emulation:
     def cancel(self) -> None:
         for task, run in sorted(self.sim.state.run.items()):
             self._stop(task, run.attempt, "cancel")
+        self.ended = self.now()
         self.status = "cancelled"
         self.registry.listeners.pop(self.run_id, None)
         self.registry.telemetry.pop(self.run_id, None)
 
     def _start(self, r: dict[str, Any]) -> None:
-        task, run = self.sim.state.tasks[r["task"]], self.sim.state.run[r["task"]]
+        task, run = self.sim.state.tasks[r["task"]], self.sim.state.run.get(r["task"])
+        if run is None or run.attempt != r["attempt"]:
+            return  # попытку прервали в том же шаге, что запустили (отказ узла): агенту слать нечего
         agent = self.agent_of[r["worker"]]
         self.containers[(r["task"], r["attempt"])] = Container(
             r["task"], r["attempt"], r["worker"], agent, r["resume_from"]
@@ -254,6 +326,7 @@ class Emulation:
                 "resume_from": r["resume_from"],
                 "checkpoint_interval": task.ckpt,
                 "time_scale_ms": self.scale_ms,
+                "speed": run.speed,
             },
         )
 

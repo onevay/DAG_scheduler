@@ -1,0 +1,39 @@
+{
+  "name": "chaos_demo",
+  "time_unit": "minute",
+  "mode": "shadow",
+  "time_scale_ms": 100,
+  "cluster": {
+    "workers": [
+      {"id": "fast", "resources": {"cpu": 16, "ram_mb": 65536, "gpu": 2}, "speed": 2.0, "agent": "demo-fast"},
+      {"id": "slow", "resources": {"cpu": 16, "ram_mb": 65536, "gpu": 2}, "agent": "demo-slow"}
+    ]
+  },
+  "tasks": [
+    {"id": "ingest", "kind": "data", "resources": {"cpu": 4, "ram_mb": 8192}, "max_retries": 6,
+     "estimate": {"median": 16, "spread": 0.3}, "checkpoint_interval": 2,
+     "container": {"image": "expsched-workload:local", "env": {"EXPSCHED_TOTAL": "20"}}},
+    {"id": "clean", "kind": "data", "resources": {"cpu": 4, "ram_mb": 8192}, "max_retries": 6,
+     "dependencies": ["ingest"], "estimate": {"median": 12, "spread": 0.3}, "checkpoint_interval": 2,
+     "container": {"image": "expsched-workload:local", "env": {"EXPSCHED_TOTAL": "12"}}},
+    {"id": "train_a", "kind": "train", "resources": {"gpu": 1, "cpu": 4, "ram_mb": 16384}, "max_retries": 6,
+     "dependencies": ["clean"], "estimate": {"median": 40, "spread": 0.5}, "checkpoint_interval": 4,
+     "container": {"image": "expsched-workload:local", "env": {"EXPSCHED_TOTAL": "60"}}},
+    {"id": "train_b", "kind": "train", "resources": {"gpu": 1, "cpu": 4, "ram_mb": 16384}, "max_retries": 6,
+     "dependencies": ["clean"], "estimate": {"median": 40, "spread": 0.5}, "checkpoint_interval": 4,
+     "container": {"image": "expsched-workload:local", "env": {"EXPSCHED_TOTAL": "32"}}},
+    {"id": "sweep", "kind": "train", "resources": {"gpu": 1, "cpu": 2, "ram_mb": 8192}, "max_retries": 6,
+     "estimate": {"median": 24, "spread": 0.4}, "checkpoint_interval": 3,
+     "container": {"image": "expsched-workload:local", "env": {"EXPSCHED_TOTAL": "28"}}},
+    {"id": "eval_a", "kind": "eval", "resources": {"gpu": 1, "cpu": 2, "ram_mb": 8192}, "max_retries": 6,
+     "dependencies": ["train_a"], "estimate": {"median": 10, "spread": 0.3},
+     "container": {"image": "expsched-workload:local", "env": {"EXPSCHED_TOTAL": "10"}}},
+    {"id": "eval_b", "kind": "eval", "resources": {"gpu": 1, "cpu": 2, "ram_mb": 8192}, "max_retries": 6,
+     "dependencies": ["train_b"], "estimate": {"median": 10, "spread": 0.3},
+     "container": {"image": "expsched-workload:local", "env": {"EXPSCHED_TOTAL": "14"}}},
+    {"id": "report", "kind": "other", "resources": {"cpu": 1, "ram_mb": 2048}, "max_retries": 6,
+     "dependencies": ["eval_a", "eval_b", "sweep"], "duration": 2}
+  ],
+  "chaos": {"crash_every": 15, "node_down_every": 40, "node_down_for": 6, "seed": 1},
+  "policy": {"name": "heft"}
+}

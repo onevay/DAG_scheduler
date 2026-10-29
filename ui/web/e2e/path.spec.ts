@@ -199,3 +199,25 @@ test.describe("на двух агентах fake", () => {
     await expect(page.getByText(/Эмуляция · закончен/).first()).toBeVisible();
   });
 });
+
+test("демо сбоев одной кнопкой: агенты, хаос, восстановление, итог", async ({ page }) => {
+  await page.goto("/containers");
+  await page.getByRole("button", { name: "Запустить демо" }).click();
+  await expect(page).toHaveURL(/\/containers\/[0-9a-f]{16}$/, { timeout: 30_000 });
+  // Агентов демо сервер запустил сам: оба на связи, узлы прогона — их
+  const agents = page.getByRole("list", { name: "Агенты" });
+  await expect(agents.getByRole("listitem", { name: "Агент demo-fast: на связи" })).toBeVisible();
+  await expect(agents.getByRole("listitem", { name: "Агент demo-slow: на связи" })).toBeVisible();
+  await expect(page.getByText(/^закончен · момент модели \d+$/)).toBeVisible({ timeout: 60_000 });
+
+  const feed = page.getByRole("list", { name: "Лента сбоев" });
+  await expect(feed.getByRole("listitem").first()).toContainText("→ повтор #");
+  await expect(page.getByRole("list", { name: "Сбои по видам" })).toContainText("хаос: контейнер убит");
+  await expect(page.getByLabel("Итог сбоев")).toContainText(/Makespan \d+ мин против \d+ мин по плану/);
+  await checkScreen(page, "Контейнеры: демо сбоев");
+
+  await page.getByRole("link", { name: "Открыть прогон" }).click();
+  await expect(page.getByRole("list", { name: "Лента сбоев" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Оценка против факта" })).toBeVisible();
+  await expect(page.getByText(/не выполнено/)).toHaveCount(0); // все задачи со сбоями восстановились
+});

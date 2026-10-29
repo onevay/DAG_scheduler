@@ -680,6 +680,18 @@
     "WorkerRecord": {
       "additionalProperties": false,
       "properties": {
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
         "seq": {
           "minimum": 0,
           "title": "Seq",
