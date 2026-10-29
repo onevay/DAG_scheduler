@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { capsules, insight, profile, type Row } from "./compare";
+import { capsules, compareScores, insight, objectiveInsight, profile, ranking, type Row } from "./compare";
 
 const row = (
   policy: string,
@@ -15,9 +15,11 @@ const row = (
   gapToLb: null,
   deadlineMisses: 0,
   weightedTardiness: 0,
-  utilizationGpu: util,
-  lostWorkGpu: lost,
+  utilization: makespan === null ? null : { gpu: util },
+  lostWork: makespan === null ? null : { gpu: lost },
   meanWait: wait,
+  objective: makespan === null ? null : "lexicographic",
+  score: makespan === null ? null : [0, 0, 0, 0, lost, makespan],
   violations: 0,
 });
 
@@ -29,42 +31,66 @@ const ROWS = [
 
 describe("capsules", () => {
   it("scale by the tallest and mark every best value", () => {
-    expect(capsules(ROWS, "makespan").map((c) => [c.policy, Number(c.height.toFixed(2)), c.best])).toEqual([
+    expect(
+      capsules(ROWS, "makespan", "gpu").map((c) => [c.policy, Number(c.height.toFixed(2)), c.best]),
+    ).toEqual([
       ["fifo", 0.73, true],
       ["fifo_skip", 0.73, true],
       ["priority_backfill", 1, false],
     ]);
-    expect(capsules(ROWS, "util").map((c) => c.best)).toEqual([true, true, false]);
+    expect(capsules(ROWS, "util", "gpu").map((c) => c.best)).toEqual([true, true, false]);
   });
 
   it("leave a run without metrics empty", () => {
-    const [c] = capsules([row("cpsat", null, null, 0, 0), ...ROWS], "makespan");
+    const [c] = capsules([row("cpsat", null, null, 0, 0), ...ROWS], "makespan", "gpu");
     expect(c).toEqual({ policy: "cpsat", value: null, height: 0, best: false });
   });
 });
 
 describe("profile", () => {
   it("is a share of the best value, one for the best", () => {
-    const p = profile(ROWS, "priority_backfill");
+    const p = profile(ROWS, "priority_backfill", "gpu");
     expect(Object.fromEntries(Object.entries(p).map(([k, v]) => [k, Number(v.toFixed(2))]))).toEqual({
       makespan: 0.73,
       util: 0.75,
       wait: 0.5,
       lost: 0,
     });
-    expect(profile(ROWS, "fifo")).toEqual({ makespan: 1, util: 1, wait: 1, lost: 1 });
+    expect(profile(ROWS, "fifo", "gpu")).toEqual({ makespan: 1, util: 1, wait: 1, lost: 1 });
+  });
+});
+
+describe("objective", () => {
+  it("compares scores element by element", () => {
+    expect(compareScores([1, 0, 9], [0, 5, 0])).toBeGreaterThan(0);
+    expect(compareScores([0, 2], [0, 2])).toBe(0);
+    expect(compareScores([3], [5])).toBeLessThan(0);
+  });
+
+  it("ranks by score, ties share a place, runs without metrics get none", () => {
+    const rows = [row("cpsat", null, null, 0, 0), ...ROWS];
+    expect(ranking(rows)).toEqual([
+      { policy: "fifo", place: 1 },
+      { policy: "fifo_skip", place: 1 },
+      { policy: "priority_backfill", place: 3 },
+    ]);
+    expect(objectiveInsight(rows)).toBe(
+      "По цели (сначала пропуски дедлайнов от старших классов, затем взвешенное опоздание, затем makespan): " +
+        "1 — fifo, fifo_skip; 3 — priority_backfill.",
+    );
+    expect(objectiveInsight([row("cpsat", null, null, 0, 0)])).toBeNull();
   });
 });
 
 describe("insight", () => {
   it("names the best and the worst or says there is no difference", () => {
-    expect(insight(ROWS, "makespan", "ч")).toBe(
+    expect(insight(ROWS, "makespan", "ч", "gpu")).toBe(
       "Лучше всех — fifo, fifo_skip (11 ч), хуже всех — priority_backfill (15 ч).",
     );
-    expect(insight(ROWS.slice(0, 2), "wait", "ч")).toBe(
+    expect(insight(ROWS.slice(0, 2), "wait", "ч", "gpu")).toBe(
       "По метрике «Ожидание» политики не различаются: у всех 1.25 ч.",
     );
-    expect(insight([row("x", null, null, 0, 0)], "makespan", "ч")).toBe(
+    expect(insight([row("x", null, null, 0, 0)], "makespan", "ч", "gpu")).toBe(
       "Ни один прогон не дошёл до расписания — метрик нет.",
     );
   });

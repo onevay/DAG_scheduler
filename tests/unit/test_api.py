@@ -1,3 +1,4 @@
+import importlib.util
 import json
 import shutil
 from contextlib import nullcontext
@@ -11,6 +12,7 @@ from expsched.api.openapi import dump_openapi
 from expsched.api.runner import RunFailed, RunQueueFull
 from expsched.api.store import RunStore
 from expsched.pipeline import run
+from expsched.policies import registry
 
 DEMO = json.loads(
     (Path(__file__).resolve().parents[2] / "scenarios" / "demo.json").read_text(encoding="utf-8")
@@ -48,7 +50,10 @@ def with_tasks(tasks):
 
 def test_policies_lists_implemented_ones_and_defaults(client):
     body = client.get("/v1/policies").json()
-    assert body["policies"] == ["fifo", "fifo_skip", "priority", "priority_backfill"]
+    expected = ["fifo", "fifo_skip", "heft", "las", "peft", "priority", "priority_backfill"]
+    assert body["policies"] == sorted(
+        [*expected, "cpsat"] if importlib.util.find_spec("ortools") else expected
+    )
     assert body["defaults"]["validation_mode"] == "lenient"
 
 
@@ -150,12 +155,17 @@ def test_run_with_a_schema_violation_is_422(client):
     assert [d["code"] for d in response.json()["diagnostics"]] == ["E070"]
 
 
-def test_run_with_a_policy_that_is_not_implemented_is_400(client):
+def test_policy_that_is_not_installed_is_400(tmp_path, monkeypatch):
+    monkeypatch.delitem(registry._FACTORIES, "cpsat", raising=False)  # как без ortools
+    client = TestClient(create_app(store=RunStore(tmp_path), runner=InlineRunner()))
     response = client.post("/v1/runs", json={"problem": DEMO, "policy": {"name": "cpsat"}})
     assert response.status_code == 400
     assert response.json() == {
         "error": {"code": "POLICY_NOT_IMPLEMENTED", "message": "policy 'cpsat' is not implemented yet"}
     }
+    remove = [{"kind": "remove_failures", "worker": "node-A"}]
+    body = {"problem": DEMO, "policy": {"name": "cpsat"}, "interventions": remove}
+    assert client.post("/v1/whatif", json=body).json()["error"]["code"] == "POLICY_NOT_IMPLEMENTED"
 
 
 # ---- ошибки, CORS, OpenAPI ----
@@ -354,3 +364,21 @@ def test_event_for_an_evicted_run_is_404(tmp_path):
     shutil.rmtree(tmp_path / run_id)
     event = {"event": {"time": 1, "type": "worker_down", "worker": "node-A"}}
     assert client.post(f"/v1/runs/{run_id}/events", json=event).status_code == 404
+
+
+def test_run_made_by_an_older_version_is_recomputed_in_place(tmp_path):
+    runner = InlineRunner()
+    client = TestClient(create_app(store=RunStore(tmp_path), runner=runner))
+    run_id = client.post("/v1/runs", json={"problem": DEMO}).json()["run_id"]
+    stored = tmp_path / run_id / "result.json"
+    stored.write_text(json.dumps({**json.loads(stored.read_text()), "schema_version": "1.0"}))
+    summary = tmp_path / run_id / "summary.json"  # сводки прежней версии были без schema_version
+    summary.write_text(
+        json.dumps({k: v for k, v in json.loads(summary.read_text()).items() if k != "schema_version"})
+    )
+    response = client.get(f"/v1/runs/{run_id}")
+    assert response.status_code == 404 and "older version" in response.json()["error"]["message"]
+    assert client.get("/v1/runs").json()["runs"] == []
+    again = client.post("/v1/runs", json={"problem": DEMO})
+    assert again.json()["run_id"] == run_id and runner.calls == 2
+    assert client.get(f"/v1/runs/{run_id}").json()["result"]["schema_version"] == "1.1"

@@ -6,13 +6,16 @@ import math
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from expsched.domain.models import Problem, Task
+from expsched.domain.models import Problem, Task, time_for
 from expsched.domain.resources import Resources
 from expsched.verify.attempts import Attempt, attempts_from_log, down_intervals
 
 
 def verify(
-    problem: Problem, log: Sequence[Mapping[str, Any]], max_preemptions: int | None = None
+    problem: Problem,
+    log: Sequence[Mapping[str, Any]],
+    max_preemptions: int | None = None,
+    exact: bool = True,
 ) -> list[str]:
     """Нарушения вида «I3 node-B t=12: ...»; пустой список — расписание допустимо.
 
@@ -21,7 +24,8 @@ def verify(
     и подачи; I6 узел допустим для задачи; I7 после успешной попытки других нет; I11 попытка продолжает
     ровно с сохранённой работы; I12 попытки одной задачи не пересекаются; C9 вытеснена только вытесняемая
     задача; C10 вытеснений задачи не больше `max_preemptions` (None — не проверять); C11 вытесняет только
-    задача класса строго выше.
+    задача класса строго выше. `exact=False` — попытки шли столько, сколько шли в жизни (прогон на агентах):
+    I1 не проверяется.
     """
     tasks = problem.all_tasks()
     submitted = {r["task"]: r["t"] for r in log if r["type"] == "SUBMIT"}
@@ -33,7 +37,7 @@ def verify(
     finished = {a.task: a.end for a in attempts if a.outcome == "DONE" and a.end is not None}
 
     for a in attempts:
-        violations += _check_attempt(problem, tasks[a.task], a, finished, submitted.get(a.task, 0))
+        violations += _check_attempt(problem, tasks[a.task], a, finished, submitted.get(a.task, 0), exact)
         violations += _check_outages(a, outages.get(a.worker, []))
     violations += _check_sequences(attempts)
     violations += _check_preemptions(attempts, tasks, max_preemptions)
@@ -44,12 +48,17 @@ def verify(
 
 
 def _check_attempt(
-    problem: Problem, task: Task, a: Attempt, finished: Mapping[str, int], submitted: int
+    problem: Problem, task: Task, a: Attempt, finished: Mapping[str, int], submitted: int, exact: bool
 ) -> list[str]:
     out = []
     name = f"{a.task}#{a.attempt}"
-    if a.outcome == "DONE" and a.end is not None and a.end - a.start != task.duration - a.resume_from:
-        out.append(f"I1 {name}: worked {a.end - a.start}, expected {task.duration - a.resume_from}")
+    if (
+        exact
+        and a.outcome == "DONE"
+        and a.end is not None
+        and a.end - a.start != (expected := _time(problem, a.worker, task.duration - a.resume_from))
+    ):
+        out.append(f"I1 {name}: worked {a.end - a.start}, expected {expected}")
     for dep in sorted(set(task.deps)):
         if dep not in finished or finished[dep] > a.start:
             out.append(f"I2 {name}: starts at {a.start} before {dep} has finished")
@@ -135,3 +144,9 @@ def _check_capacity(
         if is_start and not load.fits(capacity):
             out.append(f"I3 {worker} t={t}: load {load!r} exceeds {capacity!r}")
     return out
+
+
+def _time(problem: Problem, worker: str, work: int) -> int:
+    """Время работы на узле его скорости (узел вне входа — эталонной)."""
+    w = problem.workers.get(worker)
+    return time_for(work, w.speed if w else 1)

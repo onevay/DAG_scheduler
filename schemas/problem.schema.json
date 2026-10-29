@@ -18,6 +18,75 @@
       "title": "ClusterIn",
       "type": "object"
     },
+    "ContainerSpec": {
+      "additionalProperties": false,
+      "description": "Что агент запускает для попытки задачи; ресурсы задачи становятся лимитами контейнера.",
+      "properties": {
+        "command": {
+          "default": [],
+          "items": {
+            "maxLength": 4096,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "title": "Command",
+          "type": "array"
+        },
+        "env": {
+          "default": {},
+          "maxProperties": 64,
+          "patternProperties": {
+            "^[A-Z_][A-Z0-9_]{0,63}$": {
+              "maxLength": 4096,
+              "type": "string"
+            }
+          },
+          "title": "Env",
+          "type": "object"
+        },
+        "image": {
+          "pattern": "^[a-z0-9][a-z0-9._/:@-]{0,255}$",
+          "title": "Image",
+          "type": "string"
+        }
+      },
+      "required": [
+        "image"
+      ],
+      "title": "ContainerSpec",
+      "type": "object"
+    },
+    "EstimateIn": {
+      "additionalProperties": false,
+      "description": "Работа задачи, когда точно она неизвестна: логнормальное с медианой и разбросом (σ логарифма).",
+      "properties": {
+        "median": {
+          "exclusiveMinimum": 0,
+          "maximum": 10000000,
+          "title": "Median",
+          "type": "number"
+        },
+        "spread": {
+          "anyOf": [
+            {
+              "maximum": 3,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Spread"
+        }
+      },
+      "required": [
+        "median"
+      ],
+      "title": "EstimateIn",
+      "type": "object"
+    },
     "EventIn": {
       "additionalProperties": false,
       "properties": {
@@ -108,6 +177,9 @@
             "fifo_skip",
             "priority",
             "priority_backfill",
+            "heft",
+            "peft",
+            "las",
             "cpsat"
           ],
           "title": "Name",
@@ -132,6 +204,18 @@
           "title": "Preemption",
           "type": "string"
         },
+        "robust": {
+          "default": false,
+          "title": "Robust",
+          "type": "boolean"
+        },
+        "time_limit": {
+          "default": 5.0,
+          "exclusiveMinimum": 0,
+          "maximum": 300,
+          "title": "Time Limit",
+          "type": "number"
+        },
         "validation_mode": {
           "default": "lenient",
           "enum": [
@@ -143,6 +227,51 @@
         }
       },
       "title": "PolicyIn",
+      "type": "object"
+    },
+    "ScalingIn": {
+      "additionalProperties": false,
+      "description": "Как длительность задачи зависит от числа её CPU/GPU: закон Амдала (доля последовательной части)\nили степенной (`n^-alpha`). Нужен, чтобы переносить наблюдения, сделанные при другом числе.",
+      "properties": {
+        "alpha": {
+          "anyOf": [
+            {
+              "maximum": 1.5,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Alpha"
+        },
+        "law": {
+          "default": "amdahl",
+          "enum": [
+            "amdahl",
+            "power"
+          ],
+          "title": "Law",
+          "type": "string"
+        },
+        "serial": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Serial"
+        }
+      },
+      "title": "ScalingIn",
       "type": "object"
     },
     "TaskIn": {
@@ -169,6 +298,17 @@
           "title": "Constraints",
           "type": "object"
         },
+        "container": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ContainerSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "deadline": {
           "anyOf": [
             {
@@ -192,9 +332,34 @@
           "type": "array"
         },
         "duration": {
-          "minimum": 1,
-          "title": "Duration",
-          "type": "integer"
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration"
+        },
+        "estimate": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 10000000,
+              "type": "number"
+            },
+            {
+              "$ref": "#/$defs/EstimateIn"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Estimate"
         },
         "id": {
           "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
@@ -248,11 +413,21 @@
           },
           "title": "Resources",
           "type": "object"
+        },
+        "scaling": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScalingIn"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
-        "id",
-        "duration"
+        "id"
       ],
       "title": "TaskIn",
       "type": "object"
@@ -260,6 +435,19 @@
     "WorkerIn": {
       "additionalProperties": false,
       "properties": {
+        "agent": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agent"
+        },
         "id": {
           "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
           "title": "Id",
@@ -282,6 +470,13 @@
           },
           "title": "Resources",
           "type": "object"
+        },
+        "speed": {
+          "default": 1.0,
+          "exclusiveMinimum": 0,
+          "maximum": 100,
+          "title": "Speed",
+          "type": "number"
         }
       },
       "required": [
@@ -340,6 +535,8 @@
         "name": "priority_backfill",
         "objective": "lexicographic",
         "preemption": "deadline_only",
+        "robust": false,
+        "time_limit": 5.0,
         "validation_mode": "lenient"
       }
     },
@@ -361,6 +558,13 @@
       "maxItems": 100000,
       "title": "Tasks",
       "type": "array"
+    },
+    "time_scale_ms": {
+      "default": 1000,
+      "maximum": 3600000,
+      "minimum": 1,
+      "title": "Time Scale Ms",
+      "type": "integer"
     },
     "time_unit": {
       "default": "minute",

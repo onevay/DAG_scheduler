@@ -5,6 +5,7 @@ from __future__ import annotations
 import itertools
 from collections.abc import Mapping
 from dataclasses import replace
+from fractions import Fraction
 from typing import Literal
 
 from expsched.domain.models import Task
@@ -26,8 +27,8 @@ class PreemptivePolicy:
 
     Жертва: вытесняемая, класса строго ниже, вытеснялась меньше `max_preemptions` раз, проработала не меньше
     `min_runtime` и не предок задачи с дедлайном класса не ниже, чем у вытесняющей. Цена — работа, которая
-    потеряется после последнего чекпоинта, в GPU·времени. Задачи рассматриваются по убыванию класса, затем
-    по дедлайну (задачи без дедлайна — после), затем по id.
+    потеряется после последнего чекпоинта: время × доля доминирующего ресурса задачи на её узле. Задачи
+    рассматриваются по убыванию класса, затем по дедлайну (задачи без дедлайна — после), затем по id.
     """
 
     def __init__(
@@ -44,6 +45,7 @@ class PreemptivePolicy:
         if not any(snapshot.tasks[k].preemptible for k in snapshot.running):
             return decisions
         started = [(d.task, d.worker) for d in decisions if d.action == "START"]
+        promised = {d.task: d.reason.get("t_res") for d in decisions if d.action == "RESERVE"}
         free = dict(snapshot.free)
         for key, worker in started:
             free[worker] = free[worker] - snapshot.tasks[key].resources
@@ -66,7 +68,7 @@ class PreemptivePolicy:
             if self.trigger == "priority":
                 if _fits_somewhere(view, key, free):
                     continue
-            elif not self._misses_deadline(view, key, free, started):
+            elif not self._misses_deadline(view, key, free, started, promised.get(key)):
                 continue
             plan = self.victims(view, key, free)
             if plan is None:
@@ -91,12 +93,19 @@ class PreemptivePolicy:
 
     @staticmethod
     def _misses_deadline(
-        snapshot: Snapshot, key: str, free: Mapping[str, Resources], started: list[tuple[str, str]]
+        snapshot: Snapshot,
+        key: str,
+        free: Mapping[str, Resources],
+        started: list[tuple[str, str]],
+        promised: object = None,
     ) -> bool:
-        """Задача успеет, только если стартует сейчас: по окончаниям идущих задач она опоздает."""
+        """Задача успеет, только если стартует сейчас: по окончаниям идущих задач она опоздает. `promised` —
+        резерв базовой политики (её план): если он успевает к дедлайну, задачу не спасают."""
         deadline = snapshot.tasks[key].deadline
         if deadline is None or snapshot.t + snapshot.rem[key] > deadline:
             return False  # не успеет даже сейчас: вытеснение ничего не даст
+        if isinstance(promised, int) and promised + snapshot.rem[key] <= deadline:
+            return False
         on_time = reservation(snapshot, key, free, started)
         return on_time is None or on_time.t + snapshot.rem[key] > deadline
 
@@ -107,7 +116,7 @@ class PreemptivePolicy:
         меньше жертв, затем меньший id узла. None — такого набора нет.
         """
         task = snapshot.tasks[key]
-        best: tuple[tuple[int, int, str, tuple[str, ...]], str, list[str]] | None = None
+        best: tuple[tuple[Fraction, int, str, tuple[str, ...]], str, list[str]] | None = None
         successors: dict[str, list[str]] | None = None
         for worker in snapshot.eligible[key]:
             if not snapshot.up[worker]:
@@ -128,7 +137,7 @@ class PreemptivePolicy:
                         room = room + snapshot.tasks[victim].resources
                     if not task.resources.fits(room):
                         continue
-                    rank = (sum(_lost_work(snapshot, v) for v in subset), n, worker, subset)
+                    rank = (sum((_lost_work(snapshot, v) for v in subset), Fraction(0)), n, worker, subset)
                     if best is None or rank < best[0]:
                         best = (rank, worker, sorted(subset))
         return None if best is None else (best[1], best[2])
@@ -148,12 +157,17 @@ def _fits_somewhere(snapshot: Snapshot, key: str, free: Mapping[str, Resources])
     return any(snapshot.up[w] and need.fits(free[w]) for w in snapshot.eligible[key])
 
 
-def _lost_work(snapshot: Snapshot, key: str) -> int:
-    """Сколько GPU·времени пропадёт, если прервать задачу сейчас; задача без GPU считается как одна."""
+def _lost_work(snapshot: Snapshot, key: str) -> Fraction:
+    """Сколько работы пропадёт, если прервать задачу сейчас: время после последнего чекпоинта × доля
+    доминирующего ресурса задачи на её узле (задача на 4 GPU из 8 занимает половину узла)."""
     task = snapshot.tasks[key]
     elapsed = snapshot.t - snapshot.running[key].start
     saved = task.ckpt * (elapsed // task.ckpt) if task.ckpt else 0
-    return (elapsed - saved) * max(1, task.resources.get("gpu"))
+    capacity = snapshot.capacity[snapshot.running[key].worker]
+    share = max(
+        (Fraction(n, capacity.get(r)) for r, n in task.resources.items() if capacity.get(r)), default=0
+    )
+    return (elapsed - saved) * Fraction(share)
 
 
 def _successors(tasks: Mapping[str, Task]) -> dict[str, list[str]]:

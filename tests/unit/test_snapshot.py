@@ -6,6 +6,7 @@ from expsched.analysis import analyze
 from expsched.domain.analysis import Analysis
 from expsched.domain.resources import Resources
 from expsched.domain.snapshot import Decision, Policy, RunInfo, Snapshot
+from expsched.domain.states import TaskStatus
 
 
 def empty_snapshot(demo_problem) -> Snapshot:
@@ -13,9 +14,11 @@ def empty_snapshot(demo_problem) -> Snapshot:
         t=0,
         tasks=demo_problem.tasks,
         ready=("prep_data",),
+        status={k: TaskStatus.READY if k == "prep_data" else TaskStatus.PENDING for k in demo_problem.tasks},
         running={},
         rem={k: t.duration for k, t in demo_problem.tasks.items()},
         free={w: demo_problem.workers[w].capacity for w in demo_problem.workers},
+        capacity={w: demo_problem.workers[w].capacity for w in demo_problem.workers},
         up={w: True for w in demo_problem.workers},
         eligible={k: demo_problem.eligible(t) for k, t in demo_problem.tasks.items()},
         analysis=analyze(demo_problem),

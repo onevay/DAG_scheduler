@@ -75,11 +75,23 @@ class InterruptedRecord(Record):
     task: str
     attempt: Annotated[int, Field(ge=1)]
     worker: str
-    cause: Literal["WORKER_DOWN", "PREEMPT"]
+    cause: Literal["WORKER_DOWN", "PREEMPT", "FAILED", "OOM"]  # FAILED, OOM — сбой попытки на агенте
     saved: Time  # работа до последнего чекпоинта
     lost: Time
     remaining: Time
-    reason: Detail | None = None  # причина вытеснения от политики
+    reason: Detail | None = None  # причина вытеснения от политики или подробности сбоя
+
+
+class EstimateRecord(Record):
+    """Новая оценка работы идущей попытки на агенте: по её прогрессу или потому, что она идёт дольше
+    ожидаемого."""
+
+    type: Literal["ESTIMATE"]
+    task: str
+    attempt: Annotated[int, Field(ge=1)]
+    work: Annotated[int, Field(ge=1)]  # работа попытки от её начала
+    spread: Annotated[float, Field(ge=0)]  # что осталось неизвестным (σ логарифма)
+    end: Time  # новый прогноз окончания
 
 
 class BlockedRecord(Record):
@@ -138,6 +150,7 @@ EventRecord = Annotated[
     | FinishRecord
     | WorkerRecord
     | InterruptedRecord
+    | EstimateRecord
     | BlockedRecord
     | DiagnosticRecord
     | ReserveRecord
@@ -183,15 +196,23 @@ class DeadlineMisses(Strict):
     low: int
 
 
+class Score(Strict):
+    """Оценка по цели политики: `key` сравнивается поэлементно, меньше — лучше."""
+
+    objective: Literal["lexicographic", "weighted"]
+    key: list[int] = Field(min_length=1)
+
+
 class MetricsOut(Strict):
     makespan: Time
     lower_bound: Time | None
     gap_to_lb: float | None
     deadline_misses: DeadlineMisses
     weighted_tardiness: int
-    utilization_gpu: float | None
-    lost_work_gpu: int
+    utilization: dict[str, float | None]  # по ресурсам кластера
+    lost_work: dict[str, int]  # по ресурсам кластера, единицы ресурса × время
     mean_wait: float
+    score: Score
 
 
 class ChainLink(Strict):
@@ -222,18 +243,18 @@ IdleCode = Literal["IDLE_DOWN", "IDLE_NO_READY", "IDLE_FRAGMENTATION", "IDLE_RES
 
 
 class IdleInterval(Strict):
-    """На узле свободны `gpu` GPU с `from` до `to` по причине `code`."""
+    """На узле свободны ресурсы `free` с `from` до `to` по причине `code`."""
 
     worker: str
     from_: Time = Field(alias="from")
     to: Time
     code: IdleCode
-    gpu: Annotated[int, Field(ge=1)]
+    free: Annotated[dict[str, Annotated[int, Field(ge=1)]], Field(min_length=1)]
     detail: Detail  # для IDLE_RESERVED: head, t_res
 
 
 class IdleOut(Strict):
-    by_code: dict[IdleCode, int]  # GPU · время простоя по причинам
+    by_code: dict[str, dict[IdleCode, int]]  # по ресурсам: единицы ресурса × время простоя по причинам
     intervals: list[IdleInterval]
 
 
@@ -250,8 +271,37 @@ class DiagnosticOut(Strict):
     hint: str
 
 
+class ShadowTask(Strict):
+    plan_start: Time | None
+    plan_finish: Time | None
+    fact_start: Time | None
+    fact_finish: Time | None
+    finish_delta: int | None  # факт минус план
+    cause: Literal["manual", "failure", "duration", "upstream", "decision", "same", "waiting"]
+
+
+class ShadowOut(Strict):
+    """План (симуляция того же входа) рядом с фактом прогона на агентах."""
+
+    plan_makespan: Time
+    fact_makespan: Time
+    causes: dict[str, int]
+    tasks: dict[str, ShadowTask]
+
+
+class EstimateOut(Strict):
+    """Оценка работы задачи без длительности: логнормальное и откуда оно взято."""
+
+    median: float
+    spread: float
+    mean: float
+    p80: float
+    work: int  # работа задачи в этом прогоне — округлённое вверх среднее: по ней решает политика
+    source: Literal["estimate", "history", "similar", "kind"]
+
+
 class ResultOut(Strict):
-    schema_version: Literal["1.0"]
+    schema_version: Literal["1.1"]
     input_hash: Hash  # вход вместе с действующей политикой
     result_hash: Hash | None  # хеш журнала; None, если симуляции не было
     policy: PolicyName
@@ -263,6 +313,8 @@ class ResultOut(Strict):
     diagnostics: list[DiagnosticOut]  # ошибки и предупреждения входа
     violations: list[str]  # нарушения, найденные проверкой расписания
     replans: list[ReplanRecord] | None  # None — прогноз не строился (вход больше max_forecast_tasks)
+    shadow: ShadowOut | None = None  # только у прогона в режиме shadow
+    estimates: dict[str, EstimateOut] | None = None  # только если у задач нет длительности
 
 
 def dump_result_schema() -> str:

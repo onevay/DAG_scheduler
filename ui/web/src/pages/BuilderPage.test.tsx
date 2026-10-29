@@ -73,6 +73,7 @@ describe("BuilderPage", () => {
     expect(screen.getByText("Нижняя граница makespan — 5")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("radio", { name: "FIFO" }));
     await userEvent.click(screen.getByRole("radio", { name: "строгая" }));
+    await userEvent.click(screen.getByRole("radio", { name: "взвешенная" }));
     // Старение задают и выключают: пустое поле — null
     await userEvent.type(screen.getByLabelText("Старение очереди, ч на класс"), "5");
     await userEvent.clear(screen.getByLabelText("Старение очереди, ч на класс"));
@@ -86,6 +87,7 @@ describe("BuilderPage", () => {
         policy: {
           name: "fifo",
           validation_mode: "strict",
+          objective: "weighted",
           aging: null,
           min_runtime_before_preempt: 2,
           max_forecast_tasks: 0,

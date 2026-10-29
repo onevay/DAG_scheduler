@@ -74,20 +74,23 @@ def test_deltas():
     base = {
         "makespan": 22,
         "deadline_misses": {"high": 1, "low": 0},
-        "utilization_gpu": 0.45,
+        "utilization": {"gpu": 0.45, "cpu": None},
+        "lost_work": {"gpu": 4},
         "mean_wait": 0.1,
     }
     variant = {
         "makespan": 21,
         "deadline_misses": {"high": 0, "low": 0},
-        "utilization_gpu": 0.4765,
+        "utilization": {"gpu": 0.4765, "cpu": None},
+        "lost_work": {"gpu": 0},
         "mean_wait": 0,
     }
     assert deltas(base, variant) == {
         "makespan": -1,
         "deadline_misses": -1,
-        "utilization_gpu": 0.0265,
         "mean_wait": -0.1,
+        "utilization_gpu": 0.0265,
+        "lost_work_gpu": -4,
     }
     assert deltas(None, variant) is None and deltas(base, None) is None
 
@@ -127,15 +130,6 @@ def test_what_if_on_a_failure(client):
         ),
         ({"problem": FAILURE, "interventions": []}, 422, "SCHEMA_INVALID"),
         ({"problem": FAILURE, "interventions": [{"kind": "teleport"}]}, 422, "SCHEMA_INVALID"),
-        (
-            {
-                "problem": FAILURE,
-                "policy": {"name": "cpsat"},
-                "interventions": [{"kind": "remove_failures", "worker": "node-A"}],
-            },
-            400,
-            "POLICY_NOT_IMPLEMENTED",
-        ),
     ],
 )
 def test_bad_what_if_requests(client, body, status, code):

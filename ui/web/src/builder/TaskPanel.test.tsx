@@ -59,6 +59,18 @@ describe("TaskPanel", () => {
     expect(task("train")?.dependencies).toEqual(["prep"]);
   });
 
+  it("edits cores, memory in gigabytes and GPU, dropping zeros", async () => {
+    render(<Harness start="train" />);
+    await userEvent.click(screen.getByRole("button", { name: "Больше ядер задачи" }));
+    await userEvent.click(screen.getByRole("button", { name: "Больше памяти задачи" }));
+    await userEvent.click(screen.getByRole("button", { name: "Больше памяти задачи" }));
+    expect(task("train")?.resources).toEqual({ gpu: 4, cpu: 1, ram_mb: 1024 });
+    expect(screen.getByText("не помещается ни на один узел")).toBeInTheDocument(); // у узлов нет ядер и памяти
+    for (let i = 0; i < 4; i++)
+      await userEvent.click(screen.getByRole("button", { name: "Меньше GPU задачи" }));
+    expect(task("train")?.resources).toEqual({ cpu: 1, ram_mb: 1024 });
+  });
+
   it("renames on Enter and refuses a taken id", async () => {
     render(<Harness start="prep" />);
     const id = screen.getByLabelText("Задача");

@@ -43,6 +43,7 @@ export function App() {
             <Route path="/explain/:runId" element={<ExplainPage />} />
             <Route path="/system" element={<SystemPage />} />
             <Route path="/containers" element={<ContainersPage />} />
+            <Route path="/containers/:runId" element={<ContainersPage />} />
             <Route
               path="*"
               element={

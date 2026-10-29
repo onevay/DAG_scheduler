@@ -24,3 +24,6 @@ ui/web/dist/
 ui/web/test-results/
 ui/web/playwright-report/
 .audit-requirements.txt
+
+# журнал и чекпоинты агента, запущенного из репозитория
+.expsched-agent/

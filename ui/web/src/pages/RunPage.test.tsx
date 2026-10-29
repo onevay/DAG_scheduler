@@ -31,9 +31,10 @@ const RESULT = {
     gap_to_lb: 0.05,
     deadline_misses: { critical: 0, high: 1, normal: 0, low: 0 },
     weighted_tardiness: 0,
-    utilization_gpu: 0.476,
-    lost_work_gpu: 4,
+    utilization: { gpu: 0.476 },
+    lost_work: { gpu: 4 },
     mean_wait: 0.0909,
+    score: { objective: "lexicographic", key: [0, 1, 0, 0, 0, 22] },
   },
   attempts: [
     { task: "a", attempt: 1, worker: "n", start: 0, end: 2, resume_from: 0, saved: 0, outcome: "INT" },
@@ -51,6 +52,22 @@ const RESULT = {
   },
 };
 
+const SHADOW = {
+  plan_makespan: 4,
+  fact_makespan: 6,
+  causes: { failure: 1 },
+  tasks: {
+    a: {
+      plan_start: 0,
+      plan_finish: 4,
+      fact_start: 0,
+      fact_finish: 6,
+      finish_delta: 2,
+      cause: "failure",
+    },
+  },
+};
+
 const JOURNAL = [
   { seq: 0, t: 0, type: "READY", task: "a" },
   { seq: 1, t: 0, type: "START", task: "a", worker: "n", attempt: 1, resume_from: 0, reason: {} },
@@ -63,7 +80,26 @@ const server = setupServer(
   http.get("/v1/runs/:id", ({ params }) =>
     params.id === "missing"
       ? HttpResponse.json({ error: { code: "NOT_FOUND", message: "нет" } }, { status: 404 })
-      : HttpResponse.json({ run_id: params.id, result: RESULT }),
+      : HttpResponse.json({
+          run_id: params.id,
+          result: params.id === "shadow" ? { ...RESULT, shadow: SHADOW } : RESULT,
+        }),
+  ),
+  http.post("/v1/runs/:id/replay", ({ params }) =>
+    HttpResponse.json(
+      params.id === "shadow"
+        ? {
+            same: false,
+            same_journal: false,
+            decisions: 2,
+            divergence: {
+              index: 1,
+              expected: { t: 2, type: "START", task: "a", worker: "n", attempt: 2 },
+              got: null,
+            },
+          }
+        : { same: true, same_journal: true, decisions: 2, divergence: null },
+    ),
   ),
   http.get("/v1/runs/:id/problem", () =>
     HttpResponse.json({
@@ -117,6 +153,29 @@ describe("RunPage", () => {
     expect(await screen.findByRole("link", { name: "parent" })).toHaveAttribute("href", "/runs/parent");
     const replans = within(screen.getByRole("region", { name: "Перепланирования" }));
     expect(replans.getByRole("row", { name: /^2 / })).toHaveTextContent("2отказ na +1——");
+  });
+
+  it("replays a run and shows its plan next to the fact", async () => {
+    renderAt("0123456789abcdef");
+    await userEvent.click(await screen.findByRole("button", { name: "Проиграть журнал" }));
+    expect(
+      await within(screen.getByRole("region", { name: "Проигрывание" })).findByRole("status"),
+    ).toHaveTextContent("Решения совпали: 2 из 2, журнал совпал целиком.");
+    expect(screen.queryByRole("region", { name: "План и факт" })).not.toBeInTheDocument();
+  });
+
+  it("shows where a shadow run left its plan and where a replay diverged", async () => {
+    renderAt("shadow");
+    const plan = within(await screen.findByRole("region", { name: "План и факт" }));
+    expect(plan.getByText("Makespan: план 4 ч · факт 6 ч (+2)")).toBeInTheDocument();
+    expect(plan.getByRole("listitem")).toHaveTextContent("сбой попытки · 1");
+    expect(plan.getByRole("row", { name: /^a / })).toHaveTextContent("a0–40–6+2сбой попытки");
+    await userEvent.click(screen.getByRole("button", { name: "Проиграть журнал" }));
+    expect(
+      await within(screen.getByRole("region", { name: "Проигрывание" })).findByRole("status"),
+    ).toHaveTextContent(
+      "Расхождение на решении № 2 из 2: в прогоне — START a на n в 2 ч, при проигрывании — решения нет.",
+    );
   });
 
   it("says when a run is missing", async () => {

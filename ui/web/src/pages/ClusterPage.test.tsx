@@ -67,7 +67,7 @@ describe("ClusterPage", () => {
 
   it("edits GPU and labels, adds and removes nodes", async () => {
     renderPage();
-    await userEvent.click(card("node-B").getByRole("button", { name: "Больше GPU" }));
+    await userEvent.click(card("node-B").getByRole("button", { name: "Больше GPU узла" }));
     await userEvent.click(card("node-B").getByRole("button", { name: "Убрать метку zone=eu" }));
     await userEvent.type(card("node-B").getByLabelText("Новая метка узла node-B"), "gpu=a100{Enter}");
     expect(latest.cluster.workers[1]).toEqual({

@@ -1,0 +1,25 @@
+# Настройки агента expsched: python -m expsched.agent --config /etc/expsched/agent.toml
+# Параметры командной строки сильнее файла; неизвестное имя — ошибка.
+
+[agent]
+id = "laptop"                             # как в поле agent узлов кластера
+scheduler = "http://127.0.0.1:8000"
+runtime = "docker"                        # docker | podman | gravesentinel | fake
+state = "/var/lib/expsched-agent"         # журнал state.jsonl и чекпоинты задач
+token_file = "/etc/expsched/agent.token"  # или переменная EXPSCHED_AGENT_TOKEN; в этом файле токену не место
+log_format = "json"                       # text | json — по строке JSON на запись, удобно для journald
+
+# Ёмкость под задачи; без них — машина минус одно ядро и 2 ГиБ ОЗУ, GPU по nvidia-smi
+# cpu = 6
+# ram_mb = 12288
+# gpu = 0
+max_containers = 4
+allow_images = []                         # образы задач, кроме встроенной нагрузки
+
+# stop_on_exit = false                    # true — при остановке службы остановить и контейнеры
+# retry_max_s = 60                        # предел паузы между попытками связаться с планировщиком
+
+# Для runtime = "gravesentinel":
+# socket = "/run/gravesentinel/hypervisor.sock"
+# hypervisor_uid = 0
+# workload_image = "localhost/expsched-workload:local"

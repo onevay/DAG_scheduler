@@ -5,6 +5,7 @@ import { freeId } from "../draft/draft";
 import { useDraft } from "../draft/DraftContext";
 import styles from "./Cluster.module.css";
 import { type Outage, ticks } from "./timeline";
+import { clusterResources, mainResource, work } from "../ui/resources";
 
 const TYPES: Record<InputEvent["type"], string> = {
   worker_down: "отказ",
@@ -38,8 +39,9 @@ export function EventsBoard({
   const workers = draft.cluster.workers;
   const pct = (t: number) => `${(Math.min(t, horizon) / horizon) * 100}%`;
   const downHours = down.reduce((s, o) => s + o.to - o.from, 0);
-  const gpuOf = new Map(workers.map((w) => [w.id, w.resources.gpu ?? 0]));
-  const downGpu = down.reduce((s, o) => s + (o.to - o.from) * (gpuOf.get(o.worker) ?? 0), 0);
+  const main = mainResource(clusterResources(workers));
+  const capacityOf = new Map(workers.map((w) => [w.id, main ? (w.resources[main] ?? 0) : 0]));
+  const lost = down.reduce((s, o) => s + (o.to - o.from) * (capacityOf.get(o.worker) ?? 0), 0);
   const rows = [
     ...workers.map((w) => ({
       name: w.id,
@@ -63,12 +65,12 @@ export function EventsBoard({
             </span>
             <span className={styles.caption}>узлы недоступны</span>
           </span>
-          <span className={styles.stack}>
-            <span className={styles.techSm}>
-              {downGpu} GPU·{unit.toUpperCase()}
+          {main && (
+            <span className={styles.stack}>
+              <span className={styles.techSm}>{work(main, lost, unit.toUpperCase())}</span>
+              <span className={styles.caption}>выпало из ёмкости</span>
             </span>
-            <span className={styles.caption}>выпало из ёмкости</span>
-          </span>
+          )}
         </div>
       </div>
 
@@ -188,7 +190,9 @@ function AddEvent({ unit }: { unit: string }) {
         ...draft.tasks.map((t) => t.id),
         ...(draft.events ?? []).flatMap((e) => e.task?.id ?? []),
       ];
-      const task = { id: freeId("urgent", taken), duration: 1, resources: { gpu: 1 }, priority: 10 };
+      const main = mainResource(clusterResources(workers));
+      const resources = main ? { [main]: main === "ram_mb" ? 1024 : 1 } : {};
+      const task = { id: freeId("urgent", taken), duration: 1, resources, priority: 10 };
       dispatch({ type: "addEvent", event: { time, type, task } });
     } else if (target) {
       dispatch({ type: "addEvent", event: { time, type, worker: target } });

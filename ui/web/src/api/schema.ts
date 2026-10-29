@@ -4,6 +4,144 @@
  */
 
 export interface paths {
+  "/v1/agents": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Agents
+     * @description Агенты, представившиеся серверу: среда, ёмкость, на связи ли, какие попытки у них идут.
+     */
+    get: operations["agents_v1_agents_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/agents/{agent_id}/events": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Events */
+    post: operations["events_v1_agents__agent_id__events_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/agents/{agent_id}/hello": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Hello */
+    post: operations["hello_v1_agents__agent_id__hello_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/agents/{agent_id}/poll": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Poll
+     * @description Отдаёт неподтверждённые команды сразу, а если их нет — ждёт до `wait_s` секунд.
+     */
+    post: operations["poll_v1_agents__agent_id__poll_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/live": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Live Runs
+     * @description Прогоны на агентах этого сервера — идущие и законченные с его запуска, новые первыми.
+     */
+    get: operations["live_runs_v1_live_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/local-agents": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Local Agents
+     * @description Агенты, которых запустил этот сервер: идут ли, код выхода, хвост журнала процесса.
+     */
+    get: operations["local_agents_v1_local_agents_get"];
+    put?: never;
+    /**
+     * Start Local Agent
+     * @description Проверить среду (`agent check`) и запустить агента на машине сервера; он сам представится серверу.
+     */
+    post: operations["start_local_agent_v1_local_agents_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/local-agents/{agent_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Stop Local Agent
+     * @description Остановить агента; его контейнеры остаются и подхватываются, если запустить его снова.
+     */
+    delete: operations["stop_local_agent_v1_local_agents__agent_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/policies": {
     parameters: {
       query?: never;
@@ -40,6 +178,9 @@ export interface paths {
     /**
      * Create Run
      * @description Прогон {problem, policy?}. Тот же вход с той же политикой не пересчитывается: отдаётся сохранённый.
+     *
+     *     С `problem.mode` `emulate` или `shadow` (план рядом) — прогон на агентах: 202 `{run_id, status}`, идёт
+     *     в фоне, его состояние — `GET /v1/runs/{run_id}/containers`, результат появится по окончании.
      */
     post: operations["create_run_v1_runs_post"];
     delete?: never;
@@ -65,6 +206,66 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/runs/{run_id}/actions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Actions
+     * @description Чекпоинт задачи сейчас, уронить или вернуть узел, отменить прогон.
+     */
+    post: operations["actions_v1_runs__run_id__actions_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/runs/{run_id}/containers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Containers
+     * @description Прогон на агентах сейчас: часы модели, узлы и контейнеры попыток.
+     */
+    get: operations["containers_v1_runs__run_id__containers_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/runs/{run_id}/containers/{task}/{attempt}/logs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Container Logs
+     * @description Журнал контейнера попытки — строки, что агент успел прислать; у сред без журнала он пуст.
+     */
+    get: operations["container_logs_v1_runs__run_id__containers__task___attempt__logs_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/runs/{run_id}/events": {
     parameters: {
       query?: never;
@@ -74,7 +275,7 @@ export interface paths {
     };
     /**
      * Get Events
-     * @description Журнал страницами: записи с номерами [from_seq, from_seq + limit).
+     * @description Журнал страницами: записи с номерами [from_seq, from_seq + limit); у идущего прогона — сколько есть.
      */
     get: operations["get_events_v1_runs__run_id__events_get"];
     put?: never;
@@ -125,6 +326,26 @@ export interface paths {
     get: operations["get_problem_v1_runs__run_id__problem_get"];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/runs/{run_id}/replay": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Replay Run
+     * @description Проиграть журнал сохранённого прогона его же фактами, без контейнеров: те же ли решения у политики.
+     */
+    post: operations["replay_run_v1_runs__run_id__replay_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -226,6 +447,71 @@ export interface components {
       kind: "add_worker";
       worker: components["schemas"]["WorkerIn"];
     };
+    /**
+     * AgentEvent
+     * @description Что случилось с попыткой. accepted/rejected — ответ на команду start; started — контейнер запущен;
+     *     checkpoint — сохранено `progress` единиц работы (из `total`, если задача знает всю); exited — контейнер
+     *     завершился с `exit_code`; oom — убит за превышение памяти; killed — остановлен командой stop; lost — агент
+     *     потерял контейнер (`detail`).
+     */
+    AgentEvent: {
+      /** At */
+      at: string;
+      /** Attempt */
+      attempt: number;
+      /** Container Id */
+      container_id?: string | null;
+      /** Detail */
+      detail?: string | null;
+      /** Exit Code */
+      exit_code?: number | null;
+      /** Progress */
+      progress?: number | null;
+      /** Run Id */
+      run_id: string;
+      /** Seq */
+      seq: number;
+      /** Task */
+      task: string;
+      /** Total */
+      total?: number | null;
+      /**
+       * Type
+       * @enum {string}
+       */
+      type: "accepted" | "rejected" | "started" | "checkpoint" | "exited" | "oom" | "killed" | "lost";
+    };
+    /**
+     * AgentOut
+     * @description Агент, который хоть раз представился этому серверу.
+     */
+    AgentOut: {
+      /** Alive */
+      alive: boolean;
+      /** Capacity */
+      capacity: {
+        [key: string]: number;
+      };
+      /** Id */
+      id: string;
+      /** Max Containers */
+      max_containers: number;
+      /** Running */
+      running: string[];
+      /** Runtime */
+      runtime: string;
+      /** Seen S Ago */
+      seen_s_ago: number;
+      /** Version */
+      version: string;
+    };
+    /** AgentsOut */
+    AgentsOut: {
+      /** Agents */
+      agents: components["schemas"]["AgentOut"][];
+      /** Heartbeat Timeout S */
+      heartbeat_timeout_s: number;
+    };
     /** AttemptOut */
     AttemptOut: {
       /** Attempt */
@@ -244,6 +530,18 @@ export interface components {
       task: string;
       /** Worker */
       worker: string;
+    };
+    /**
+     * AttemptRef
+     * @description Попытка задачи в прогоне — то, чем управляет агент; `key` — метка её контейнера.
+     */
+    AttemptRef: {
+      /** Attempt */
+      attempt: number;
+      /** Run Id */
+      run_id: string;
+      /** Task */
+      task: string;
     };
     /** BlockedRecord */
     BlockedRecord: {
@@ -288,10 +586,74 @@ export interface components {
       /** Worker */
       worker: string;
     };
+    /**
+     * CheckpointCommand
+     * @description Сохранить чекпоинт сейчас, не дожидаясь интервала.
+     */
+    CheckpointCommand: {
+      /** Attempt */
+      attempt: number;
+      /** Command Id */
+      command_id: number;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "checkpoint";
+      /** Run Id */
+      run_id: string;
+      /** Task */
+      task: string;
+    };
     /** ClusterIn */
     ClusterIn: {
       /** Workers */
       workers: components["schemas"]["WorkerIn"][];
+    };
+    /**
+     * ContainerOut
+     * @description Попытка задачи на агенте: где идёт, что с ней и сколько работы сохранено.
+     */
+    ContainerOut: {
+      /** Agent */
+      agent: string;
+      /** Attempt */
+      attempt: number;
+      /** Container Id */
+      container_id: string | null;
+      /** Detail */
+      detail: string | null;
+      /** Progress */
+      progress: number;
+      /** Resume From */
+      resume_from: number;
+      /** State */
+      state: string;
+      /** Task */
+      task: string;
+      usage?: components["schemas"]["Usage"] | null;
+      /** Worker */
+      worker: string;
+    };
+    /**
+     * ContainerSpec
+     * @description Что агент запускает для попытки задачи; ресурсы задачи становятся лимитами контейнера.
+     */
+    ContainerSpec: {
+      /**
+       * Command
+       * @default []
+       */
+      command?: string[];
+      /**
+       * Env
+       * @default {}
+       */
+      env?: {
+        [key: string]: string;
+      };
+      /** Image */
+      image: string;
     };
     /** DeadlineMisses */
     DeadlineMisses: {
@@ -363,6 +725,22 @@ export interface components {
        */
       type: "DIAGNOSTIC";
     };
+    /**
+     * Divergence
+     * @description Первое решение, в котором проигрывание разошлось с прогоном: `{t, type, task, worker, attempt}`.
+     */
+    Divergence: {
+      /** Expected */
+      expected: {
+        [key: string]: unknown;
+      } | null;
+      /** Got */
+      got: {
+        [key: string]: unknown;
+      } | null;
+      /** Index */
+      index: number;
+    };
     /** ErrorInfo */
     ErrorInfo: {
       /**
@@ -379,6 +757,11 @@ export interface components {
         | "RUN_FAILED"
         | "NOT_FOUND"
         | "METHOD_NOT_ALLOWED"
+        | "FORBIDDEN"
+        | "EVENT_GAP"
+        | "RUN_IN_PROGRESS"
+        | "AGENT_RUNNING"
+        | "AGENT_NOT_READY"
         | "INTERNAL";
       /** Message */
       message: string;
@@ -388,6 +771,63 @@ export interface components {
       /** Diagnostics */
       diagnostics?: components["schemas"]["DiagnosticOut"][] | null;
       error: components["schemas"]["ErrorInfo"];
+    };
+    /**
+     * EstimateIn
+     * @description Работа задачи, когда точно она неизвестна: логнормальное с медианой и разбросом (σ логарифма).
+     */
+    EstimateIn: {
+      /** Median */
+      median: number;
+      /** Spread */
+      spread?: number | null;
+    };
+    /**
+     * EstimateOut
+     * @description Оценка работы задачи без длительности: логнормальное и откуда оно взято.
+     */
+    EstimateOut: {
+      /** Mean */
+      mean: number;
+      /** Median */
+      median: number;
+      /** P80 */
+      p80: number;
+      /**
+       * Source
+       * @enum {string}
+       */
+      source: "estimate" | "history" | "similar" | "kind";
+      /** Spread */
+      spread: number;
+      /** Work */
+      work: number;
+    };
+    /**
+     * EstimateRecord
+     * @description Новая оценка работы идущей попытки на агенте: по её прогрессу или потому, что она идёт дольше
+     *     ожидаемого.
+     */
+    EstimateRecord: {
+      /** Attempt */
+      attempt: number;
+      /** End */
+      end: number;
+      /** Seq */
+      seq: number;
+      /** Spread */
+      spread: number;
+      /** T */
+      t: number;
+      /** Task */
+      task: string;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: "ESTIMATE";
+      /** Work */
+      work: number;
     };
     /** EventIn */
     EventIn: {
@@ -406,6 +846,19 @@ export interface components {
     EventRequest: {
       event: components["schemas"]["EventIn"];
     };
+    /** EventsAck */
+    EventsAck: {
+      /** Next Event Seq */
+      next_event_seq: number;
+    };
+    /**
+     * EventsBatch
+     * @description События подряд по номерам; повтор уже принятых безопасен, пропуск номера — ошибка.
+     */
+    EventsBatch: {
+      /** Events */
+      events: components["schemas"]["AgentEvent"][];
+    };
     /** EventsPage */
     EventsPage: {
       /** Events */
@@ -417,6 +870,7 @@ export interface components {
         | components["schemas"]["FinishRecord"]
         | components["schemas"]["WorkerRecord"]
         | components["schemas"]["InterruptedRecord"]
+        | components["schemas"]["EstimateRecord"]
         | components["schemas"]["BlockedRecord"]
         | components["schemas"]["DiagnosticRecord"]
         | components["schemas"]["ReserveRecord"]
@@ -473,8 +927,58 @@ export interface components {
       detail?: components["schemas"]["ValidationError"][];
     };
     /**
+     * Hello
+     * @description Агент представляется: что умеет и сколько ресурсов отдаёт; после своего перезапуска — что уже идёт.
+     */
+    Hello: {
+      /**
+       * Acked Command Id
+       * @default 0
+       */
+      acked_command_id?: number;
+      /** Agent Version */
+      agent_version: string;
+      /** Capacity */
+      capacity: {
+        [key: string]: number;
+      };
+      /** Max Containers */
+      max_containers: number;
+      /**
+       * Next Event Seq
+       * @default 0
+       */
+      next_event_seq?: number;
+      /**
+       * Protocol
+       * @constant
+       */
+      protocol: 1;
+      /**
+       * Running
+       * @default []
+       */
+      running?: components["schemas"]["AttemptRef"][];
+      /**
+       * Runtime
+       * @enum {string}
+       */
+      runtime: "docker" | "podman" | "fake" | "gravesentinel";
+    };
+    /** HelloAck */
+    HelloAck: {
+      /** Agent */
+      agent: string;
+      /** Heartbeat Timeout S */
+      heartbeat_timeout_s: number;
+      /** Next Event Seq */
+      next_event_seq: number;
+      /** Poll Timeout S */
+      poll_timeout_s: number;
+    };
+    /**
      * IdleInterval
-     * @description На узле свободны `gpu` GPU с `from` до `to` по причине `code`.
+     * @description На узле свободны ресурсы `free` с `from` до `to` по причине `code`.
      */
     IdleInterval: {
       /**
@@ -486,10 +990,12 @@ export interface components {
       detail: {
         [key: string]: unknown;
       };
+      /** Free */
+      free: {
+        [key: string]: number;
+      };
       /** From */
       from: number;
-      /** Gpu */
-      gpu: number;
       /** To */
       to: number;
       /** Worker */
@@ -499,7 +1005,9 @@ export interface components {
     IdleOut: {
       /** By Code */
       by_code: {
-        [key: string]: number;
+        [key: string]: {
+          [key: string]: number;
+        };
       };
       /** Intervals */
       intervals: components["schemas"]["IdleInterval"][];
@@ -519,7 +1027,7 @@ export interface components {
        * Cause
        * @enum {string}
        */
-      cause: "WORKER_DOWN" | "PREEMPT";
+      cause: "WORKER_DOWN" | "PREEMPT" | "FAILED" | "OOM";
       /** Lost */
       lost: number;
       /** Reason */
@@ -544,21 +1052,146 @@ export interface components {
       /** Worker */
       worker: string;
     };
+    /** LiveOut */
+    LiveOut: {
+      /** Containers */
+      containers: components["schemas"]["ContainerOut"][];
+      /**
+       * Estimates
+       * @default {}
+       */
+      estimates?: {
+        [key: string]: components["schemas"]["EstimateOut"];
+      };
+      /** Now */
+      now: number;
+      /** Run Id */
+      run_id: string;
+      shadow?: components["schemas"]["ShadowOut"] | null;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "running" | "done" | "cancelled";
+      /** Time Scale Ms */
+      time_scale_ms: number;
+      /** Workers */
+      workers: {
+        [key: string]: components["schemas"]["WorkerLive"];
+      };
+    };
+    /** LiveRunOut */
+    LiveRunOut: {
+      /** Containers */
+      containers: number;
+      /**
+       * Mode
+       * @enum {string}
+       */
+      mode: "emulate" | "shadow";
+      /** Name */
+      name: string | null;
+      /** Now */
+      now: number;
+      /** Run Id */
+      run_id: string;
+      /** Running */
+      running: number;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "running" | "done" | "cancelled";
+    };
+    /**
+     * LiveRunsOut
+     * @description Прогоны на агентах, которые помнит этот сервер (до его перезапуска), — новые первыми.
+     */
+    LiveRunsOut: {
+      /** Runs */
+      runs: components["schemas"]["LiveRunOut"][];
+    };
+    /** LiveStarted */
+    LiveStarted: {
+      /** Run Id */
+      run_id: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "running" | "done" | "cancelled";
+    };
+    /**
+     * LocalAgentIn
+     * @description Агент на машине сервера: id, среда и, если не автоматически, ёмкость под задачи.
+     */
+    LocalAgentIn: {
+      /** Cpu */
+      cpu?: number | null;
+      /** Gpu */
+      gpu?: number | null;
+      /** Id */
+      id: string;
+      /** Ram Mb */
+      ram_mb?: number | null;
+      /**
+       * Runtime
+       * @default docker
+       * @enum {string}
+       */
+      runtime?: "docker" | "podman" | "fake";
+    };
+    /** LocalAgentOut */
+    LocalAgentOut: {
+      /** Alive */
+      alive: boolean;
+      /** Exit Code */
+      exit_code: number | null;
+      /** Id */
+      id: string;
+      /** Log */
+      log: string[];
+      /** Pid */
+      pid: number;
+      /**
+       * Runtime
+       * @enum {string}
+       */
+      runtime: "docker" | "podman" | "fake";
+    };
+    /** LocalAgentsOut */
+    LocalAgentsOut: {
+      /** Agents */
+      agents: components["schemas"]["LocalAgentOut"][];
+    };
+    /**
+     * LogsOut
+     * @description Журнал контейнера попытки: последние строки, что прислал агент (сервер помнит до 500).
+     */
+    LogsOut: {
+      /** Lines */
+      lines: string[];
+    };
     /** MetricsOut */
     MetricsOut: {
       deadline_misses: components["schemas"]["DeadlineMisses"];
       /** Gap To Lb */
       gap_to_lb: number | null;
-      /** Lost Work Gpu */
-      lost_work_gpu: number;
+      /** Lost Work */
+      lost_work: {
+        [key: string]: number;
+      };
       /** Lower Bound */
       lower_bound: number | null;
       /** Makespan */
       makespan: number;
       /** Mean Wait */
       mean_wait: number;
-      /** Utilization Gpu */
-      utilization_gpu: number | null;
+      score: components["schemas"]["Score"];
+      /** Utilization */
+      utilization: {
+        [key: string]: number | null;
+      };
       /** Weighted Tardiness */
       weighted_tardiness: number;
     };
@@ -566,7 +1199,9 @@ export interface components {
     PoliciesOut: {
       defaults: components["schemas"]["PolicyIn"];
       /** Policies */
-      policies: ("fifo" | "fifo_skip" | "priority" | "priority_backfill" | "cpsat")[];
+      policies: (
+        "fifo" | "fifo_skip" | "priority" | "priority_backfill" | "heft" | "peft" | "las" | "cpsat"
+      )[];
     };
     /** PolicyIn */
     PolicyIn: {
@@ -595,7 +1230,7 @@ export interface components {
        * @default priority_backfill
        * @enum {string}
        */
-      name?: "fifo" | "fifo_skip" | "priority" | "priority_backfill" | "cpsat";
+      name?: "fifo" | "fifo_skip" | "priority" | "priority_backfill" | "heft" | "peft" | "las" | "cpsat";
       /**
        * Objective
        * @default lexicographic
@@ -609,11 +1244,58 @@ export interface components {
        */
       preemption?: "never" | "deadline_only" | "priority";
       /**
+       * Robust
+       * @default false
+       */
+      robust?: boolean;
+      /**
+       * Time Limit
+       * @default 5
+       */
+      time_limit?: number;
+      /**
        * Validation Mode
        * @default lenient
        * @enum {string}
        */
       validation_mode?: "strict" | "lenient";
+    };
+    /**
+     * Poll
+     * @description Опрос команд; заодно — потребление идущих попыток и новые строки их журналов (без гарантии доставки:
+     *     потерянный опрос теряет и их).
+     */
+    Poll: {
+      /** Acked Command Id */
+      acked_command_id: number;
+      /**
+       * Logs
+       * @default {}
+       */
+      logs?: {
+        [key: string]: string[];
+      };
+      /**
+       * Usage
+       * @default {}
+       */
+      usage?: {
+        [key: string]: components["schemas"]["Usage"];
+      };
+      /**
+       * Wait S
+       * @default 25
+       */
+      wait_s?: number;
+    };
+    /** PollReply */
+    PollReply: {
+      /** Commands */
+      commands: (
+        | components["schemas"]["StartCommand"]
+        | components["schemas"]["StopCommand"]
+        | components["schemas"]["CheckpointCommand"]
+      )[];
     };
     /** ProblemIn */
     ProblemIn: {
@@ -640,6 +1322,8 @@ export interface components {
        *       "name": "priority_backfill",
        *       "objective": "lexicographic",
        *       "preemption": "deadline_only",
+       *       "robust": false,
+       *       "time_limit": 5,
        *       "validation_mode": "lenient"
        *     }
        */
@@ -657,6 +1341,11 @@ export interface components {
       seed?: number;
       /** Tasks */
       tasks: components["schemas"]["TaskIn"][];
+      /**
+       * Time Scale Ms
+       * @default 1000
+       */
+      time_scale_ms?: number;
       /**
        * Time Unit
        * @default minute
@@ -733,6 +1422,16 @@ export interface components {
        */
       type: "REPLAN";
     };
+    /** ReplayOut */
+    ReplayOut: {
+      /** Decisions */
+      decisions: number;
+      divergence: components["schemas"]["Divergence"] | null;
+      /** Same */
+      same: boolean;
+      /** Same Journal */
+      same_journal: boolean;
+    };
     /** ReserveRecord */
     ReserveRecord: {
       /** Seq */
@@ -757,6 +1456,10 @@ export interface components {
       attempts: components["schemas"]["AttemptOut"][];
       /** Diagnostics */
       diagnostics: components["schemas"]["DiagnosticOut"][];
+      /** Estimates */
+      estimates?: {
+        [key: string]: components["schemas"]["EstimateOut"];
+      } | null;
       explain: components["schemas"]["ExplainOut"] | null;
       /** Input Hash */
       input_hash: string;
@@ -765,7 +1468,7 @@ export interface components {
        * Policy
        * @enum {string}
        */
-      policy: "fifo" | "fifo_skip" | "priority" | "priority_backfill" | "cpsat";
+      policy: "fifo" | "fifo_skip" | "priority" | "priority_backfill" | "heft" | "peft" | "las" | "cpsat";
       /** Replans */
       replans: components["schemas"]["ReplanRecord"][] | null;
       /** Result Hash */
@@ -774,7 +1477,8 @@ export interface components {
        * Schema Version
        * @constant
        */
-      schema_version: "1.0";
+      schema_version: "1.1";
+      shadow?: components["schemas"]["ShadowOut"] | null;
       /**
        * Status
        * @enum {string}
@@ -799,7 +1503,7 @@ export interface components {
        * Policy
        * @enum {string}
        */
-      policy: "fifo" | "fifo_skip" | "priority" | "priority_backfill" | "cpsat";
+      policy: "fifo" | "fifo_skip" | "priority" | "priority_backfill" | "heft" | "peft" | "las" | "cpsat";
       /** Run Id */
       run_id: string;
       /**
@@ -838,6 +1542,23 @@ export interface components {
       /** Runs */
       runs: components["schemas"]["RunListItem"][];
     };
+    /**
+     * ScalingIn
+     * @description Как длительность задачи зависит от числа её CPU/GPU: закон Амдала (доля последовательной части)
+     *     или степенной (`n^-alpha`). Нужен, чтобы переносить наблюдения, сделанные при другом числе.
+     */
+    ScalingIn: {
+      /** Alpha */
+      alpha?: number | null;
+      /**
+       * Law
+       * @default amdahl
+       * @enum {string}
+       */
+      law?: "amdahl" | "power";
+      /** Serial */
+      serial?: number | null;
+    };
     /** ScenarioInfo */
     ScenarioInfo: {
       /** Events */
@@ -848,7 +1569,7 @@ export interface components {
        * Policy
        * @enum {string}
        */
-      policy: "fifo" | "fifo_skip" | "priority" | "priority_backfill" | "cpsat";
+      policy: "fifo" | "fifo_skip" | "priority" | "priority_backfill" | "heft" | "peft" | "las" | "cpsat";
       /** Tasks */
       tasks: number;
       /** Time Unit */
@@ -860,6 +1581,19 @@ export interface components {
     ScenariosOut: {
       /** Scenarios */
       scenarios: components["schemas"]["ScenarioInfo"][];
+    };
+    /**
+     * Score
+     * @description Оценка по цели политики: `key` сравнивается поэлементно, меньше — лучше.
+     */
+    Score: {
+      /** Key */
+      key: number[];
+      /**
+       * Objective
+       * @enum {string}
+       */
+      objective: "lexicographic" | "weighted";
     };
     /** SetCheckpoint */
     SetCheckpoint: {
@@ -912,6 +1646,80 @@ export interface components {
       /** Task */
       task: string;
     };
+    /**
+     * ShadowOut
+     * @description План (симуляция того же входа) рядом с фактом прогона на агентах.
+     */
+    ShadowOut: {
+      /** Causes */
+      causes: {
+        [key: string]: number;
+      };
+      /** Fact Makespan */
+      fact_makespan: number;
+      /** Plan Makespan */
+      plan_makespan: number;
+      /** Tasks */
+      tasks: {
+        [key: string]: components["schemas"]["ShadowTask"];
+      };
+    };
+    /** ShadowTask */
+    ShadowTask: {
+      /**
+       * Cause
+       * @enum {string}
+       */
+      cause: "manual" | "failure" | "duration" | "upstream" | "decision" | "same" | "waiting";
+      /** Fact Finish */
+      fact_finish: number | null;
+      /** Fact Start */
+      fact_start: number | null;
+      /** Finish Delta */
+      finish_delta: number | null;
+      /** Plan Finish */
+      plan_finish: number | null;
+      /** Plan Start */
+      plan_start: number | null;
+    };
+    /**
+     * StartCommand
+     * @description Запустить попытку на узле `worker`. Без `container` — встроенная нагрузка: `work` единиц времени
+     *     модели по `time_scale_ms` миллисекунд, с чекпоинтами каждые `checkpoint_interval` единиц.
+     */
+    StartCommand: {
+      /** Attempt */
+      attempt: number;
+      /** Checkpoint Interval */
+      checkpoint_interval?: number | null;
+      /** Command Id */
+      command_id: number;
+      container?: components["schemas"]["ContainerSpec"] | null;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "start";
+      /** Limits */
+      limits: {
+        [key: string]: number;
+      };
+      /**
+       * Resume From
+       * @default 0
+       */
+      resume_from?: number;
+      /** Run Id */
+      run_id: string;
+      /** Task */
+      task: string;
+      /** Time Scale Ms */
+      time_scale_ms: number;
+      /** Work */
+      work: number;
+      /** Worker */
+      worker: string;
+    };
     /** StartRecord */
     StartRecord: {
       /** Attempt */
@@ -947,6 +1755,27 @@ export interface components {
       /** Task */
       task: string;
     };
+    /** StopCommand */
+    StopCommand: {
+      /** Attempt */
+      attempt: number;
+      /** Command Id */
+      command_id: number;
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      kind: "stop";
+      /**
+       * Reason
+       * @enum {string}
+       */
+      reason: "preempt" | "worker_down" | "cancel";
+      /** Run Id */
+      run_id: string;
+      /** Task */
+      task: string;
+    };
     /** SubmitRecord */
     SubmitRecord: {
       /** Deadline */
@@ -976,6 +1805,7 @@ export interface components {
       constraints?: {
         [key: string]: string;
       };
+      container?: components["schemas"]["ContainerSpec"] | null;
       /** Deadline */
       deadline?: number | null;
       /**
@@ -984,7 +1814,9 @@ export interface components {
        */
       dependencies?: string[];
       /** Duration */
-      duration: number;
+      duration?: number | null;
+      /** Estimate */
+      estimate?: number | components["schemas"]["EstimateIn"] | null;
       /** Id */
       id: string;
       /**
@@ -1020,6 +1852,7 @@ export interface components {
       resources?: {
         [key: string]: number;
       };
+      scaling?: components["schemas"]["ScalingIn"] | null;
     };
     /** TaskOut */
     TaskOut: {
@@ -1041,6 +1874,16 @@ export interface components {
      */
     TaskStatus:
       "PENDING" | "READY" | "RUNNING" | "SUCCEEDED" | "FAILED" | "INFEASIBLE" | "BLOCKED" | "CANCELLED";
+    /**
+     * Usage
+     * @description Сколько контейнер потребляет сейчас.
+     */
+    Usage: {
+      /** Cpu Milli */
+      cpu_milli: number;
+      /** Ram Mb */
+      ram_mb: number;
+    };
     /** ValidationError */
     ValidationError: {
       /** Context */
@@ -1168,6 +2011,8 @@ export interface components {
     };
     /** WorkerIn */
     WorkerIn: {
+      /** Agent */
+      agent?: string | null;
       /** Id */
       id: string;
       /**
@@ -1181,6 +2026,20 @@ export interface components {
       resources: {
         [key: string]: number;
       };
+      /**
+       * Speed
+       * @default 1
+       */
+      speed?: number;
+    };
+    /** WorkerLive */
+    WorkerLive: {
+      /** Agent */
+      agent: string;
+      /** Dropped */
+      dropped: boolean;
+      /** Up */
+      up: boolean;
     };
     /** WorkerRecord */
     WorkerRecord: {
@@ -1205,6 +2064,368 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  agents_v1_agents_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AgentsOut"];
+        };
+      };
+    };
+  };
+  events_v1_agents__agent_id__events_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        agent_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["EventsBatch"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EventsAck"];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+    };
+  };
+  hello_v1_agents__agent_id__hello_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        agent_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Hello"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HelloAck"];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+    };
+  };
+  poll_v1_agents__agent_id__poll_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        agent_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Poll"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PollReply"];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+    };
+  };
+  live_runs_v1_live_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LiveRunsOut"];
+        };
+      };
+    };
+  };
+  local_agents_v1_local_agents_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LocalAgentsOut"];
+        };
+      };
+    };
+  };
+  start_local_agent_v1_local_agents_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LocalAgentIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LocalAgentOut"];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+    };
+  };
+  stop_local_agent_v1_local_agents__agent_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        agent_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+    };
+  };
   policies_v1_policies_get: {
     parameters: {
       query?: never;
@@ -1278,6 +2499,15 @@ export interface operations {
           "application/json": components["schemas"]["RunOut"];
         };
       };
+      /** @description Accepted */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LiveStarted"];
+        };
+      };
       /** @description Bad Request */
       400: {
         headers: {
@@ -1287,8 +2517,26 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };
@@ -1372,8 +2620,26 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };
@@ -1428,6 +2694,134 @@ export interface operations {
       };
     };
   };
+  actions_v1_runs__run_id__actions_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        run_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          [key: string]: unknown;
+        };
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LiveOut"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+    };
+  };
+  containers_v1_runs__run_id__containers_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        run_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LiveOut"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+    };
+  };
+  container_logs_v1_runs__run_id__containers__task___attempt__logs_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        run_id: string;
+        task: string;
+        attempt: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LogsOut"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+    };
+  };
   get_events_v1_runs__run_id__events_get: {
     parameters: {
       query?: {
@@ -1460,8 +2854,26 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };
@@ -1549,8 +2961,26 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };
@@ -1638,8 +3068,26 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };
@@ -1723,8 +3171,129 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Request Entity Too Large */
+      413: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Internal Server Error */
+      500: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Gateway Timeout */
+      504: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+    };
+  };
+  replay_run_v1_runs__run_id__replay_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        run_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ReplayOut"];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };
@@ -1828,8 +3397,26 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };
@@ -1917,8 +3504,26 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };
@@ -2004,8 +3609,26 @@ export interface operations {
           "application/json": components["schemas"]["ErrorOut"];
         };
       };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorOut"];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };

@@ -2,7 +2,7 @@ import { type ChangeEvent, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { api } from "../api/client";
-import { useCreateRun, useScenarios } from "../api/hooks";
+import { useCreateRun, useScenarios, useStartOnAgents } from "../api/hooks";
 import type { Validation } from "../api/types";
 import { Canvas } from "../builder/Canvas";
 import { CheckStrip, PolicySettings } from "../builder/Checks";
@@ -50,26 +50,38 @@ export function BuilderPage() {
   );
 }
 
-/** Запуск черновика: новый прогон сразу открывается на своей странице. */
+/** Запуск черновика: прогон открывается на своей странице, прогон на агентах — на экране «Контейнеры». */
 function RunButton({ validation }: { validation: Validation | undefined }) {
   const { draft } = useDraft();
   const navigate = useNavigate();
   const run = useCreateRun();
-  const blocked = draft.tasks.length === 0 || validation?.valid === false;
+  const start = useStartOnAgents();
+  const onAgents = draft.mode === "emulate" || draft.mode === "shadow";
+  const blocked = draft.tasks.length === 0 || validation?.valid === false || draft.mode === "replay";
+  const pending = run.isPending || start.isPending;
+  const error = run.error ?? start.error;
+  const launch = () =>
+    onAgents
+      ? start.mutate({ problem: draft }, { onSuccess: (r) => void navigate(`/containers/${r.run_id}`) })
+      : run.mutate({ problem: draft }, { onSuccess: (r) => void navigate(`/runs/${r.run_id}`) });
   return (
     <div className={styles.run}>
       <Button
-        disabled={blocked || run.isPending}
-        title={blocked ? "Сначала исправьте ошибки входа" : undefined}
-        onClick={() =>
-          run.mutate({ problem: draft }, { onSuccess: (r) => void navigate(`/runs/${r.run_id}`) })
+        disabled={blocked || pending}
+        title={
+          draft.mode === "replay"
+            ? "Replay проигрывает сохранённый прогон, а не черновик"
+            : blocked
+              ? "Сначала исправьте ошибки входа"
+              : undefined
         }
+        onClick={launch}
       >
-        {run.isPending ? "Запускаю…" : "Запустить"}
+        {pending ? "Запускаю…" : onAgents ? "Запустить на агентах" : "Запустить"}
       </Button>
-      {run.isError && (
+      {error && (
         <p role="alert" className={styles.error}>
-          {run.error.message}
+          {error.message}
         </p>
       )}
     </div>

@@ -41,9 +41,10 @@ const server = setupServer(
           metrics: {
             makespan,
             mean_wait: wait,
-            utilization_gpu: 6.6 / makespan,
-            lost_work_gpu: 0,
+            utilization: { gpu: 6.6 / makespan },
+            lost_work: { gpu: 0 },
             deadline_misses: { critical: 0, high: 0, normal: 0, low: 0 },
+            score: { objective: "weighted", key: [makespan] },
           },
         },
       },
@@ -74,6 +75,9 @@ describe("ComparePage", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("backfill — 3 политики, детерминированно")).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("cpsat: нет решателя");
+    expect(
+      screen.getByText("По цели (взвешенное опоздание плюс makespan): 1 — fifo; 2 — priority."),
+    ).toBeVisible();
     expect(screen.getByRole("button", { name: "fifo: 11 ч" })).toHaveAttribute("aria-pressed", "true");
 
     await userEvent.click(screen.getByRole("radio", { name: "Загрузка" }));

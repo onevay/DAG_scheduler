@@ -164,9 +164,11 @@ export function comparisonRows(results: Readonly<Record<string, Result>>) {
       gapToLb: m?.gap_to_lb ?? null,
       deadlineMisses: m ? Object.values(m.deadline_misses).reduce((s, v) => s + v, 0) : null,
       weightedTardiness: m?.weighted_tardiness ?? null,
-      utilizationGpu: m?.utilization_gpu ?? null,
-      lostWorkGpu: m?.lost_work_gpu ?? null,
+      utilization: m?.utilization ?? null,
+      lostWork: m?.lost_work ?? null,
       meanWait: m?.mean_wait ?? null,
+      objective: m?.score.objective ?? null,
+      score: m?.score.key ?? null,
       violations: r.violations.length,
     };
   });

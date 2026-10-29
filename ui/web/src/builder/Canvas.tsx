@@ -19,6 +19,7 @@ import { Icon, type IconName } from "../shell/Icon";
 import styles from "./Canvas.module.css";
 import { graphEdges, graphTasks, layeredLayout, type XY } from "./graph";
 import { type TaskFlowNode, TaskNode } from "./TaskNode";
+import { formatResources } from "../ui/resources";
 
 const NODE_TYPES = { task: TaskNode };
 const KINDS: readonly TaskKind[] = ["data", "train", "eval", "infer", "other"];
@@ -70,7 +71,6 @@ function Board({ selected, onSelect, criticalPath, invalid, lowerBound }: Canvas
       const before = new Map(prev.map((n) => [n.id, n]));
       return tasks.map(({ task, submitted }): TaskFlowNode => {
         const old = before.get(task.id);
-        const gpu = task.resources?.gpu ?? 0;
         return {
           ...old,
           id: task.id,
@@ -78,7 +78,7 @@ function Board({ selected, onSelect, criticalPath, invalid, lowerBound }: Canvas
           position: old?.position ?? dropped.current.get(task.id) ?? layout.get(task.id) ?? { x: 0, y: 0 },
           selected: task.id === selected,
           deletable: !submitted,
-          ariaLabel: `${task.id}, ${task.duration} ${unit}, ${gpu} GPU${submitted ? ", подаётся во время прогона" : ""}`,
+          ariaLabel: `${task.id}, ${task.duration} ${unit}, ${formatResources(task.resources)}${submitted ? ", подаётся во время прогона" : ""}`,
           data: { task, submitted, invalid: invalid.has(task.id), unit },
         };
       });

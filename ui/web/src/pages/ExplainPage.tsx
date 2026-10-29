@@ -51,7 +51,7 @@ export function ExplainPage() {
       </PageHeader>
     );
   }
-  const workers = problem.data.cluster.workers.map((w) => ({ id: w.id, gpu: w.resources.gpu ?? 0 }));
+  const workers = problem.data.cluster.workers.map((w) => ({ id: w.id, capacity: w.resources }));
   return (
     <>
       <PageHeader title={`Почему ${makespan} ${unit}`} badge={crumb} actions={actions} />

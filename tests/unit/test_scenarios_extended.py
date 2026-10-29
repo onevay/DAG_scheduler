@@ -19,7 +19,7 @@ def outcome(name, policy=None, **settings):
 
 
 def idle_codes(result):
-    return {code for code, value in result["explain"]["idle"]["by_code"].items() if value}
+    return {code for code, value in result["explain"]["idle"]["by_code"]["gpu"].items() if value}
 
 
 def statuses(result):
@@ -39,6 +39,10 @@ def statuses(result):
         ("invalid_mix", "PARTIAL"),
         ("ml_platform", "OK"),
         ("priority_preemption", "OK"),
+        ("laptop", "OK"),
+        ("criu_pairs", "OK"),
+        ("two_machines", "OK"),
+        ("ml_hetero", "OK"),
     ],
 )
 @pytest.mark.parametrize("policy", POLICIES)
@@ -112,6 +116,31 @@ def test_urgent_work_without_deadlines_preempts_the_cheapest_background_job():
     assert out.result["metrics"]["makespan"] == waiting.result["metrics"]["makespan"] == 15
 
 
+def test_laptop_without_gpu_waits_for_memory_not_for_cores():
+    """Один ноутбук без GPU: train_small ждёт с 25 до 35 не ядер (6 свободны), а памяти — 12 ГБ из 16
+    держит embed_index. Метрики и простой — по cpu и ram_mb, GPU в них нет."""
+    result = outcome("laptop").result
+    assert result["tasks"]["train_small"]["waits"][-1] == {
+        "code": "WAIT_RESOURCES",
+        "from": 25,
+        "to": 35,
+        "detail": {"need": {"cpu": 6, "ram_mb": 6144}, "best": {"laptop": {"cpu": 6, "ram_mb": 4096}}},
+    }
+    idle = result["explain"]["idle"]
+    assert {
+        "worker": "laptop",
+        "from": 25,
+        "to": 35,
+        "code": "IDLE_FRAGMENTATION",
+        "free": {"cpu": 6, "ram_mb": 4096},
+        "detail": {},
+    } in idle["intervals"]
+    assert idle["by_code"]["cpu"]["IDLE_FRAGMENTATION"] == 60  # 6 ядер × 10 мин
+    metrics = result["metrics"]
+    assert (metrics["makespan"], metrics["lower_bound"]) == (90, 80)
+    assert set(metrics["utilization"]) == set(metrics["lost_work"]) == {"cpu", "ram_mb"}
+
+
 def test_cascade_of_failures():
     """Два отказа подряд у train_main, хрупкая задача без ретраев падает, узел B не возвращается."""
     out = outcome("cascade")
@@ -131,7 +160,7 @@ def test_cascade_of_failures():
     assert main[:2] == [("node-A", 0, "INT"), ("node-C", 2, "INT")] and main[2][2] == "DONE"
     (stuck,) = [r for r in out.events if r["type"] == "DIAGNOSTIC"]
     assert (stuck["task"], stuck["code"], stuck["detail"]["eligible"]) == ("rack_b_smoke", "E050", ["node-B"])
-    assert result["metrics"]["lost_work_gpu"] == 12  # по 3 ч у двух задач на 2 GPU без чекпоинтов
+    assert result["metrics"]["lost_work"]["gpu"] == 12  # по 3 ч у двух задач на 2 GPU без чекпоинтов
 
 
 def test_urgent_tasks_preempt_background_work_once():

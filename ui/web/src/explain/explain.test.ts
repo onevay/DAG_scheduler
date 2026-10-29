@@ -34,15 +34,16 @@ describe("explain", () => {
   it("puts the widest idle reason into every hour and marks partial idle", () => {
     const grid = idleGrid(
       [
-        { worker: "a", from: 0, to: 2, code: "IDLE_NO_READY", gpu: 4, detail: {} },
-        { worker: "a", from: 1, to: 3, code: "IDLE_DOWN", gpu: 2, detail: {} },
-        { worker: "b", from: 2, to: 3, code: "IDLE_RESERVED", gpu: 1, detail: {} },
+        { worker: "a", from: 0, to: 2, code: "IDLE_NO_READY", free: { gpu: 4 }, detail: {} },
+        { worker: "a", from: 1, to: 3, code: "IDLE_DOWN", free: { gpu: 2 }, detail: {} },
+        { worker: "b", from: 2, to: 3, code: "IDLE_RESERVED", free: { gpu: 1 }, detail: {} },
       ],
       [
-        { id: "a", gpu: 4 },
-        { id: "b", gpu: 2 },
+        { id: "a", capacity: { gpu: 4 } },
+        { id: "b", capacity: { gpu: 2 } },
       ],
       4,
+      "gpu",
     );
     expect(
       grid.map((r) => [r.worker, r.cells.map((c) => (c.code ? `${c.code}${c.part ? "~" : ""}` : "-"))]),
@@ -56,6 +57,7 @@ describe("explain", () => {
     const { rows, total, insight } = codeSummary(
       { IDLE_DOWN: 40, IDLE_NO_READY: 89, IDLE_FRAGMENTATION: 0 },
       "ч",
+      "gpu",
     );
     expect(rows).toEqual([
       ["IDLE_NO_READY", 89],
@@ -65,6 +67,9 @@ describe("explain", () => {
     expect(insight).toBe(
       "Больше всего простоя — IDLE_NO_READY: 89 из 129 GPU·ч (нет готовых задач, подходящих узлу).",
     );
-    expect(codeSummary({ IDLE_DOWN: 0 }, "ч").insight).toBe("GPU не простаивали.");
+    expect(codeSummary({ IDLE_DOWN: 0 }, "ч", "gpu").insight).toBe("GPU не простаивали.");
+    expect(codeSummary({ IDLE_FRAGMENTATION: 61440 }, "мин", "ram_mb").insight).toBe(
+      "Больше всего простоя — IDLE_FRAGMENTATION: 60 из 60 ГБ·мин (готовая задача не помещается в свободное место).",
+    );
   });
 });

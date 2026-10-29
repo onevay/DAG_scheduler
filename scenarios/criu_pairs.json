@@ -1,0 +1,26 @@
+{
+  "name": "criu_pairs",
+  "time_unit": "minute",
+  "cluster": {
+    "workers": [
+      {"id": "pair0", "resources": {"cpu": 1, "ram_mb": 1024}},
+      {"id": "pair1", "resources": {"cpu": 1, "ram_mb": 1024}},
+      {"id": "pair2", "resources": {"cpu": 1, "ram_mb": 1024}},
+      {"id": "pair3", "resources": {"cpu": 1, "ram_mb": 1024}}
+    ]
+  },
+  "tasks": [
+    {"id": "prepare", "kind": "data", "duration": 10, "resources": {"cpu": 1, "ram_mb": 256}},
+    {"id": "train_a", "kind": "train", "duration": 40, "resources": {"cpu": 1, "ram_mb": 512},
+     "dependencies": ["prepare"], "checkpoint_interval": 10},
+    {"id": "train_b", "kind": "train", "duration": 30, "resources": {"cpu": 1, "ram_mb": 512},
+     "dependencies": ["prepare"], "checkpoint_interval": 10},
+    {"id": "sweep", "kind": "train", "duration": 20, "resources": {"cpu": 1, "ram_mb": 512},
+     "checkpoint_interval": 5},
+    {"id": "eval", "kind": "eval", "duration": 10, "resources": {"cpu": 1, "ram_mb": 256},
+     "dependencies": ["train_a", "train_b"]},
+    {"id": "report", "kind": "other", "duration": 5, "resources": {"cpu": 1, "ram_mb": 128},
+     "dependencies": ["eval", "sweep"]}
+  ],
+  "policy": {"name": "priority_backfill"}
+}

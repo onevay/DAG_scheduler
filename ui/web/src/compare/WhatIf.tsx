@@ -7,7 +7,7 @@ import { freeId } from "../draft/draft";
 import { ButtonLink } from "../ui/controls";
 import { plural, VARIANTS } from "../ui/plural";
 import styles from "./WhatIf.module.css";
-import { deltaNote, describe, headline, type Kind, KINDS, suggest } from "./interventions";
+import { deltaNote, describe, headline, type Kind, KINDS, largest, suggest } from "./interventions";
 
 const MAX = 16;
 
@@ -117,6 +117,8 @@ function AddIntervention({ problem, onAdd }: { problem: Problem; onAdd: (i: Inte
     ...(problem.events ?? []).flatMap((e) => e.task?.id ?? []),
   ];
   const workers = problem.cluster.workers.map((w) => w.id);
+  // Новый узел — копия самого крупного
+  const largestWorker = problem.cluster.workers.length > 0 ? largest(problem.cluster.workers) : undefined;
   const [kind, setKind] = useState<Kind>("set_checkpoint");
   const [task, setTask] = useState(tasks[0] ?? "");
   const [worker, setWorker] = useState(workers[0] ?? "");
@@ -127,7 +129,9 @@ function AddIntervention({ problem, onAdd }: { problem: Problem; onAdd: (i: Inte
   const build = (): Intervention | null => {
     switch (kind) {
       case "add_worker":
-        return { kind, worker: { id: freeId("node", workers), resources: { gpu: value ?? 4 } } };
+        return largestWorker
+          ? { kind, worker: { id: freeId("node", workers), resources: { ...largestWorker.resources } } }
+          : null;
       case "remove_failures":
         return worker ? { kind, worker } : null;
       case "set_checkpoint":
@@ -142,7 +146,6 @@ function AddIntervention({ problem, onAdd }: { problem: Problem; onAdd: (i: Inte
   };
   const next = build();
   const numberLabel = {
-    add_worker: "GPU (4)",
     set_checkpoint: "каждые (пусто — без)",
     set_priority: "приоритет 0–10 (10)",
     set_deadline: "момент (пусто — без)",

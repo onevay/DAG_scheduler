@@ -1,9 +1,9 @@
-"""Простой GPU по узлам и причинам, восстановленный из журнала прогона."""
+"""Простой ресурсов узлов по причинам, восстановленный из журнала прогона."""
 
 from __future__ import annotations
 
 import itertools
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
 from expsched.domain.models import Problem
@@ -14,13 +14,13 @@ Shape = tuple[Resources, tuple[str, ...]]  # требования задачи �
 
 
 def idle_intervals(problem: Problem, log: Sequence[Mapping[str, Any]], horizon: int) -> list[dict[str, Any]]:
-    """Интервалы `{worker, from, to, code, gpu, detail}` на [0, horizon), где на узле свободны GPU.
+    """Интервалы `{worker, from, to, code, free, detail}` на [0, horizon), где на узле что-то свободно.
 
-    Код — почему GPU свободны: IDLE_DOWN — узел недоступен; IDLE_NO_READY — нет готовых задач, которым
+    Код — почему ресурсы свободны: IDLE_DOWN — узел недоступен; IDLE_NO_READY — нет готовых задач, которым
     подходит узел; IDLE_FRAGMENTATION — такие задачи есть, но ни одна не помещается в свободное;
     IDLE_RESERVED — помещается, но место держит резерв (`detail`: head, t_res); IDLE_POLICY — помещается,
-    резерва нет, а политика её не запустила. `gpu` — сколько GPU свободно. Соседние интервалы с одинаковыми
-    кодом и `gpu` склеены. Учитываются только GPU: на узле без GPU простоя нет.
+    резерва нет, а политика её не запустила. `free` — свободные ресурсы узла (у недоступного — вся ёмкость),
+    только ненулевые. Соседние интервалы с одинаковыми кодом и `free` склеены.
     """
     tasks = problem.all_tasks()
     shape_of: dict[str, Shape] = {k: (t.resources, problem.eligible(t)) for k, t in tasks.items()}
@@ -47,34 +47,33 @@ def idle_intervals(problem: Problem, log: Sequence[Mapping[str, Any]], horizon: 
                 if w == worker:
                     used = used + need
             free = capacity - used
-            gpu = capacity.get("gpu") if worker in down else free.get("gpu")
-            if gpu == 0:
+            idle = dict((capacity if worker in down else free).items())
+            if not idle:
                 continue
             code, detail = _code(worker, free, down, ready, reserved)
             previous = last.get(worker)
             if (
                 previous
                 and previous["to"] == t
-                and (previous["code"], previous["gpu"], previous["detail"])
-                == (
-                    code,
-                    gpu,
-                    detail,
-                )
+                and (previous["code"], previous["free"], previous["detail"]) == (code, idle, detail)
             ):
                 previous["to"] = end
                 continue
-            interval = {"worker": worker, "from": t, "to": end, "code": code, "gpu": gpu, "detail": detail}
+            interval = {"worker": worker, "from": t, "to": end, "code": code, "free": idle, "detail": detail}
             out.append(interval)
             last[worker] = interval
     return out
 
 
-def idle_by_code(intervals: Sequence[Mapping[str, Any]]) -> dict[str, int]:
-    """GPU · время простоя по кодам; коды, которых не было, — с нулём."""
-    out = dict.fromkeys(CODES, 0)
+def idle_by_code(
+    intervals: Sequence[Mapping[str, Any]], resources: Iterable[str]
+) -> dict[str, dict[str, int]]:
+    """Простой по ресурсам и кодам в единицах ресурса × время; коды, которых не было, — с нулём."""
+    out = {r: dict.fromkeys(CODES, 0) for r in sorted(resources)}
     for i in intervals:
-        out[i["code"]] += i["gpu"] * (i["to"] - i["from"])
+        for resource, amount in i["free"].items():
+            if resource in out:
+                out[resource][i["code"]] += amount * (i["to"] - i["from"])
     return out
 
 

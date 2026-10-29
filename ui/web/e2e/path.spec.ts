@@ -1,3 +1,8 @@
+import { type ChildProcess, spawn } from "node:child_process";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
 
@@ -58,6 +63,27 @@ test("пример → сборка → прогон → объяснения �
   await expect(page.getByText("Makespan").locator("..")).toContainText("21 / 21 ч");
 });
 
+test("ноутбук без GPU: ресурсы, загрузка и простой по ядрам и памяти", async ({ page }) => {
+  await page.goto("/");
+  await page
+    .getByRole("region", { name: /Соберите DAG/ })
+    .getByRole("button", { name: /^laptop/ })
+    .click();
+  await expect(page.getByText("Вход корректен")).toBeVisible();
+  await expect(page.getByRole("group", { name: "train_small, 40 МИН, 6 CPU · 6 ГБ" })).toBeVisible();
+  await expect(page.getByText("395 CPU·мин работы")).toBeVisible();
+  await page.getByRole("button", { name: "Запустить" }).click();
+
+  await expect(page.getByRole("heading", { level: 1, name: "laptop" })).toBeVisible();
+  await expect(page.getByText("Загрузка CPU").locator("..")).toContainText("55");
+  await expect(page.getByText("Загрузка ОЗУ").locator("..")).toContainText("45");
+  await page.getByRole("link", { name: /^Почему 90/ }).click();
+  const idle = page.getByRole("region", { name: "Почему простаивают узлы" });
+  await idle.getByRole("radio", { name: "ОЗУ" }).click();
+  await expect(idle.getByText(/ГБ·мин/)).toBeVisible();
+  await checkScreen(page, "Объяснения: ноутбук");
+});
+
 test("остальные экраны доступны и не шире экрана", async ({ page }) => {
   for (const [path, heading] of [
     ["/", /Планируйте/],
@@ -69,4 +95,107 @@ test("остальные экраны доступны и не шире экра
     await expect(page.getByRole("heading", { level: 1 })).toContainText(heading);
     await checkScreen(page, path);
   }
+});
+
+/** Агент без контейнеров: работа идёт по часам стены в масштабе прогона. */
+function spawnAgent(id: string, cpu: number, ramMb: number): ChildProcess {
+  const root = resolve("../..");
+  const python = join(root, ".venv", process.platform === "win32" ? "Scripts/python.exe" : "bin/python");
+  const state = mkdtempSync(join(tmpdir(), `expsched-agent-${id}-`));
+  const args = ["-m", "expsched.agent", "--scheduler", String(test.info().project.use.baseURL), "--id", id];
+  return spawn(
+    python,
+    args.concat(["--runtime", "fake", "--cpu", String(cpu), "--ram-mb", String(ramMb), "--state", state]),
+    {
+      cwd: root,
+      env: { ...process.env, EXPSCHED_AGENT_TOKEN: "e2e-token" },
+      stdio: ["ignore", "ignore", "inherit"],
+    },
+  );
+}
+
+test.describe("на агенте fake", () => {
+  let agent: ChildProcess | undefined;
+
+  test.beforeAll(() => {
+    agent = spawnAgent("laptop", 8, 16384);
+  });
+
+  test.afterAll(() => {
+    agent?.kill();
+  });
+
+  test("shadow: контейнеры, план рядом с фактом, проигрывание журнала", async ({ page }) => {
+    await page.goto("/");
+    await page
+      .getByRole("region", { name: /Соберите DAG/ })
+      .getByRole("button", { name: /^laptop/ })
+      .click();
+    await expect(page.getByText("Вход корректен")).toBeVisible();
+    await page.goto("/containers");
+
+    await page.getByRole("radio", { name: "Shadow" }).click();
+    await page.getByRole("radio", { name: "100 мс" }).click();
+    await page.getByRole("button", { name: "Назначить узлам" }).click();
+    await page.getByRole("button", { name: "Запустить на агентах" }).click();
+
+    await expect(page).toHaveURL(/\/containers\/[0-9a-f]{16}$/);
+    await expect(page.getByText(/^закончен · момент модели \d+$/)).toBeVisible({ timeout: 60_000 });
+    await expect(
+      page.getByRole("button", { name: /^report, попытка 1 на laptop: завершён, 100%$/ }),
+    ).toBeVisible();
+    const plan = page.getByRole("region", { name: "План и факт", exact: true });
+    await expect(plan.getByText(/^Makespan: план 90 мин · факт \d+ мин/)).toBeVisible();
+    await checkScreen(page, "Контейнеры: прогон");
+    await page.getByRole("link", { name: "Открыть прогон" }).click();
+
+    await expect(page.getByRole("heading", { level: 1, name: "laptop" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "План и факт", exact: true })).toBeVisible();
+    const replay = page.getByRole("region", { name: "Проигрывание" });
+    await replay.getByRole("button", { name: "Проиграть журнал" }).click();
+    await expect(replay.getByRole("status")).toContainText("Решения совпали");
+    await checkScreen(page, "Прогон на агентах");
+  });
+});
+
+test.describe("на двух агентах fake", () => {
+  const agents: ChildProcess[] = [];
+
+  test.beforeAll(() => {
+    agents.push(spawnAgent("alpha", 4, 8192), spawnAgent("beta", 4, 8192));
+  });
+
+  test.afterAll(() => {
+    for (const agent of agents) agent.kill();
+  });
+
+  test("две машины: агенты на связи, у каждого узла свой, прогон до конца", async ({ page }) => {
+    await page.goto("/");
+    await page
+      .getByRole("region", { name: /Соберите DAG/ })
+      .getByRole("button", { name: /^two_machines/ })
+      .click();
+    await expect(page.getByText("Вход корректен")).toBeVisible();
+    await page.goto("/containers");
+
+    const agents = page.getByRole("list", { name: "Агенты" });
+    await expect(agents.getByRole("listitem", { name: "Агент alpha: на связи" })).toBeVisible();
+    await expect(agents.getByRole("listitem", { name: "Агент beta: на связи" })).toBeVisible();
+    await page.getByRole("radio", { name: "Эмуляция" }).click();
+    await page.getByRole("radio", { name: "100 мс" }).click();
+    // Пример уже называет агентов узлов — выбор показывает их
+    await expect(page.getByRole("combobox", { name: "Агент узла ws-1" })).toHaveValue("alpha");
+    await expect(page.getByRole("combobox", { name: "Агент узла ws-2" })).toHaveValue("beta");
+    await checkScreen(page, "Контейнеры: агенты");
+    await page.getByRole("button", { name: "Запустить на агентах" }).click();
+
+    await expect(page).toHaveURL(/\/containers\/[0-9a-f]{16}$/);
+    await expect(page.getByText(/^закончен · момент модели \d+$/)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole("button", { name: /на ws-1: завершён/ }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /на ws-2: завершён/ }).first()).toBeVisible();
+
+    await page.goto("/containers");
+    await expect(page.getByRole("link", { name: "two_machines" }).first()).toBeVisible();
+    await expect(page.getByText(/Эмуляция · закончен/).first()).toBeVisible();
+  });
 });

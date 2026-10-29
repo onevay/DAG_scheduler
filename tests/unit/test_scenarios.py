@@ -32,7 +32,7 @@ def test_failure_of_node_a():
     out = outcome("failure")
     result = out.result
     assert result["status"] == "OK" and result["violations"] == []
-    assert result["metrics"]["makespan"] == 22 and result["metrics"]["lost_work_gpu"] == 4  # 1 ч × 4 GPU
+    assert result["metrics"]["makespan"] == 22 and result["metrics"]["lost_work"]["gpu"] == 4  # 1 ч × 4 GPU
     assert pretrain_attempts(result) == [(1, "node-A", 2, 5, "INT", 2), (2, "node-B", 5, 11, "DONE", 0)]
     (interrupted,) = [r for r in out.events if r["type"] == "INTERRUPTED"]
     assert (interrupted["saved"], interrupted["lost"], interrupted["remaining"]) == (2, 1, 6)
@@ -43,7 +43,7 @@ def test_urgent_task_during_a_failure():
     result = out.result
     assert result["status"] == "OK" and result["violations"] == []
     assert result["metrics"]["makespan"] == 22
-    assert result["metrics"]["utilization_gpu"] == round(87 / 180, 4)  # node-A не считается, пока лежит
+    assert result["metrics"]["utilization"]["gpu"] == round(87 / 180, 4)  # node-A не считается, пока лежит
     urgent = result["tasks"]["urgent_eval"]
     assert (urgent["start"], urgent["finish"], urgent["tardiness"]) == (10, 13, 0)
     assert [(w["code"], w["from"], w["to"], w["detail"]) for w in urgent["waits"]] == [
@@ -71,7 +71,7 @@ def test_urgent_task_preempts_the_background_one():
     result = outcome("preemption").result
     assert result["status"] == "OK" and result["violations"] == []
     assert spans(result) == {"background": (0, 13), "urgent": (3, 5)}
-    assert result["metrics"]["lost_work_gpu"] == 2  # час после чекпоинта в 2, на 2 GPU
+    assert result["metrics"]["lost_work"]["gpu"] == 2  # час после чекпоинта в 2, на 2 GPU
     late = outcome("preemption", preemption="never").result
     assert spans(late)["urgent"] == (10, 12) and late["metrics"]["deadline_misses"]["critical"] == 1
 

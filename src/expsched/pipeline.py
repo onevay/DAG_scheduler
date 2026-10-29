@@ -3,25 +3,27 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, field, replace
 from typing import Any
 
 from expsched.analysis import analyze
 from expsched.contract.hashing import canonical_hash
 from expsched.contract.io_models import PolicyIn, ProblemIn, to_domain
-from expsched.domain.models import Problem, Task
+from expsched.domain.models import Problem, Task, time_for
 from expsched.domain.states import TaskStatus
+from expsched.engine.executor import Executor
 from expsched.engine.simulator import Simulator
+from expsched.estimate import Estimate, resolve
 from expsched.explain.chain import critical_chain, decompose
 from expsched.explain.idle import idle_by_code, idle_intervals
 from expsched.explain.waits import wait_intervals
 from expsched.metrics.metrics import metrics
 from expsched.policies.registry import make_policy
-from expsched.validation import quarantine, validate_problem
+from expsched.validation import Quarantine, quarantine, validate_problem
 from expsched.verify.attempts import attempts_from_log
 from expsched.verify.invariants import verify
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
 
 
 @dataclass(frozen=True)
@@ -35,6 +37,24 @@ def input_hash(problem: ProblemIn, policy: PolicyIn) -> str:
     return canonical_hash({"problem": problem.model_dump(mode="json"), "policy": policy.model_dump()})
 
 
+@dataclass(frozen=True)
+class Prepared:
+    """Вход после проверки и карантина — всё, чтобы запустить симулятор и потом собрать результат."""
+
+    problem: ProblemIn
+    config: PolicyIn
+    base: dict[str, Any]
+    validated: Problem
+    diagnostics: list[dict[str, Any]]
+    plan: Quarantine
+    forecast: bool
+    estimates: dict[str, Estimate] = field(default_factory=dict)  # задачи без длительности: чем их заменили
+
+    def simulator(self, executor: Executor | None = None) -> Simulator:
+        policy = make_policy(self.config, self.problem.seed)
+        return Simulator(self.plan.problem, policy, forecast=self.forecast, executor=executor)
+
+
 def run(problem: ProblemIn, policy: PolicyIn | None = None) -> RunResult:
     """Прогон входа политикой `policy` (по умолчанию — из входа).
 
@@ -43,13 +63,28 @@ def run(problem: ProblemIn, policy: PolicyIn | None = None) -> RunResult:
     Диагностики результата — это ошибки входа; то, что случилось во время прогона, видно в журнале.
     `replans` — None, если задач больше `max_forecast_tasks` и прогноз не строился.
     """
+    prepared = prepare(problem, policy)
+    if isinstance(prepared, RunResult):
+        return prepared
+    sim = prepared.simulator()
+    sim.run_all()
+    return conclude(prepared, sim)
+
+
+def prepare(
+    problem: ProblemIn, policy: PolicyIn | None = None, history: Mapping[str, Estimate] | None = None
+) -> Prepared | RunResult:
+    """Проверка и карантин входа; RunResult — вход не прошёл строгую проверку (INFEASIBLE)."""
     config = policy or problem.policy
     base = {
         "schema_version": SCHEMA_VERSION,
         "input_hash": input_hash(problem, config),
         "policy": config.name,
     }
-    validated, diagnostics = validate_problem(to_domain(problem), config.validation_mode)
+    resolved, estimates = resolve(problem, history)
+    validated, diagnostics = validate_problem(
+        _with_spread(to_domain(resolved), estimates), config.validation_mode
+    )
     found = [d.to_dict() for d in diagnostics]
     result: dict[str, Any]
     if validated is None:
@@ -69,24 +104,35 @@ def run(problem: ProblemIn, policy: PolicyIn | None = None) -> RunResult:
 
     plan = quarantine(validated, diagnostics)
     forecast = 0 < len(plan.problem.all_tasks()) <= config.max_forecast_tasks
-    sim = Simulator(plan.problem, make_policy(config), forecast=forecast)
-    log = sim.run_all()
+    return Prepared(resolved, config, base, validated, found, plan, forecast, estimates)
+
+
+def conclude(prepared: Prepared, sim: Simulator, exact: bool = True) -> RunResult:
+    """Результат законченного прогона симулятора. `exact=False` — длительности попыток взяты из жизни
+    (прогон на агентах): проверка I1 «попытка шла ровно остаток работы» не делается."""
+    base, config, plan, forecast = prepared.base, prepared.config, prepared.plan, prepared.forecast
+    log = sim.run_all()  # у законченного прогона событий нет: только итоговая диагностика
     status = {**plan.excluded, **sim.state.status}
     planned = {k: t for k, t in sim.state.tasks.items() if status[k] is not TaskStatus.INFEASIBLE}
+    fastest = max((w.speed for w in plan.problem.workers.values()), default=1)
+    if fastest > 1:  # граница должна остаться границей и на узлах быстрее эталона
+        planned = {k: replace(t, duration=time_for(t.duration, fastest)) for k, t in planned.items()}
     lower_bound = analyze(replace(plan.problem, tasks=planned)).lb if planned else None
-    scores = metrics(plan.problem, log, lower_bound)
+    scores = metrics(plan.problem, log, lower_bound, config.objective)
     result = {
         **base,
         "status": "OK" if set(status.values()) <= {TaskStatus.SUCCEEDED} else "PARTIAL",
         "result_hash": sim.journal.result_hash(),
         "attempts": [asdict(a) for a in attempts_from_log(log)],
-        "tasks": _task_summaries(validated.all_tasks() | sim.state.tasks, status, log),
+        "tasks": _task_summaries(prepared.validated.all_tasks() | sim.state.tasks, status, log),
         "metrics": scores,
         "explain": _explain(plan.problem, sim.state.tasks, log, scores["makespan"]),
         "replans": [r for r in log if r["type"] == "REPLAN"] if forecast else None,
-        "diagnostics": found,
-        "violations": verify(plan.problem, log, config.max_preemptions_per_task),
+        "diagnostics": prepared.diagnostics,
+        "violations": verify(plan.problem, log, config.max_preemptions_per_task, exact),
     }
+    if prepared.estimates:
+        result["estimates"] = {k: e.to_dict() for k, e in sorted(prepared.estimates.items())}
     return RunResult(result, log)
 
 
@@ -98,7 +144,10 @@ def _explain(
     return {
         "chain": chain,
         "decomposition": decompose(chain),
-        "idle": {"by_code": idle_by_code(idle), "intervals": idle},
+        "idle": {
+            "by_code": idle_by_code(idle, {r for w in problem.workers.values() for r in w.capacity}),
+            "intervals": idle,
+        },
     }
 
 
@@ -125,3 +174,15 @@ def _task_summaries(
             "waits": waits.get(key, []),
         }
     return out
+
+
+def _with_spread(problem: Problem, estimates: Mapping[str, Estimate]) -> Problem:
+    """Задачам без длительности — разброс их оценки: по нему политики берут осторожное окончание."""
+    if not estimates:
+        return problem
+
+    def spread(t: Task) -> Task:
+        return replace(t, spread=estimates[t.id].spread) if t.id in estimates else t
+
+    events = [replace(e, task=spread(e.task)) if e.task else e for e in problem.events]
+    return replace(problem, tasks={k: spread(t) for k, t in problem.tasks.items()}, events=events)

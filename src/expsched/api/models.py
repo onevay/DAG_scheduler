@@ -2,20 +2,23 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import Field
 
-from expsched.contract.io_models import EventIn, PolicyIn, PolicyName, ProblemIn, Strict
+from expsched.contract.agent import Usage
+from expsched.contract.io_models import EventIn, Id, PolicyIn, PolicyName, ProblemIn, Strict
 from expsched.contract.output_models import (
     AttemptOut,
     ChainLink,
     Decomposition,
     DiagnosticOut,
+    EstimateOut,
     EventRecord,
     IdleInterval,
     MetricsOut,
     ResultOut,
+    ShadowOut,
     WaitInterval,
 )
 from expsched.contract.whatif import Intervention
@@ -30,6 +33,11 @@ ErrorCode = Literal[
     "RUN_FAILED",  # прогон упал в рабочем процессе; подробности только в журнале сервера
     "NOT_FOUND",
     "METHOD_NOT_ALLOWED",
+    "FORBIDDEN",  # агентский API выключен или токен неверный
+    "EVENT_GAP",  # агент пропустил номер события; дослать с указанного
+    "RUN_IN_PROGRESS",  # прогон на агентах ещё идёт: результата пока нет
+    "AGENT_RUNNING",  # локальный агент с этим id уже идёт или их слишком много
+    "AGENT_NOT_READY",  # проверка локального агента не прошла: среда или связь не готовы
     "INTERNAL",  # ошибка сервера; подробности только в его журнале
 ]
 
@@ -141,3 +149,138 @@ class ErrorInfo(Strict):
 class ErrorOut(Strict):
     error: ErrorInfo
     diagnostics: list[DiagnosticOut] | None = None
+
+
+# ---- прогон на агентах ----
+
+
+class Divergence(Strict):
+    """Первое решение, в котором проигрывание разошлось с прогоном: `{t, type, task, worker, attempt}`."""
+
+    index: int
+    expected: dict[str, Any] | None  # решение в журнале прогона; None — проигрывание приняло лишнее
+    got: dict[str, Any] | None  # решение проигрывания; None — проигрывание приняло меньше решений
+
+
+class ReplayOut(Strict):
+    same: bool  # решения политики совпали
+    same_journal: bool  # совпал весь журнал (у прогона на агентах — обычно тоже)
+    decisions: int  # сколько решений в журнале прогона
+    divergence: Divergence | None
+
+
+class LiveStarted(Strict):
+    run_id: str
+    status: Literal["running", "done", "cancelled"]
+
+
+class ContainerOut(Strict):
+    """Попытка задачи на агенте: где идёт, что с ней и сколько работы сохранено."""
+
+    task: str
+    attempt: int
+    worker: str
+    agent: str
+    state: str  # sent, accepted, started или тип последнего события агента
+    container_id: str | None
+    resume_from: int
+    progress: int  # сохранено по последнему чекпоинту, в единицах модели
+    detail: str | None
+    usage: Usage | None = None  # последний замер агента, пока контейнер идёт; среда без замеров — None
+
+
+class AgentOut(Strict):
+    """Агент, который хоть раз представился этому серверу."""
+
+    id: str
+    runtime: str
+    version: str
+    capacity: dict[str, int]
+    max_containers: int
+    alive: bool  # опрашивал не дольше heartbeat_timeout_s назад
+    seen_s_ago: float  # сколько секунд назад был на связи
+    running: list[str]  # идущие попытки прогонов этого сервера: run:task:attempt
+
+
+class AgentsOut(Strict):
+    agents: list[AgentOut]
+    heartbeat_timeout_s: int
+
+
+class LocalAgentIn(Strict):
+    """Агент на машине сервера: id, среда и, если не автоматически, ёмкость под задачи."""
+
+    id: Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")]
+    runtime: Literal["docker", "podman", "fake"] = "docker"
+    cpu: Annotated[int, Field(ge=1, le=1024)] | None = None
+    ram_mb: Annotated[int, Field(ge=128, le=16_777_216)] | None = None
+    gpu: Annotated[int, Field(ge=0, le=64)] | None = None
+
+
+class LocalAgentOut(Strict):
+    id: str
+    runtime: Literal["docker", "podman", "fake"]
+    pid: int
+    alive: bool  # процесс идёт
+    exit_code: int | None  # процесс закончился с этим кодом
+    log: list[str]  # последние строки журнала процесса
+
+
+class LocalAgentsOut(Strict):
+    agents: list[LocalAgentOut]
+
+
+class LiveRunOut(Strict):
+    run_id: str
+    name: str | None
+    mode: Literal["emulate", "shadow"]
+    status: Literal["running", "done", "cancelled"]
+    now: int  # часы модели
+    containers: int  # попыток всего
+    running: int  # из них идут сейчас
+
+
+class LiveRunsOut(Strict):
+    """Прогоны на агентах, которые помнит этот сервер (до его перезапуска), — новые первыми."""
+
+    runs: list[LiveRunOut]
+
+
+class LogsOut(Strict):
+    """Журнал контейнера попытки: последние строки, что прислал агент (сервер помнит до 500)."""
+
+    lines: list[str]
+
+
+class WorkerLive(Strict):
+    agent: str
+    up: bool
+    dropped: bool  # уронен вручную
+
+
+class LiveOut(Strict):
+    run_id: str
+    status: Literal["running", "done", "cancelled"]
+    now: int  # часы модели
+    time_scale_ms: int
+    workers: dict[str, WorkerLive]
+    containers: list[ContainerOut]
+    shadow: ShadowOut | None = None  # режим shadow: план рядом с фактом на сейчас
+    estimates: dict[str, EstimateOut] = {}  # задачи без длительности: их оценки
+
+
+class CheckpointAction(Strict):
+    kind: Literal["checkpoint"]
+    task: Id
+
+
+class WorkerAction(Strict):
+    kind: Literal["worker_down", "worker_up"]
+    worker: Id
+
+
+class CancelAction(Strict):
+    kind: Literal["cancel"]
+
+
+Action = Annotated[CheckpointAction | WorkerAction | CancelAction, Field(discriminator="kind")]

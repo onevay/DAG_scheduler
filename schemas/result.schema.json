@@ -254,6 +254,52 @@
       "title": "DiagnosticOut",
       "type": "object"
     },
+    "EstimateOut": {
+      "additionalProperties": false,
+      "description": "Оценка работы задачи без длительности: логнормальное и откуда оно взято.",
+      "properties": {
+        "mean": {
+          "title": "Mean",
+          "type": "number"
+        },
+        "median": {
+          "title": "Median",
+          "type": "number"
+        },
+        "p80": {
+          "title": "P80",
+          "type": "number"
+        },
+        "source": {
+          "enum": [
+            "estimate",
+            "history",
+            "similar",
+            "kind"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "spread": {
+          "title": "Spread",
+          "type": "number"
+        },
+        "work": {
+          "title": "Work",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "median",
+        "spread",
+        "mean",
+        "p80",
+        "work",
+        "source"
+      ],
+      "title": "EstimateOut",
+      "type": "object"
+    },
     "ExplainOut": {
       "additionalProperties": false,
       "properties": {
@@ -281,7 +327,7 @@
     },
     "IdleInterval": {
       "additionalProperties": false,
-      "description": "На узле свободны `gpu` GPU с `from` до `to` по причине `code`.",
+      "description": "На узле свободны ресурсы `free` с `from` до `to` по причине `code`.",
       "properties": {
         "code": {
           "enum": [
@@ -299,14 +345,18 @@
           "title": "Detail",
           "type": "object"
         },
+        "free": {
+          "additionalProperties": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "minProperties": 1,
+          "title": "Free",
+          "type": "object"
+        },
         "from": {
           "minimum": 0,
           "title": "From",
-          "type": "integer"
-        },
-        "gpu": {
-          "minimum": 1,
-          "title": "Gpu",
           "type": "integer"
         },
         "to": {
@@ -324,7 +374,7 @@
         "from",
         "to",
         "code",
-        "gpu",
+        "free",
         "detail"
       ],
       "title": "IdleInterval",
@@ -335,16 +385,19 @@
       "properties": {
         "by_code": {
           "additionalProperties": {
-            "type": "integer"
-          },
-          "propertyNames": {
-            "enum": [
-              "IDLE_DOWN",
-              "IDLE_NO_READY",
-              "IDLE_FRAGMENTATION",
-              "IDLE_RESERVED",
-              "IDLE_POLICY"
-            ]
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "enum": [
+                "IDLE_DOWN",
+                "IDLE_NO_READY",
+                "IDLE_FRAGMENTATION",
+                "IDLE_RESERVED",
+                "IDLE_POLICY"
+              ]
+            },
+            "type": "object"
           },
           "title": "By Code",
           "type": "object"
@@ -381,9 +434,12 @@
           ],
           "title": "Gap To Lb"
         },
-        "lost_work_gpu": {
-          "title": "Lost Work Gpu",
-          "type": "integer"
+        "lost_work": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Lost Work",
+          "type": "object"
         },
         "lower_bound": {
           "anyOf": [
@@ -406,16 +462,22 @@
           "title": "Mean Wait",
           "type": "number"
         },
-        "utilization_gpu": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Utilization Gpu"
+        "score": {
+          "$ref": "#/$defs/Score"
+        },
+        "utilization": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Utilization",
+          "type": "object"
         },
         "weighted_tardiness": {
           "title": "Weighted Tardiness",
@@ -428,9 +490,10 @@
         "gap_to_lb",
         "deadline_misses",
         "weighted_tardiness",
-        "utilization_gpu",
-        "lost_work_gpu",
-        "mean_wait"
+        "utilization",
+        "lost_work",
+        "mean_wait",
+        "score"
       ],
       "title": "MetricsOut",
       "type": "object"
@@ -547,6 +610,159 @@
         "dropped"
       ],
       "title": "ReplanRecord",
+      "type": "object"
+    },
+    "Score": {
+      "additionalProperties": false,
+      "description": "Оценка по цели политики: `key` сравнивается поэлементно, меньше — лучше.",
+      "properties": {
+        "key": {
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 1,
+          "title": "Key",
+          "type": "array"
+        },
+        "objective": {
+          "enum": [
+            "lexicographic",
+            "weighted"
+          ],
+          "title": "Objective",
+          "type": "string"
+        }
+      },
+      "required": [
+        "objective",
+        "key"
+      ],
+      "title": "Score",
+      "type": "object"
+    },
+    "ShadowOut": {
+      "additionalProperties": false,
+      "description": "План (симуляция того же входа) рядом с фактом прогона на агентах.",
+      "properties": {
+        "causes": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Causes",
+          "type": "object"
+        },
+        "fact_makespan": {
+          "minimum": 0,
+          "title": "Fact Makespan",
+          "type": "integer"
+        },
+        "plan_makespan": {
+          "minimum": 0,
+          "title": "Plan Makespan",
+          "type": "integer"
+        },
+        "tasks": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ShadowTask"
+          },
+          "title": "Tasks",
+          "type": "object"
+        }
+      },
+      "required": [
+        "plan_makespan",
+        "fact_makespan",
+        "causes",
+        "tasks"
+      ],
+      "title": "ShadowOut",
+      "type": "object"
+    },
+    "ShadowTask": {
+      "additionalProperties": false,
+      "properties": {
+        "cause": {
+          "enum": [
+            "manual",
+            "failure",
+            "duration",
+            "upstream",
+            "decision",
+            "same",
+            "waiting"
+          ],
+          "title": "Cause",
+          "type": "string"
+        },
+        "fact_finish": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Fact Finish"
+        },
+        "fact_start": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Fact Start"
+        },
+        "finish_delta": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Finish Delta"
+        },
+        "plan_finish": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Plan Finish"
+        },
+        "plan_start": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Plan Start"
+        }
+      },
+      "required": [
+        "plan_start",
+        "plan_finish",
+        "fact_start",
+        "fact_finish",
+        "finish_delta",
+        "cause"
+      ],
+      "title": "ShadowTask",
       "type": "object"
     },
     "StartShift": {
@@ -716,6 +932,21 @@
       "title": "Diagnostics",
       "type": "array"
     },
+    "estimates": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/EstimateOut"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Estimates"
+    },
     "explain": {
       "anyOf": [
         {
@@ -747,6 +978,9 @@
         "fifo_skip",
         "priority",
         "priority_backfill",
+        "heft",
+        "peft",
+        "las",
         "cpsat"
       ],
       "title": "Policy",
@@ -779,9 +1013,20 @@
       "title": "Result Hash"
     },
     "schema_version": {
-      "const": "1.0",
+      "const": "1.1",
       "title": "Schema Version",
       "type": "string"
+    },
+    "shadow": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ShadowOut"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "status": {
       "enum": [

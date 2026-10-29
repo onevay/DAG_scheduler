@@ -5,8 +5,9 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
+from expsched.domain.models import p80_work, time_for
 from expsched.domain.resources import Resources
-from expsched.domain.snapshot import Decision, Snapshot
+from expsched.domain.snapshot import Decision, RunInfo, Snapshot
 from expsched.policies.base import best_fit
 from expsched.policies.priority import PriorityPolicy, queue_reason
 
@@ -67,13 +68,21 @@ def release_profile(
     snapshot: Snapshot, worker: str, started: Sequence[tuple[str, str]]
 ) -> list[tuple[int, Resources]]:
     """Когда и сколько освободится на узле: выполняющиеся задачи и стартовавшие в эту эпоху, по времени."""
+    # Попытка на агенте может идти дольше прогноза: раньше «сейчас» она уже не освободит узел
+    # Неизвестная работа берётся по квантилю 0,8: резерв, обещанный раньше, чем узел освободится, хуже
     profile = [
-        (run.end_pred, snapshot.tasks[k].resources)
+        (max(p80_end(snapshot, k, run), snapshot.t), snapshot.tasks[k].resources)
         for k, run in snapshot.running.items()
         if run.worker == worker
     ]
     profile += [
-        (snapshot.t + snapshot.rem[k], snapshot.tasks[k].resources) for k, w in started if w == worker
+        (
+            snapshot.t
+            + time_for(p80_work(snapshot.rem[k], snapshot.tasks[k].spread), snapshot.speed.get(w, 1)),
+            snapshot.tasks[k].resources,
+        )
+        for k, w in started
+        if w == worker
     ]
     return sorted(profile, key=lambda p: p[0])
 
@@ -84,22 +93,37 @@ def reservation(
     """Самый ранний момент, когда задача поместится на допустимый работающий узел; при равенстве — узел
     с меньшим id. None — допустимых работающих узлов нет или задача не поместится, даже когда они опустеют.
     """
-    need = snapshot.tasks[task_id].resources
     best: Reservation | None = None
     for worker in snapshot.eligible[task_id]:
         if not snapshot.up[worker]:
             continue
-        available = free[worker]
-        profile = release_profile(snapshot, worker, started)
-        for i, (t, released) in enumerate(profile):
-            available = available + released
-            if i + 1 < len(profile) and profile[i + 1][0] == t:
-                continue  # всё, что освобождается в один момент, учитывается вместе
-            if need.fits(available):
-                if best is None or t < best.t:
-                    best = Reservation(task_id, worker, t, available - need)
-                break
+        found = earliest(snapshot, task_id, worker, free, started)
+        if found is not None and (best is None or found[0] < best.t):
+            best = Reservation(task_id, worker, found[0], found[1])
     return best
+
+
+def earliest(
+    snapshot: Snapshot,
+    task_id: str,
+    worker: str,
+    free: Mapping[str, Resources],
+    started: Sequence[tuple[str, str]],
+) -> tuple[int, Resources] | None:
+    """Самый ранний момент, когда задача поместится на узел (сейчас — если помещается уже), и что тогда
+    останется свободным; None — не поместится, даже когда узел опустеет."""
+    need = snapshot.tasks[task_id].resources
+    available = free[worker]
+    if need.fits(available):
+        return snapshot.t, available - need
+    profile = release_profile(snapshot, worker, started)
+    for i, (t, released) in enumerate(profile):
+        available = available + released
+        if i + 1 < len(profile) and profile[i + 1][0] == t:
+            continue  # всё, что освобождается в один момент, учитывается вместе
+        if need.fits(available):
+            return t, available - need
+    return None
 
 
 def _not_delaying(
@@ -112,3 +136,11 @@ def _not_delaying(
     if not (ends_in_time or need.fits(held.extra)):
         allowed[held.worker] = Resources()
     return allowed
+
+
+def p80_end(snapshot: Snapshot, key: str, run: RunInfo) -> int:
+    """Осторожное окончание идущей попытки: при неизвестной работе — по её квантилю 0,8."""
+    spread = snapshot.tasks[key].spread
+    if spread == 0:
+        return run.end_pred
+    return run.start + time_for(p80_work(run.work or run.end_pred - run.start, spread), run.speed)

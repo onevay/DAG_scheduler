@@ -27,12 +27,14 @@ def result_of(scenario, **policy):
 
 
 def spans(intervals, worker):
-    return [(i["from"], i["to"], i["code"], i["gpu"]) for i in intervals if i["worker"] == worker]
+    return [
+        (i["from"], i["to"], i["code"], i["free"].get("gpu", 0)) for i in intervals if i["worker"] == worker
+    ]
 
 
 def test_idle_after_a_failure():
     idle = result_of("urgent_failure")["explain"]["idle"]
-    assert idle["by_code"] == {
+    assert idle["by_code"]["gpu"] == {
         "IDLE_DOWN": 40,  # node-A, 4 GPU с 5 до 15
         "IDLE_NO_READY": 89,
         "IDLE_FRAGMENTATION": 0,
@@ -48,7 +50,7 @@ def test_idle_held_by_a_reservation():
     held = [i for i in intervals if i["code"] == "IDLE_RESERVED"]
     assert [(i["from"], i["to"]) for i in held] == [(0, 1), (1, 3), (3, 4)]  # свободно 2, 1, 2 GPU
     assert all(i["detail"] == {"head": "big", "t_res": 4} for i in held)
-    assert result_of("backfill", name="fifo")["explain"]["idle"]["by_code"]["IDLE_RESERVED"] == 0
+    assert result_of("backfill", name="fifo")["explain"]["idle"]["by_code"]["gpu"]["IDLE_RESERVED"] == 0
 
 
 def test_fragmentation_and_policy(make_task, make_problem):
@@ -79,7 +81,8 @@ def test_busy_and_idle_add_up_to_capacity(random_problem, seed):
         if a.end is not None and a.start < horizon
     )
     capacity = sum(w.capacity.get("gpu") for w in problem.workers.values()) * horizon
-    assert busy + sum(idle_by_code(idle_intervals(problem, log, horizon)).values()) == capacity
+    idle = idle_by_code(idle_intervals(problem, log, horizon), {"gpu"})["gpu"]
+    assert busy + sum(idle.values()) == capacity
 
 
 def test_explain_view_narrows_every_list():

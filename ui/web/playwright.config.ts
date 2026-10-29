@@ -33,7 +33,13 @@ export default defineConfig({
   webServer: {
     command: `npm run build && uv run --project ../.. --extra api uvicorn expsched.api.app:app --host 127.0.0.1 --port ${PORT}`,
     url: `${URL}/v1/policies`,
-    env: { EXPSCHED_RUNS_DIR: runsDir, EXPSCHED_RUN_WORKERS: "2", EXPSCHED_WEB_DIR: resolve("dist") },
+    env: {
+      EXPSCHED_RUNS_DIR: runsDir,
+      EXPSCHED_RUN_WORKERS: "2",
+      EXPSCHED_WEB_DIR: resolve("dist"),
+      // Прогон на агентах: агента `fake` проверка запускает сама
+      EXPSCHED_AGENT_TOKEN: "e2e-token",
+    },
     reuseExistingServer: false,
     timeout: 180_000,
   },

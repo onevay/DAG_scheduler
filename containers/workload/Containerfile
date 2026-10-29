@@ -1,0 +1,6 @@
+# Встроенная нагрузка агента: python:3.12-slim и один файл, непривилегированный пользователь.
+# Сборка из корня репозитория: make workload-image
+FROM python:3.12-slim
+COPY --chmod=0444 src/expsched/agent/workload.py /workload.py
+USER 65532:65532
+ENTRYPOINT ["python", "/workload.py"]

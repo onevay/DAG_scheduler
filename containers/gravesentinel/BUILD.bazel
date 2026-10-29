@@ -1,0 +1,59 @@
+package(default_visibility = ["//visibility:private"])
+
+config_setting(
+    name = "sanitizer_enabled",
+    define_values = {"gravesentinel_sanitizer": "true"},
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "distribution_files",
+    srcs = [
+        ".bazelignore",
+        ".bazelrc",
+        ".bazelversion",
+        ".clang-format",
+        ".gitignore",
+        "MODULE.bazel",
+        "README.md",
+    ],
+)
+
+filegroup(
+    name = "clang_format_config",
+    srcs = [".clang-format"],
+    visibility = ["//scripts:__pkg__"],
+)
+
+alias(
+    name = "hypervisor",
+    actual = "//src/hypervisor:gravesentinel_hypervisor",
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "scheduler_client",
+    hdrs = ["include/gravesentinel/scheduler_client.hxx"],
+    strip_include_prefix = "include",
+    deps = ["//src/client:scheduler_client"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "public_client_headers",
+    srcs = ["include/gravesentinel/scheduler_client.hxx"],
+    visibility = ["//scripts:__pkg__"],
+)
+
+test_suite(
+    name = "unit_tests",
+    tests = ["//tests/unit:unit_tests"],
+)
+
+test_suite(
+    name = "checks",
+    tests = [
+        "//scripts:clang_format_test",
+        "//tests/unit:unit_tests",
+    ],
+)

@@ -3,11 +3,11 @@ import { useState } from "react";
 import type { Worker } from "../api/types";
 import { useDraft } from "../draft/DraftContext";
 import { Icon } from "../shell/Icon";
-import { Stepper } from "../ui/controls";
 import styles from "./Cluster.module.css";
 import { defaultOutage, type Outage } from "./timeline";
+import { ResourceFields } from "../ui/ResourceFields";
 
-/** Узел кластера: GPU слотами, метки для ограничений задач, отказ «одной кнопкой». */
+/** Узел кластера: ядра, память и GPU (GPU ещё и слотами), метки для ограничений задач, отказ «одной кнопкой». */
 export function WorkerCard({
   worker,
   down,
@@ -60,20 +60,14 @@ export function WorkerCard({
         </span>
       </div>
 
-      <Stepper
-        label="GPU"
-        value={gpu}
-        min={0}
-        max={16}
-        onChange={(n) => update({ resources: { ...worker.resources, gpu: n } })}
-        less="Меньше GPU"
-        more="Больше GPU"
-      />
-      <div className={styles.slots} aria-hidden="true">
-        {Array.from({ length: Math.max(4, gpu) }, (_, i) => (
-          <span key={i} className={`${styles.slot} motion-data`} data-on={i < gpu} data-failing={failing} />
-        ))}
-      </div>
+      <ResourceFields value={worker.resources} onChange={(resources) => update({ resources })} of="узла" />
+      {gpu > 0 && (
+        <div className={styles.slots} aria-hidden="true">
+          {Array.from({ length: Math.max(4, gpu) }, (_, i) => (
+            <span key={i} className={`${styles.slot} motion-data`} data-on={i < gpu} data-failing={failing} />
+          ))}
+        </div>
+      )}
 
       <div className={styles.labels}>
         {labels.map(([k, v]) => (

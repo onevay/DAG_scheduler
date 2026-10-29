@@ -2,7 +2,16 @@ import { useState } from "react";
 
 import { usePolicies, usePolicyRuns } from "../api/hooks";
 import type { PolicyName, Problem, Result } from "../api/types";
-import { capsules, insight, METRICS, type MetricKey, profile } from "../compare/compare";
+import {
+  capsules,
+  insight,
+  METRICS,
+  type MetricKey,
+  objectiveInsight,
+  profile,
+  ranking,
+  rowResources,
+} from "../compare/compare";
 import styles from "../compare/Compare.module.css";
 import { Flower } from "../compare/Flower";
 import { WhatIf } from "../compare/WhatIf";
@@ -11,6 +20,7 @@ import { comparisonRows } from "../run/results";
 import { Button, ButtonLink, Segmented } from "../ui/controls";
 import { PageHeader } from "../ui/PageHeader";
 import { plural, POLICIES } from "../ui/plural";
+import { mainResource, resourceLabel } from "../ui/resources";
 
 const UNITS = { hour: "ч", minute: "мин", second: "с" } as const;
 const METRIC_OPTIONS = (Object.keys(METRICS) as MetricKey[]).map((k) => ({
@@ -28,6 +38,7 @@ export function ComparePage() {
   const names: PolicyName[] = policies.data?.policies ?? [];
   const runs = usePolicyRuns(problem, names);
   const [metric, setMetric] = useState<MetricKey>("makespan");
+  const [pickedResource, setResource] = useState<string | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
 
   const done = runs.flatMap((r, i) => (r.data ? [[names[i] as string, r.data] as const] : []));
@@ -36,7 +47,15 @@ export function ComparePage() {
   );
   const failed = runs.flatMap((r, i) => (r.error ? [`${names[i]}: ${r.error.message}`] : []));
   const pending = runs.some((r) => r.isFetching);
-  const selected = picked ?? rows[0]?.policy ?? null;
+  // По умолчанию открыт профиль лучшей по цели политики
+  const selected = picked ?? ranking(rows)[0]?.policy ?? rows[0]?.policy ?? null;
+  const byObjective = objectiveInsight(rows);
+  const resources = rowResources(rows);
+  const resource =
+    pickedResource && resources.includes(pickedResource)
+      ? pickedResource
+      : (mainResource(resources) ?? "gpu");
+  const perResource = (metric === "util" || metric === "lost") && resources.length > 1;
   const runOf = new Map(done.map(([name, run]) => [name, run.run_id]));
   const unit = UNITS[problem?.time_unit ?? "hour"];
   const stale = problem !== undefined && problem !== draft;
@@ -75,22 +94,30 @@ export function ComparePage() {
           <section aria-labelledby="compare-metric" className={styles.panel}>
             <div className={styles.head}>
               <h2 id="compare-metric" className={styles.h2}>
-                {METRICS[metric].title(unit)}
+                {METRICS[metric].title(unit, resource)}
               </h2>
               <Segmented label="Метрика" options={METRIC_OPTIONS} value={metric} onChange={setMetric} />
+              {perResource && (
+                <Segmented
+                  label="Ресурс"
+                  options={resources.map((r) => ({ value: r, label: resourceLabel(r) }))}
+                  value={resource}
+                  onChange={setResource}
+                />
+              )}
             </div>
             <div className={styles.capsules} aria-busy={pending}>
-              {capsules(rows, metric).map((c) => (
+              {capsules(rows, metric, resource).map((c) => (
                 <button
                   key={c.policy}
                   type="button"
                   className={styles.capsule}
                   aria-pressed={c.policy === selected}
-                  aria-label={`${c.policy}: ${c.value === null ? "нет метрик" : METRICS[metric].format(c.value, unit)}`}
+                  aria-label={`${c.policy}: ${c.value === null ? "нет метрик" : METRICS[metric].format(c.value, unit, resource)}`}
                   onClick={() => setPicked(c.policy)}
                 >
                   <span className={styles.pill}>
-                    {c.value === null ? "—" : METRICS[metric].format(c.value, unit)}
+                    {c.value === null ? "—" : METRICS[metric].format(c.value, unit, resource)}
                   </span>
                   <span
                     className={`${styles.bar} motion-data`}
@@ -109,7 +136,8 @@ export function ComparePage() {
                 {f}
               </p>
             ))}
-            {rows.length > 0 && <p className={styles.insight}>{insight(rows, metric, unit)}</p>}
+            {rows.length > 0 && <p className={styles.insight}>{insight(rows, metric, unit, resource)}</p>}
+            {byObjective && <p className={styles.insight}>{byObjective}</p>}
           </section>
 
           {selected && (
@@ -120,7 +148,7 @@ export function ComparePage() {
                 </h2>
                 <span className={styles.policy}>{selected}</span>
               </div>
-              <Flower policy={selected} scores={profile(rows, selected)} />
+              <Flower policy={selected} scores={profile(rows, selected, resource)} />
               <p className={styles.note}>
                 Чем длиннее лепесток, тем лучше: короче расписание, выше загрузка, меньше ожидания и потерь.
                 100% — лучшая среди политик.

@@ -235,3 +235,9 @@
   background: var(--color-surface-raised);
   color: var(--color-ink);
 }
+
+.resources {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-3);
+}

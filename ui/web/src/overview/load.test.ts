@@ -40,7 +40,7 @@ const RESULT = {
   explain: {
     idle: {
       by_code: {},
-      intervals: [{ worker: "a", from: 3, to: 6, code: "IDLE_DOWN", gpu: 4, detail: {} }],
+      intervals: [{ worker: "a", from: 3, to: 6, code: "IDLE_DOWN", free: { gpu: 4 }, detail: {} }],
     },
   },
 } as unknown as Result;

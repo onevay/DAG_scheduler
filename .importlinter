@@ -7,12 +7,14 @@ root_package = expsched
 name = Слои ядра
 type = layers
 layers =
-    expsched.api | (expsched.cli) | (expsched.io)
+    expsched.api | expsched.agent | (expsched.cli) | (expsched.io)
+    expsched.emulate
     expsched.pipeline
     expsched.explain | expsched.metrics
     expsched.verify
     expsched.engine | expsched.policies
     expsched.validation
+    expsched.estimate
     expsched.analysis | expsched.contract
     expsched.domain
 
@@ -24,3 +26,20 @@ source_modules = expsched.verify
 forbidden_modules =
     expsched.engine
     expsched.policies
+
+# Агент работает на другой машине и знает только протокол: ни движка, ни политик, ни API планировщика.
+[importlinter:contract:agent-knows-only-the-contract]
+name = Агент зависит только от контракта
+type = forbidden
+source_modules = expsched.agent
+forbidden_modules =
+    expsched.api
+    expsched.emulate
+    expsched.pipeline
+    expsched.explain
+    expsched.metrics
+    expsched.verify
+    expsched.engine
+    expsched.policies
+    expsched.validation
+    expsched.analysis

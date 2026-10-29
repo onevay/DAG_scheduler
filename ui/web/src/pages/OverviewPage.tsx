@@ -9,6 +9,7 @@ import { NewScenario } from "../overview/NewScenario";
 import styles from "../overview/Overview.module.css";
 import { MetricCard, PillMeter } from "../ui/data";
 import { NODES, plural, TASKS } from "../ui/plural";
+import { mainResource, resourceLabel, work } from "../ui/resources";
 
 const UNITS = { hour: "ч", minute: "мин", second: "с" } as const;
 
@@ -107,7 +108,8 @@ function RunOverview({ runId, result, problem }: { runId: string; result: Result
       </p>
     );
   const gap = gapLabel(m.makespan, m.lower_bound);
-  const util = m.utilization_gpu ?? 0;
+  const main = mainResource(Object.keys(m.utilization)) ?? "gpu";
+  const util = m.utilization[main] ?? 0;
   const misses = Object.values(m.deadline_misses).reduce((s, v) => s + v, 0);
 
   return (
@@ -121,9 +123,14 @@ function RunOverview({ runId, result, problem }: { runId: string; result: Result
           )}
           <PillMeter share={m.lower_bound ? m.lower_bound / m.makespan : 1} />
         </MetricCard>
-        <MetricCard label="Загрузка GPU" value={Math.round(util * 100)} unit="%" tone="accent">
+        <MetricCard
+          label={`Загрузка ${resourceLabel(main)}`}
+          value={Math.round(util * 100)}
+          unit="%"
+          tone="accent"
+        >
           <span className={styles.gap}>
-            пропущено дедлайнов {misses} · потеряно {m.lost_work_gpu} GPU·{unit}
+            пропущено дедлайнов {misses} · потеряно {work(main, m.lost_work[main] ?? 0, unit)}
           </span>
           <PillMeter share={util} tone="accent" />
         </MetricCard>

@@ -16,17 +16,49 @@ ResMap = dict[
     Annotated[int, Field(ge=0)],
 ]
 Id = Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")]
-PolicyName = Literal["fifo", "fifo_skip", "priority", "priority_backfill", "cpsat"]
+PolicyName = Literal["fifo", "fifo_skip", "priority", "priority_backfill", "heft", "peft", "las", "cpsat"]
 
 
 class Strict(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
 
+class ContainerSpec(Strict):
+    """Что агент запускает для попытки задачи; ресурсы задачи становятся лимитами контейнера."""
+
+    image: Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9._/:@-]{0,255}$")]
+    command: Annotated[list[Annotated[str, Field(max_length=4096)]], Field(max_length=64)] = []
+    env: Annotated[
+        dict[
+            Annotated[str, Field(pattern=r"^[A-Z_][A-Z0-9_]{0,63}$")], Annotated[str, Field(max_length=4096)]
+        ],
+        Field(max_length=64),
+    ] = {}
+
+
+class EstimateIn(Strict):
+    """Работа задачи, когда точно она неизвестна: логнормальное с медианой и разбросом (σ логарифма)."""
+
+    median: Annotated[float, Field(gt=0, le=10_000_000)]
+    spread: Annotated[float, Field(ge=0, le=3)] | None = None  # None — по виду задачи
+
+
+class ScalingIn(Strict):
+    """Как длительность задачи зависит от числа её CPU/GPU: закон Амдала (доля последовательной части)
+    или степенной (`n^-alpha`). Нужен, чтобы переносить наблюдения, сделанные при другом числе."""
+
+    law: Literal["amdahl", "power"] = "amdahl"
+    serial: Annotated[float, Field(ge=0, le=1)] | None = None
+    alpha: Annotated[float, Field(ge=0, le=1.5)] | None = None
+
+
 class TaskIn(Strict):
     id: Id
     kind: Literal["data", "train", "eval", "infer", "other"] = "other"
-    duration: Annotated[int, Field(ge=1)]
+    # Работа: время на узле со скоростью 1. Нет — длительность неизвестна (только для прогона на агентах)
+    duration: Annotated[int, Field(ge=1)] | None = None
+    estimate: Annotated[float, Field(gt=0, le=10_000_000)] | EstimateIn | None = None
+    scaling: ScalingIn | None = None
     resources: ResMap = {}
     priority: Annotated[int, Field(ge=0, le=10)] = 1
     deadline: Annotated[int, Field(ge=0)] | None = None
@@ -36,12 +68,15 @@ class TaskIn(Strict):
     checkpoint_interval: Annotated[int, Field(ge=1)] | None = None
     max_retries: Annotated[int, Field(ge=0, le=20)] = 2
     constraints: dict[str, str] = {}
+    container: ContainerSpec | None = None  # для прогона на агентах; без него — встроенная нагрузка-эмуляция
 
 
 class WorkerIn(Strict):
     id: Id
     resources: ResMap
     labels: dict[str, str] = {}
+    agent: Id | None = None  # агент, который запускает задачи этого узла при прогоне на агентах
+    speed: Annotated[float, Field(gt=0, le=100)] = 1.0  # во сколько раз узел быстрее эталона
 
 
 class EventIn(Strict):
@@ -68,6 +103,11 @@ class PolicyIn(Strict):
     # Прогноз перепланирования стоит как весь остаток прогона на каждом внешнем событии: на больших входах
     # он не строится. 0 — не строить никогда.
     max_forecast_tasks: Annotated[int, Field(ge=0)] = 1000
+    # Только для cpsat: бюджет решателя на одно решение в детерминированном времени (условных секундах).
+    # Бюджет, а не часы, делает журнал воспроизводимым на любой машине.
+    time_limit: Annotated[float, Field(gt=0, le=300)] = 5.0
+    # Только для cpsat: неизвестную работу задач планировать по квантилю 0,8, а не по среднему — осторожнее
+    robust: bool = False
     validation_mode: Literal["strict", "lenient"] = "lenient"
 
 
@@ -85,6 +125,8 @@ class ProblemIn(Strict):
     events: list[EventIn] = []
     policy: PolicyIn = PolicyIn()
     mode: Literal["simulate", "emulate", "shadow", "replay"] = "simulate"
+    # Для прогона на агентах: длительность единицы времени модели, мс (1000 — единица модели идёт секунду).
+    time_scale_ms: Annotated[int, Field(ge=1, le=3_600_000)] = 1000
 
     @model_validator(mode="after")
     def _ids_and_limits(self) -> ProblemIn:
@@ -93,10 +135,22 @@ class ProblemIn(Strict):
             raise ValueError("duplicate task id")
         if sum(len(t.dependencies) for t in self.tasks) > MAX_EDGES:
             raise ValueError("too many edges")
+        if self.mode not in ("emulate", "shadow"):
+            unknown = [t.id for t in self.all_tasks() if t.duration is None]
+            if unknown:
+                raise ValueError(
+                    f"tasks without duration: {', '.join(unknown[:5])}; give a duration, "
+                    "or run on agents (mode emulate or shadow) with an estimate"
+                )
         return self
+
+    def all_tasks(self) -> list[TaskIn]:
+        return [*self.tasks, *(e.task for e in self.events if e.task)]
 
 
 def to_task(t: TaskIn) -> Task:
+    if t.duration is None:
+        raise ValueError(f"task {t.id!r} has no duration: resolve estimates first (expsched.estimate)")
     return Task(
         id=t.id,
         duration=t.duration,
@@ -116,7 +170,8 @@ def to_task(t: TaskIn) -> Task:
 def to_domain(p: ProblemIn) -> Problem:
     events = [Event(e.time, EvType(e.type), e.worker, to_task(e.task) if e.task else None) for e in p.events]
     workers = {
-        w.id: Worker(w.id, Resources(w.resources), tuple(sorted(w.labels.items()))) for w in p.cluster.workers
+        w.id: Worker(w.id, Resources(w.resources), tuple(sorted(w.labels.items())), w.speed)
+        for w in p.cluster.workers
     }
     return Problem({t.id: to_task(t) for t in p.tasks}, workers, events, p.seed)
 

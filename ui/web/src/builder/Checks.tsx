@@ -8,6 +8,7 @@ import { NumberField, type Option, Segmented, Stepper } from "../ui/controls";
 import { Section } from "../ui/data";
 import styles from "./Checks.module.css";
 import { EDGES, plural, TASKS } from "../ui/plural";
+import { clusterResources, mainResource, work } from "../ui/resources";
 
 /** Итог проверки входа: статус, объём работы и диагностики по задачам; id задачи выбирает её на холсте. */
 export function CheckStrip({
@@ -21,7 +22,11 @@ export function CheckStrip({
   if (draft.tasks.length === 0) return null;
 
   const edges = draft.tasks.reduce((n, t) => n + (t.dependencies?.length ?? 0), 0);
-  const work = draft.tasks.reduce((n, t) => n + t.duration * (t.resources?.gpu ?? 0), 0);
+  const main = mainResource(clusterResources(draft.cluster.workers));
+  const total = main
+    ? draft.tasks.reduce((n, t) => n + (t.duration ?? 0) * (t.resources?.[main] ?? 0), 0)
+    : 0;
+  const timeUnit = draft.time_unit === "minute" ? "мин" : draft.time_unit === "second" ? "с" : "ч";
   const data = validation.data;
   const errors = data?.diagnostics.filter((d) => d.level === "error") ?? [];
   const warnings = (data?.diagnostics.length ?? 0) - errors.length;
@@ -57,10 +62,7 @@ export function CheckStrip({
         <span className={styles.counts}>
           <span>{plural(draft.tasks.length, TASKS)}</span>
           <span>{plural(edges, EDGES)}</span>
-          <span>
-            {work} GPU·{draft.time_unit === "minute" ? "мин" : draft.time_unit === "second" ? "с" : "ч"}{" "}
-            работы
-          </span>
+          {main && <span>{work(main, total, timeUnit)} работы</span>}
         </span>
       </div>
       {data && data.diagnostics.length > 0 && (
@@ -94,12 +96,20 @@ const POLICY_LABELS: Record<string, string> = {
   fifo_skip: "FIFO с пропуском",
   priority: "По приоритету",
   priority_backfill: "Приоритет + backfill",
+  heft: "HEFT",
+  peft: "PEFT",
+  las: "LAS (Tiresias)",
   cpsat: "CP-SAT",
 };
 
 const VALIDATION: readonly Option<NonNullable<Policy["validation_mode"]>>[] = [
   { value: "lenient", label: "мягкая" },
   { value: "strict", label: "строгая" },
+];
+
+const OBJECTIVE: readonly Option<NonNullable<Policy["objective"]>>[] = [
+  { value: "lexicographic", label: "сначала дедлайны" },
+  { value: "weighted", label: "взвешенная" },
 ];
 
 const UNITS = { hour: "ч", minute: "мин", second: "с" } as const;
@@ -174,6 +184,14 @@ export function PolicySettings() {
           onChange={(n) => set({ max_forecast_tasks: n ?? 0 })}
           hint="на входах больше этого прогноз не строится; 0 — не строить вовсе"
         />
+        {policy.name === "cpsat" && (
+          <NumberField
+            label="Бюджет решателя cpsat"
+            value={policy.time_limit}
+            onChange={(n) => set({ time_limit: n && n > 0 ? Math.min(n, 300) : 5 })}
+            hint="условные секунды на одно решение; больше — план лучше, но прогон дольше"
+          />
+        )}
         <div className={styles.labelled}>
           <span className={styles.detail}>Проверка входа</span>
           <Segmented
@@ -183,6 +201,18 @@ export function PolicySettings() {
             onChange={(validation_mode) => set({ validation_mode })}
           />
           <span className={styles.detail}>строгая — при любой ошибке входа прогон не запускается</span>
+        </div>
+        <div className={styles.labelled}>
+          <span className={styles.detail}>Цель</span>
+          <Segmented
+            label="Цель"
+            options={OBJECTIVE}
+            value={policy.objective ?? "lexicographic"}
+            onChange={(objective) => set({ objective })}
+          />
+          <span className={styles.detail}>
+            по ней сравниваются политики; сначала дедлайны — пропуски по классам, затем опоздание и makespan
+          </span>
         </div>
       </div>
     </Section>

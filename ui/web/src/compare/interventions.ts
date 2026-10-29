@@ -1,5 +1,6 @@
 import type { Intervention, Problem, WhatIf } from "../api/types";
 import { freeId } from "../draft/draft";
+import { formatResources, resourceLabel, sortResources, workAmount, workUnit } from "../ui/resources";
 
 export type Kind = Intervention["kind"];
 type Delta = NonNullable<WhatIf["variants"][number]["delta"]>;
@@ -17,7 +18,7 @@ export const KINDS: readonly { value: Kind; label: string }[] = [
 export function describe(i: Intervention, unit: string): string {
   switch (i.kind) {
     case "add_worker":
-      return `Ещё узел ${i.worker.id} на ${i.worker.resources.gpu ?? 0} GPU`;
+      return `Ещё узел ${i.worker.id}: ${formatResources(i.worker.resources)}`;
     case "set_checkpoint":
       return i.checkpoint_interval
         ? `Чекпоинт ${i.task} каждые ${i.checkpoint_interval} ${unit}`
@@ -45,21 +46,20 @@ export function suggest(problem: Problem): Intervention[] {
   for (const worker of failing) if (worker) out.push({ kind: "remove_failures", worker });
   const workers = problem.cluster.workers;
   if (workers.length > 0) {
-    const gpu = Math.max(...workers.map((w) => w.resources.gpu ?? 0));
     const id = freeId(
       "node",
       workers.map((w) => w.id),
     );
-    out.push({ kind: "add_worker", worker: { id, resources: { gpu } } });
+    out.push({ kind: "add_worker", worker: { id, resources: { ...largest(workers).resources } } });
   }
   const longest = [...problem.tasks]
-    .filter((t) => !t.checkpoint_interval && t.duration > 1)
-    .sort((a, b) => b.duration - a.duration)[0];
+    .filter((t) => !t.checkpoint_interval && (t.duration ?? 0) > 1)
+    .sort((a, b) => (b.duration ?? 0) - (a.duration ?? 0))[0];
   if (longest)
     out.push({
       kind: "set_checkpoint",
       task: longest.id,
-      checkpoint_interval: Math.max(1, Math.ceil(longest.duration / 4)),
+      checkpoint_interval: Math.max(1, Math.ceil((longest.duration ?? 4) / 4)),
     });
   return out.slice(0, 4);
 }
@@ -76,21 +76,35 @@ export function headline(
   return { text: `${signed(d)} ${unit}`, tone: d < 0 ? "good" : d > 0 ? "bad" : "same" };
 }
 
-const NOTES: [keyof Delta, string, (u: string) => string][] = [
-  ["lost_work_gpu", "потери", (u) => ` GPU·${u}`],
-  ["deadline_misses", "пропуски дедлайнов", () => ""],
-  ["mean_wait", "ожидание", (u) => ` ${u}`],
-  ["utilization_gpu", "загрузка", () => ""],
-];
+/** Самый крупный узел: по GPU, затем по ядрам, затем по памяти. */
+export function largest<W extends { resources: Readonly<Record<string, number>> }>(workers: readonly W[]): W {
+  const key = (w: W) => [w.resources.gpu ?? 0, w.resources.cpu ?? 0, w.resources.ram_mb ?? 0];
+  return [...workers].sort((a, b) => {
+    const [x, y] = [key(a), key(b)];
+    return (y[0] ?? 0) - (x[0] ?? 0) || (y[1] ?? 0) - (x[1] ?? 0) || (y[2] ?? 0) - (x[2] ?? 0);
+  })[0] as W;
+}
 
-/** Остальные изменившиеся метрики короткой строкой; загрузка — в процентных пунктах. */
+/** Остальные изменившиеся метрики короткой строкой: потери по ресурсам, пропуски, ожидание, загрузка в п.п. */
 export function deltaNote(delta: Delta | null, unit: string): string {
   if (!delta) return "вариант не дошёл до расписания";
-  const parts = NOTES.flatMap(([key, label, suffix]) => {
-    const v = delta[key];
-    if (v === undefined || v === 0) return [];
-    if (key === "utilization_gpu") return [`${label} ${signed(Math.round(v * 1000) / 10)} п.п.`];
-    return [`${label} ${signed(Math.round(v * 100) / 100)}${suffix(unit)}`];
-  });
+  const perResource = (prefix: string) =>
+    sortResources(Object.keys(delta).flatMap((k) => (k.startsWith(prefix) ? [k.slice(prefix.length)] : [])));
+  const changed = (key: string) => (delta[key] ?? 0) !== 0;
+  const parts = [
+    ...perResource("lost_work_").flatMap((r) => {
+      const v = delta[`lost_work_${r}`] ?? 0;
+      return changed(`lost_work_${r}`) ? [`потери ${signed(workAmount(r, v))} ${workUnit(r, unit)}`] : [];
+    }),
+    ...(changed("deadline_misses") ? [`пропуски дедлайнов ${signed(delta.deadline_misses ?? 0)}`] : []),
+    ...(changed("mean_wait")
+      ? [`ожидание ${signed(Math.round((delta.mean_wait ?? 0) * 100) / 100)} ${unit}`]
+      : []),
+    ...perResource("utilization_").flatMap((r) => {
+      const v = delta[`utilization_${r}`] ?? 0;
+      const label = perResource("utilization_").length > 1 ? `загрузка ${resourceLabel(r)}` : "загрузка";
+      return changed(`utilization_${r}`) ? [`${label} ${signed(Math.round(v * 1000) / 10)} п.п.`] : [];
+    }),
+  ];
   return parts.length ? parts.join(", ") : "остальные метрики не изменились";
 }

@@ -1,8 +1,9 @@
 import { Link, useParams, useSearchParams } from "react-router";
 
 import { ApiError } from "../api/client";
-import { useRun, useRunEvents, useRunProblem } from "../api/hooks";
+import { useReplay, useRun, useRunEvents, useRunProblem } from "../api/hooks";
 import type { Problem, Result } from "../api/types";
+import { PlanVsFact } from "../containers/PlanVsFact";
 import { replanRows, taskRows } from "../run/results";
 import { Schedule } from "../run/Schedule";
 import { Button, ButtonLink } from "../ui/controls";
@@ -10,6 +11,7 @@ import { StatusChip } from "../ui/data";
 import { downloadText, safeFileName } from "../ui/download";
 import { PageHeader } from "../ui/PageHeader";
 import styles from "./RunPage.module.css";
+import { mainResource, resourceLabel, sortResources, work } from "../ui/resources";
 
 const UNITS = { hour: "ч", minute: "мин", second: "с" } as const;
 const TRIGGERS: Record<string, string> = {
@@ -44,6 +46,8 @@ export function RunPage() {
       <Schedule key={runId} runId={runId} result={result} problem={problem.data} unit={unit} />
       <TaskTable result={result} />
       <ReplanTable result={result} unit={unit} />
+      {result.shadow && <PlanVsFact shadow={result.shadow} unit={unit} />}
+      <ReplayCheck runId={runId} unit={unit} />
     </>
   );
 }
@@ -100,19 +104,27 @@ function Metrics({ result, unit }: { result: Result; unit: string }) {
   const m = result.metrics;
   if (!m) return <p className={styles.note}>Метрик нет: прогон не дошёл до расписания ({result.status}).</p>;
   const misses = Object.values(m.deadline_misses).reduce((s, v) => s + v, 0);
-  const cards = [
+  const resources = sortResources(Object.keys(m.utilization));
+  const main = mainResource(resources);
+  const lost = resources
+    .filter((r) => (m.lost_work[r] ?? 0) > 0)
+    .map((r) => work(r, m.lost_work[r] ?? 0, unit));
+  const cards: { label: string; value: string | number; unit: string; accent?: boolean }[] = [
     {
       label: "Makespan",
       value: m.makespan,
       unit: m.lower_bound != null ? `/ ${m.lower_bound} ${unit}` : unit,
     },
-    {
-      label: "Загрузка GPU",
-      value: m.utilization_gpu != null ? Math.round(m.utilization_gpu * 100) : "—",
-      unit: "%",
-      accent: true,
-    },
-    { label: "Потеряно", value: m.lost_work_gpu, unit: `GPU·${unit}` },
+    ...resources.map((r) => {
+      const share = m.utilization[r];
+      return {
+        label: `Загрузка ${resourceLabel(r)}`,
+        value: share != null ? Math.round(share * 100) : "—",
+        unit: "%",
+        accent: r === main,
+      };
+    }),
+    { label: "Потеряно", value: lost.length ? lost.join(" · ") : "0", unit: lost.length ? "" : "работы" },
     { label: "Дедлайны", value: misses, unit: "пропущено" },
     { label: "Среднее ожидание", value: Number(m.mean_wait.toFixed(2)), unit },
   ];
@@ -218,6 +230,46 @@ function ReplanTable({ result, unit }: { result: Result; unit: string }) {
           </tbody>
         </table>
       </div>
+    </section>
+  );
+}
+
+/** Решение из журнала: `{t, type, task, worker, attempt}`. */
+function decision(d: Record<string, unknown> | null | undefined, unit: string) {
+  if (!d) return "решения нет";
+  return `${String(d.type)} ${String(d.task)}${d.worker ? ` на ${String(d.worker)}` : ""} в ${String(d.t)} ${unit}`;
+}
+
+/** Проигрывание прогона его же фактами: та же ли получается последовательность решений. */
+function ReplayCheck({ runId, unit }: { runId: string; unit: string }) {
+  const replay = useReplay(runId);
+  const r = replay.data;
+  return (
+    <section aria-labelledby="run-replay" className={styles.section}>
+      <h2 id="run-replay" className={styles.h2}>
+        Проигрывание
+      </h2>
+      <p className={styles.note}>
+        Журнал прогона подаётся политике заново теми же фактами в те же моменты, без контейнеров: совпали
+        решения — прогон воспроизводим.
+      </p>
+      <div className={styles.downloads}>
+        <Button variant="secondary" disabled={replay.isPending} onClick={() => replay.mutate()}>
+          {replay.isPending ? "Проигрываю…" : "Проиграть журнал"}
+        </Button>
+      </div>
+      {replay.isError && (
+        <p role="alert" className={styles.note}>
+          {replay.error.message}
+        </p>
+      )}
+      {r && (
+        <p role="status">
+          {r.same
+            ? `Решения совпали: ${r.decisions} из ${r.decisions}${r.same_journal ? ", журнал совпал целиком" : ", факты журнала отличаются"}.`
+            : `Расхождение на решении № ${(r.divergence?.index ?? 0) + 1} из ${r.decisions}: в прогоне — ${decision(r.divergence?.expected, unit)}, при проигрывании — ${decision(r.divergence?.got, unit)}.`}
+        </p>
+      )}
     </section>
   );
 }

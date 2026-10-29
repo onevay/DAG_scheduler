@@ -3,19 +3,27 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, Literal
 
-from expsched.domain.models import Problem
+from expsched.domain.models import Problem, time_for
 from expsched.domain.states import PriorityClass
 from expsched.verify.attempts import attempts_from_log, down_intervals
 
+Objective = Literal["lexicographic", "weighted"]
 
-def metrics(problem: Problem, log: Sequence[Mapping[str, Any]], lower_bound: int | None) -> dict[str, Any]:
-    """Сводка прогона: время, дедлайны, загрузка, потери, ожидание.
 
-    Дедлайн задачи, которая так и не завершилась, считается пропущенным. Загрузка GPU — полезная работа
-    завершённых задач, делённая на ёмкость работающих узлов за время прогона. Потерянная работа — то, что
-    прерванные попытки сделали после последнего чекпоинта, в GPU·единицах времени.
+def metrics(
+    problem: Problem,
+    log: Sequence[Mapping[str, Any]],
+    lower_bound: int | None,
+    objective: Objective = "lexicographic",
+) -> dict[str, Any]:
+    """Сводка прогона: время, дедлайны, загрузка, потери, ожидание и оценка по цели (`score`).
+
+    Дедлайн задачи, которая так и не завершилась, считается пропущенным. Загрузка и потери — по каждому
+    ресурсу кластера: загрузка — полезная работа завершённых задач, делённая на ёмкость работающих узлов за
+    время прогона (None, если ёмкости нет); потери — то, что прерванные попытки сделали после последнего
+    чекпоинта, в единицах ресурса × время.
     """
     tasks = problem.all_tasks()
     attempts = attempts_from_log(log)
@@ -37,28 +45,57 @@ def metrics(problem: Problem, log: Sequence[Mapping[str, Any]], lower_bound: int
         if end is not None:
             weighted_tardiness += 2 ** int(task.cls) * max(0, end - task.deadline)
 
-    useful = sum(tasks[k].duration * tasks[k].resources.get("gpu") for k in finish)
     outages = down_intervals(log)
-    capacity = sum(
-        w.capacity.get("gpu") * (makespan - _downtime(outages.get(w.id, []), makespan))
-        for w in problem.workers.values()
-    )
-    lost = sum(
-        (a.end - a.start - a.saved) * tasks[a.task].resources.get("gpu")
+    alive = {w.id: makespan - _downtime(outages.get(w.id, []), makespan) for w in problem.workers.values()}
+    speed = {w.id: w.speed for w in problem.workers.values()}
+    # Полезное время задачи — время, за которое её работа сделана: законченная попытка целиком, у прерванных —
+    # то, что ушло на сохранённую работу (на узле своей скорости)
+    worked: dict[str, int] = {}
+    for a in attempts:
+        if a.end is None or a.task not in finish:
+            continue
+        useful = a.end - a.start if a.outcome == "DONE" else time_for(a.saved, speed.get(a.worker, 1))
+        worked[a.task] = worked.get(a.task, 0) + useful
+    lost_time = [
+        (a.end - a.start - time_for(a.saved, speed.get(a.worker, 1)), tasks[a.task].resources)
         for a in attempts
         if a.outcome in ("INT", "PRE") and a.end is not None and a.task in tasks
-    )
-    waits = [finish[k] - ready[k] - tasks[k].duration for k in finish if k in ready]
+    ]
+    utilization: dict[str, float | None] = {}
+    lost: dict[str, int] = {}
+    for resource in sorted({r for w in problem.workers.values() for r in w.capacity}):
+        useful = sum(worked.get(k, 0) * tasks[k].resources.get(resource) for k in finish)
+        capacity = sum(w.capacity.get(resource) * alive[w.id] for w in problem.workers.values())
+        utilization[resource] = round(useful / capacity, 4) if capacity else None
+        lost[resource] = sum(time * need.get(resource) for time, need in lost_time)
+    waits = [finish[k] - ready[k] - worked.get(k, 0) for k in finish if k in ready]
     return {
         "makespan": makespan,
         "lower_bound": lower_bound,
         "gap_to_lb": round((makespan - lower_bound) / lower_bound, 4) if lower_bound else None,
         "deadline_misses": misses,
         "weighted_tardiness": weighted_tardiness,
-        "utilization_gpu": round(useful / capacity, 4) if capacity else None,
-        "lost_work_gpu": lost,
+        "utilization": utilization,
+        "lost_work": lost,
         "mean_wait": round(sum(waits) / len(waits), 3) if waits else 0,
+        "score": score(misses, weighted_tardiness, makespan, objective),
     }
+
+
+def score(
+    misses: Mapping[str, int], weighted_tardiness: int, makespan: int, objective: Objective
+) -> dict[str, Any]:
+    """Оценка прогона по цели: `key` сравнивается поэлементно, меньше — лучше.
+
+    lexicographic — пропуски дедлайнов по классам от critical до low, затем взвешенное опоздание, затем
+    makespan: один пропуск старшего класса хуже любых потерь младших. weighted — одно число: взвешенное
+    опоздание плюс makespan, где час опоздания critical-задачи стоит 8 часов makespan.
+    """
+    if objective == "weighted":
+        key = [weighted_tardiness + makespan]
+    else:
+        key = [*(misses[c.name.lower()] for c in reversed(PriorityClass)), weighted_tardiness, makespan]
+    return {"objective": objective, "key": key}
 
 
 def _downtime(outages: Sequence[tuple[int, int | None]], horizon: int) -> int:
