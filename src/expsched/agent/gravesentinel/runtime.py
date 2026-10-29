@@ -149,6 +149,10 @@ class GravesentinelRuntime:
         del self.attempts[key]
         self._save()
 
+    def kill(self, key: str) -> None:
+        """Сигнала гипервизору нет: контейнер останавливается и снимается, попытка пропадает (`lost`)."""
+        self.stop(key)
+
     def checkpoint(self, key: str) -> None:
         if key in self.attempts:
             self.attempts[key].requested = True

@@ -94,6 +94,7 @@ class Event:
     type: EvType
     worker: str | None = None
     task: Task | None = None
+    reason: str | None = None  # для журнала: почему узел упал или вернулся
 
 
 @dataclass(frozen=True)

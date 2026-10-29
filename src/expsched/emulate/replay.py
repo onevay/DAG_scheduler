@@ -95,7 +95,7 @@ def _fact(r: Mapping[str, Any]) -> Payload | None:
     if r["type"] == "ESTIMATE":
         return Reestimate(r["task"], r["attempt"], r["work"], r["spread"])
     if r["type"] in ("WORKER_DOWN", "WORKER_UP"):
-        return Event(r["t"], EvType(r["type"].lower()), worker=r["worker"])
+        return Event(r["t"], EvType(r["type"].lower()), worker=r["worker"], reason=r.get("reason"))
     return None
 
 

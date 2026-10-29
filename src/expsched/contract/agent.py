@@ -67,6 +67,8 @@ class StartCommand(AttemptRef):
     resume_from: Annotated[int, Field(ge=0)] = 0  # сколько работы сохранено чекпоинтами прежних попыток
     checkpoint_interval: Annotated[int, Field(ge=1)] | None = None
     time_scale_ms: Annotated[int, Field(ge=1)]
+    # Скорость узла из входа: настоящая среда её не меняет (узел быстр сам), fake ведёт по ней работу
+    speed: Annotated[float, Field(gt=0)] = 1.0
 
 
 class StopCommand(AttemptRef):
@@ -82,7 +84,15 @@ class CheckpointCommand(AttemptRef):
     command_id: Annotated[int, Field(ge=1)]
 
 
-Command = Annotated[StartCommand | StopCommand | CheckpointCommand, Field(discriminator="kind")]
+class KillCommand(AttemptRef):
+    """Убить контейнер попытки, как убивает его сбой: docker/podman — SIGKILL (код 137), gravesentinel —
+    остановка без сохранения. Попытка кончается событием `exited` или `lost`, а не `killed`: это сбой."""
+
+    kind: Literal["kill"]
+    command_id: Annotated[int, Field(ge=1)]
+
+
+Command = Annotated[StartCommand | StopCommand | CheckpointCommand | KillCommand, Field(discriminator="kind")]
 
 
 AttemptKey = Annotated[str, Field(pattern=r"^[0-9a-f]{16}:[A-Za-z0-9][A-Za-z0-9_.-]{0,127}:[1-9][0-9]{0,5}$")]

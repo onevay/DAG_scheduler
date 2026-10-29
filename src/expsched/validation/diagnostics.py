@@ -20,6 +20,8 @@ class Code(StrEnum):
     E050 = "E050"  # во время прогона не осталось работающего подходящего узла
     E070 = "E070"  # длительность задачи меньше 1
     W060 = "W060"  # дубликат ребра зависимости
+    W080 = "W080"  # хаос может исчерпать повторы задачи
+    W081 = "W081"  # хаос задан, но режим не на агентах
 
 
 TITLES: dict[Code, str] = {
@@ -34,6 +36,8 @@ TITLES: dict[Code, str] = {
     Code.E050: "NO_LIVE_CAPACITY",
     Code.E070: "DURATION_NOT_POSITIVE",
     Code.W060: "DUPLICATE_EDGE",
+    Code.W080: "CHAOS_FEW_RETRIES",
+    Code.W081: "CHAOS_WITHOUT_AGENTS",
 }
 
 Level = Literal["error", "warning"]

@@ -24,11 +24,11 @@ from expsched.api.history import History
 from expsched.api.models import (
     Action,
     CancelAction,
-    CheckpointAction,
     ErrorOut,
     LiveOut,
     LiveRunsOut,
     LogsOut,
+    TaskAction,
 )
 from expsched.api.store import RUN_ID_PATTERN, RunStore
 from expsched.contract.io_models import PolicyIn, ProblemIn
@@ -59,17 +59,29 @@ class Emulations:
         self.limit = int(os.environ.get("EXPSCHED_EMULATIONS", "1"))
         self.max_s = float(os.environ.get("EXPSCHED_EMULATION_MAX_S", "3600"))
         self.live: dict[str, Live] = {}
+        self.keep = int(os.environ.get("EXPSCHED_EMULATIONS_KEEP", "20"))  # законченных — для экрана
+
+    def prune(self) -> None:
+        """Забыть самые старые законченные прогоны сверх `keep`: они уже в хранилище, а память конечна."""
+        finished = [k for k, item in self.live.items() if item.emulation.status != "running"]
+        for run_id in finished[: max(0, len(finished) - self.keep)]:
+            del self.live[run_id]
 
     def running(self) -> int:
         return sum(1 for item in self.live.values() if item.emulation.status == "running")
 
-    def start(self, problem: ProblemIn, policy: PolicyIn) -> str:
-        """Новый прогон на агентах; ValueError — вход для него не годится (узел без агента)."""
+    async def start(self, problem: ProblemIn, policy: PolicyIn) -> str:
+        """Новый прогон на агентах; ValueError — вход для него не годится (узел без агента). Подготовка
+        (и план shadow) на большом входе — секунды: она идёт в потоке, а не в цикле событий с опросами."""
         run_id = secrets.token_hex(8)
-        emulation = Emulation(run_id, problem, policy, self.registry, history=self.history.estimates(problem))
+        history = await asyncio.to_thread(self.history.estimates, problem)
+        emulation = await asyncio.to_thread(
+            Emulation, run_id, problem, policy, self.registry, history=history
+        )
         stored = problem.model_copy(update={"policy": policy}).model_dump(mode="json")
         item = Live(emulation, stored)
         self.live[run_id] = item
+        self.prune()
         item.task = asyncio.create_task(self._drive(run_id))
         return run_id
 
@@ -78,7 +90,10 @@ class Emulations:
         emulation, started = item.emulation, time.monotonic()
         try:
             while emulation.status == "running":
-                emulation.tick()
+                emulation.tick(conclude=False)
+                if emulation.concluding:  # итог — в потоке: агенты и экран не ждут секунды
+                    await asyncio.to_thread(emulation.finish)
+                    break
                 if time.monotonic() - started > self.max_s:
                     log.warning("run %s exceeded EXPSCHED_EMULATION_MAX_S and is cancelled", run_id)
                     emulation.cancel()
@@ -166,7 +181,7 @@ async def container_logs(request: Request, run_id: RunId, task: str, attempt: in
 
 @router.post("/actions", response_model=LiveOut, responses=ERRORS)
 async def actions(request: Request, run_id: RunId, body: dict[str, Any]) -> Any:
-    """Чекпоинт задачи сейчас, уронить или вернуть узел, отменить прогон."""
+    """Чекпоинт задачи сейчас или убить её контейнер, уронить или вернуть узел, отменить прогон."""
     item = emulations(request).live.get(run_id)
     if item is None or item.emulation.status != "running":
         return error_response(404, "NOT_FOUND", f"run {run_id} is not running on agents")
@@ -175,8 +190,12 @@ async def actions(request: Request, run_id: RunId, body: dict[str, Any]) -> Any:
     except ValidationError as error:
         return error_response(422, "INVALID_REQUEST", str(error).splitlines()[0])
     emulation = item.emulation
-    if isinstance(action, CheckpointAction):
-        emulation.checkpoint(action.task)
+    if isinstance(action, TaskAction):
+        if action.kind == "kill":
+            if not emulation.kill(action.task):
+                return error_response(409, "TASK_NOT_RUNNING", f"task {action.task!r} has no running attempt")
+        else:
+            emulation.checkpoint(action.task)
     elif isinstance(action, CancelAction):
         emulation.cancel()
     elif action.worker not in emulation.agent_of:

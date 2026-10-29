@@ -68,6 +68,7 @@ class FinishRecord(Record):
 class WorkerRecord(Record):
     type: Literal["WORKER_DOWN", "WORKER_UP"]
     worker: str
+    reason: str | None = None  # откуда отказ, если не от агента и не из входа: «chaos: …»
 
 
 class InterruptedRecord(Record):

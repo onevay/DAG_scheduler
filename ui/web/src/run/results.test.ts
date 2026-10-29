@@ -4,6 +4,8 @@ import type { JournalRecord, Problem, Result } from "../api/types";
 import {
   assignLanes,
   comparisonRows,
+  estimateRows,
+  estimateSummary,
   ganttBars,
   journalOutages,
   laneOrder,
@@ -221,5 +223,32 @@ describe("tables", () => {
       ["fifo", 21, 3, [24], 0],
       ["priority", null, null, null, 1],
     ]);
+  });
+});
+
+describe("estimateRows", () => {
+  it("compares the estimate with the work the finished attempt took on its node", () => {
+    const problem = {
+      cluster: { workers: [{ id: "fast", resources: { gpu: 1 }, speed: 2 }] },
+      tasks: [{ id: "train" }, { id: "eval" }],
+    } as Problem;
+    const result = {
+      attempts: [
+        attempt("train", "fast", 0, 4, { outcome: "INT" }),
+        attempt("train", "fast", 5, 12, { attempt: 2, resume_from: 6 }),
+        attempt("eval", "fast", 12, null, { outcome: null }),
+      ],
+      estimates: {
+        train: { median: 16, spread: 0.3, mean: 16.7, p80: 21, work: 17, source: "history" },
+        eval: { median: 5, spread: 0.3, mean: 5.2, p80: 6, work: 6, source: "kind" },
+      },
+    } as unknown as Result;
+    const rows = estimateRows(result, problem);
+    expect(rows.map((r) => [r.task, r.actual])).toEqual([
+      ["eval", null],
+      ["train", 20], // позиция 6 + 7 единиц на скорости 2
+    ]);
+    expect(rows[1]?.error).toBeCloseTo((20 - 16.7) / 16.7);
+    expect(estimateSummary(rows)).toMatchObject({ within: 1, seen: 1 });
   });
 });

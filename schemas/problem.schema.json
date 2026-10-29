@@ -1,5 +1,50 @@
 {
   "$defs": {
+    "ChaosIn": {
+      "additionalProperties": false,
+      "description": "Сбои напоказ на агентах: в среднем раз в `crash_every` единиц убивается случайная идущая попытка, раз\nв `node_down_every` падает случайный узел на `node_down_for` единиц. Расписание — по `seed`: прогон с тем\nже seed даёт ту же последовательность сбоев.",
+      "properties": {
+        "crash_every": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Crash Every"
+        },
+        "node_down_every": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Node Down Every"
+        },
+        "node_down_for": {
+          "default": 5,
+          "minimum": 1,
+          "title": "Node Down For",
+          "type": "integer"
+        },
+        "seed": {
+          "default": 0,
+          "title": "Seed",
+          "type": "integer"
+        }
+      },
+      "title": "ChaosIn",
+      "type": "object"
+    },
     "ClusterIn": {
       "additionalProperties": false,
       "properties": {
@@ -69,7 +114,7 @@
         "spread": {
           "anyOf": [
             {
-              "maximum": 3,
+              "maximum": 3.0,
               "minimum": 0,
               "type": "number"
             },
@@ -489,6 +534,17 @@
   },
   "additionalProperties": false,
   "properties": {
+    "chaos": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ChaosIn"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
     "cluster": {
       "$ref": "#/$defs/ClusterIn"
     },

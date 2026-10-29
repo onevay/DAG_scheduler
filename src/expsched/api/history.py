@@ -27,9 +27,9 @@ class History:
     def load(self) -> dict[str, list[Observation]]:
         try:
             raw = json.loads(self.path.read_text(encoding="utf-8"))
-        except (FileNotFoundError, ValueError):
+            return {k: [Observation(**o) for o in obs] for k, obs in raw["observations"].items()}
+        except (OSError, ValueError, TypeError, KeyError, AttributeError):
             return {}  # нет истории или файл испорчен: оценки — по умолчаниям, файл перепишется
-        return {k: [Observation(**o) for o in obs] for k, obs in raw.get("observations", {}).items()}
 
     def estimates(self, problem: ProblemIn) -> dict[str, Estimate]:
         return estimates(self.load(), problem)

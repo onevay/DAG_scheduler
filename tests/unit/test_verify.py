@@ -167,3 +167,15 @@ def test_down_intervals_from_the_journal():
         {"t": 7, "type": "WORKER_DOWN", "worker": "b"},
     ]
     assert down_intervals(log) == {"a": [(2, 5)], "b": [(7, None)]}
+
+
+def test_attempt_cut_at_its_start_takes_no_capacity():
+    # Хаос убил попытку в тот же момент, что её запустили: следующая занимает те же GPU с того же момента
+    from expsched.domain.models import Task
+    from expsched.domain.resources import Resources
+    from expsched.verify.attempts import Attempt
+    from expsched.verify.invariants import _check_capacity
+
+    tasks = {k: Task(k, duration=5, resources=Resources({"gpu": 1})) for k in ("a", "b")}
+    attempts = [Attempt("a", 1, "w", 3, 0, end=3, outcome="INT"), Attempt("b", 1, "w", 3, 0, end=8)]
+    assert _check_capacity("w", Resources({"gpu": 1}), attempts, tasks) == []

@@ -38,6 +38,7 @@ ErrorCode = Literal[
     "RUN_IN_PROGRESS",  # прогон на агентах ещё идёт: результата пока нет
     "AGENT_RUNNING",  # локальный агент с этим id уже идёт или их слишком много
     "AGENT_NOT_READY",  # проверка локального агента не прошла: среда или связь не готовы
+    "TASK_NOT_RUNNING",  # у задачи нет идущей попытки: убивать нечего
     "INTERNAL",  # ошибка сервера; подробности только в его журнале
 ]
 
@@ -65,6 +66,7 @@ class ValidationOut(Strict):
     valid: bool
     diagnostics: list[DiagnosticOut]
     analysis: InputAnalysis | None  # планируемой части входа; None — планировать нечего
+    estimates: dict[str, EstimateOut] = {}  # задачи без длительности: с какой оценкой пойдёт прогон
 
 
 class ScenarioInfo(Strict):
@@ -269,8 +271,10 @@ class LiveOut(Strict):
     estimates: dict[str, EstimateOut] = {}  # задачи без длительности: их оценки
 
 
-class CheckpointAction(Strict):
-    kind: Literal["checkpoint"]
+class TaskAction(Strict):
+    """Чекпоинт задачи сейчас или убить её контейнер, как убивает сбой."""
+
+    kind: Literal["checkpoint", "kill"]
     task: Id
 
 
@@ -283,4 +287,4 @@ class CancelAction(Strict):
     kind: Literal["cancel"]
 
 
-Action = Annotated[CheckpointAction | WorkerAction | CancelAction, Field(discriminator="kind")]
+Action = Annotated[TaskAction | WorkerAction | CancelAction, Field(discriminator="kind")]

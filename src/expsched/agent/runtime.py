@@ -29,6 +29,8 @@ class Runtime(Protocol):
 
     def stop(self, key: str) -> None: ...
 
+    def kill(self, key: str) -> None: ...  # оборвать, как сбой: контейнер остаётся упавшим или пропадает
+
     def checkpoint(self, key: str) -> None: ...  # попросить задачу сохраниться сейчас
 
     def inspect(self, key: str) -> State: ...
@@ -87,8 +89,9 @@ class _FakeContainer:
 
 
 class FakeRuntime:
-    """Контейнеры без контейнеров: работа идёт по часам `advance(ms)` с масштабом из команды, чекпоинты
-    пишутся в каталог задачи, как у встроенной нагрузки. `fail`, `oom`, `vanish` — сбои для тестов."""
+    """Контейнеры без контейнеров: работа идёт по часам `advance(ms)` с масштабом и скоростью узла из
+    команды, чекпоинты пишутся в каталог задачи, как у встроенной нагрузки. `fail`, `oom`, `vanish` —
+    сбои для тестов."""
 
     name: Literal["fake"] = "fake"
     workload_image = WORKLOAD_IMAGE  # «запускает» встроенную нагрузку и с этим образом
@@ -112,6 +115,12 @@ class FakeRuntime:
     def stop(self, key: str) -> None:
         self.containers.pop(key, None)
 
+    def kill(self, key: str) -> None:
+        c = self.containers.get(key)
+        if c and c.state.status == "running":
+            c.state = State("exited", 137)
+            c.lines.append("killed: SIGKILL")
+
     def checkpoint(self, key: str) -> None:
         c = self.containers.get(key)
         if c and c.state.status == "running":
@@ -130,7 +139,7 @@ class FakeRuntime:
                 continue
             total = true_total(c.command)
             before = c.done
-            c.done = min(total, c.done + ms / c.command.time_scale_ms)
+            c.done = min(total, c.done + ms / c.command.time_scale_ms * c.command.speed)
             step = c.command.checkpoint_interval
             if step:  # последний пройденный чекпоинт; в момент окончания чекпоинт уже не нужен
                 mark = (min(int(c.done), total - 1)) // step * step

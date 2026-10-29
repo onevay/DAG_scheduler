@@ -15,6 +15,16 @@ describe("draftIssue", () => {
   it("accepts a well-formed problem", () => {
     expect(draftIssue(ok)).toBeNull();
     expect(draftIssue({ tasks: [], cluster: { workers: [] } })).toBeNull();
+    // Длительность неизвестна: оценка и закон ускорения вместо неё, у узла — скорость
+    const unknown = {
+      id: "a",
+      duration: null,
+      estimate: { median: 6, spread: 0.4 },
+      scaling: { law: "amdahl" },
+    };
+    expect(
+      draftIssue({ tasks: [unknown], cluster: { workers: [{ id: "n", resources: {}, speed: 2 }] } }),
+    ).toBeNull();
   });
 
   it.each([
@@ -33,8 +43,13 @@ describe("draftIssue", () => {
     [{ ...ok, events: [{ time: 1, type: "explode" }] }, "событие 1: неизвестный тип explode"],
     [{ ...ok, events: [{ time: 1, type: "worker_up" }] }, "событие 1: нет worker"],
     [
-      { ...ok, events: [{ time: 1, type: "submit_task", task: { id: "u" } }] },
+      { ...ok, events: [{ time: 1, type: "submit_task", task: { id: "u", duration: "1" } }] },
       "событие 1: задача события: duration — не число",
+    ],
+    [{ ...ok, tasks: [{ id: "a", estimate: { spread: 1 } }] }, "задача 1 (a): неверное поле estimate"],
+    [
+      { ...ok, cluster: { workers: [{ id: "n", resources: {}, speed: "2" }] } },
+      "узел 1 (n): speed — не число",
     ],
   ])("names what is wrong: %#", (data, issue) => {
     expect(draftIssue(data)).toBe(issue);

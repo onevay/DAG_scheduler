@@ -223,14 +223,23 @@ export function NumberField({
   onChange,
   placeholder,
   hint,
+  step = 1,
+  max,
 }: {
   label: string;
   value: number | null | undefined;
   onChange: (value: number | null) => void;
   placeholder?: string;
   hint?: string;
+  /** Шаг меньше единицы — дробные значения (разброс, доля), иначе целые. */
+  step?: number;
+  max?: number;
 }) {
   const id = useId();
+  const parse = (text: string) => {
+    const n = Math.max(0, Math.min(max ?? Infinity, Number(text)));
+    return step < 1 ? Math.round(n * 100) / 100 : Math.round(n);
+  };
   return (
     <div className={styles.numberField}>
       <label htmlFor={id} className={styles.numberLabel}>
@@ -240,13 +249,13 @@ export function NumberField({
         id={id}
         className={styles.numberInput}
         type="number"
-        inputMode="numeric"
+        inputMode={step < 1 ? "decimal" : "numeric"}
         min={0}
+        max={max}
+        step={step}
         value={value ?? ""}
         placeholder={placeholder}
-        onChange={(e) =>
-          onChange(e.target.value === "" ? null : Math.max(0, Math.round(Number(e.target.value))))
-        }
+        onChange={(e) => onChange(e.target.value === "" ? null : parse(e.target.value))}
       />
       {hint && <span className={styles.hint}>{hint}</span>}
     </div>

@@ -32,7 +32,15 @@ class Loop:
         self.now = 0.0
         self.registry = AgentRegistry(clock=lambda: self.now, heartbeat_s=1)
         self.runtime = FakeRuntime()
-        self.agent = Agent("laptop", self.runtime, tmp_path, {"cpu": 8, "ram_mb": 16384}, now=lambda: "T")
+        # Часы агента — те же: по ним он забирает строки журналов, а они попадают в причины сбоев
+        self.agent = Agent(
+            "laptop",
+            self.runtime,
+            tmp_path,
+            {"cpu": 8, "ram_mb": 16384},
+            now=lambda: "T",
+            clock=lambda: self.now,
+        )
         self.emulation = Emulation(run_id, problem, problem.policy, self.registry, clock=lambda: self.now)
         self.online = True
         self.registry.hello("laptop", self.agent.hello())

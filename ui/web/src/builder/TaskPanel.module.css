@@ -93,3 +93,7 @@
 .dep:hover {
   background: var(--color-error-soft);
 }
+
+.hint[data-tone="warn"] {
+  color: var(--color-warning);
+}

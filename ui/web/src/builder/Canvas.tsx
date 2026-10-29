@@ -1,5 +1,6 @@
 import "@xyflow/react/dist/base.css";
 
+import { durationText } from "./DurationFields";
 import {
   applyNodeChanges,
   type Connection,
@@ -78,7 +79,7 @@ function Board({ selected, onSelect, criticalPath, invalid, lowerBound }: Canvas
           position: old?.position ?? dropped.current.get(task.id) ?? layout.get(task.id) ?? { x: 0, y: 0 },
           selected: task.id === selected,
           deletable: !submitted,
-          ariaLabel: `${task.id}, ${task.duration} ${unit}, ${formatResources(task.resources)}${submitted ? ", подаётся во время прогона" : ""}`,
+          ariaLabel: `${task.id}, ${durationText(task)} ${unit}, ${formatResources(task.resources)}${submitted ? ", подаётся во время прогона" : ""}`,
           data: { task, submitted, invalid: invalid.has(task.id), unit },
         };
       });

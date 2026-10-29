@@ -16,7 +16,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from expsched.contract.io_models import ProblemIn, ScalingIn, TaskIn
+from expsched.contract.io_models import MAX_SPREAD, ProblemIn, ScalingIn, TaskIn
 from expsched.estimate import KIND, Estimate, key, time_factor, units
 
 MIN_SPREAD = 0.05  # одно-два наблюдения не делают работу известной точно
@@ -62,7 +62,7 @@ def fit(observations: Sequence[Observation], task: TaskIn, time_scale_ms: int) -
     mu = statistics.fmean(base)
     spread = statistics.stdev(base) if len(base) >= 2 else KIND[task.kind][1] / 2
     median = math.exp(mu) * time_factor(scaling, task.kind, units(task.resources))
-    return Estimate(median, max(MIN_SPREAD, spread), "history")
+    return Estimate(median, min(MAX_SPREAD, max(MIN_SPREAD, spread)), "history")
 
 
 def _serial(seen: Sequence[tuple[float, int]], kind: str) -> float:

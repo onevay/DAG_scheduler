@@ -191,29 +191,29 @@ class Simulator:
         elif event.worker not in self.state.up:
             raise ValueError(f"{event.type.value} event for unknown worker {event.worker!r}")
         elif event.type is EvType.WORKER_DOWN:
-            self._worker_down(event.worker)
+            self._worker_down(event.worker, event.reason)
         else:
-            self._worker_up(event.worker)
+            self._worker_up(event.worker, event.reason)
 
-    def _worker_down(self, worker: str) -> None:
+    def _worker_down(self, worker: str, reason: str | None = None) -> None:
         """Узел перестаёт работать: его попытки прерываются, ресурсов у него больше нет."""
         s = self.state
         if not s.up[worker]:
             return  # узел уже недоступен
         s.up[worker] = False
-        self.journal.append("WORKER_DOWN", self.t, worker=worker)
+        self.journal.append("WORKER_DOWN", self.t, worker=worker, **({"reason": reason} if reason else {}))
         for key in sorted(k for k, run in s.run.items() if run.worker == worker):
             self._interrupt(key, cause="WORKER_DOWN")
         s.free[worker] = Resources()
 
-    def _worker_up(self, worker: str) -> None:
+    def _worker_up(self, worker: str, reason: str | None = None) -> None:
         """Узел вернулся пустым: все его ресурсы свободны."""
         s = self.state
         if s.up[worker]:
             return
         s.up[worker] = True
         s.free[worker] = s.problem.workers[worker].capacity
-        self.journal.append("WORKER_UP", self.t, worker=worker)
+        self.journal.append("WORKER_UP", self.t, worker=worker, **({"reason": reason} if reason else {}))
 
     def _interrupt(self, key: str, cause: str, reason: dict[str, Any] | None = None) -> None:
         """Прерывает попытку: работа до последнего чекпоинта сохраняется, остальное теряется.

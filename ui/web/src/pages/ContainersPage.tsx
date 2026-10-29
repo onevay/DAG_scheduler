@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
+import { useQueryClient } from "@tanstack/react-query";
 
 import {
   useAgents,
@@ -16,12 +17,16 @@ import {
 import type { AgentInfo, Container, Live, LocalAgent, LocalAgentStart } from "../api/types";
 import {
   attemptLog,
+  type Check,
   counts,
+  expectation,
   FILTERS,
   type Filter,
   type Mode,
   MODES,
   phase,
+  progressOf,
+  readiness,
   scaleLabel,
   SCALES,
   share,
@@ -30,8 +35,13 @@ import {
   withoutAgent,
 } from "../containers/containers";
 import styles from "../containers/Containers.module.css";
+import { startDemo, type Step, STEPS } from "../containers/demo";
+import { summary } from "../containers/failureFeed";
+import { Failures } from "../containers/Failures";
+import { Checklist, Overview, Steps } from "../containers/Guide";
 import { PlanVsFact } from "../containers/PlanVsFact";
-import { useDraft } from "../draft/DraftContext";
+import { SOURCES } from "../builder/DurationFields";
+import { useDraft, useDraftValidation } from "../draft/DraftContext";
 import { Button, Segmented, Switch } from "../ui/controls";
 import { Section } from "../ui/data";
 import { ResourceFields } from "../ui/ResourceFields";
@@ -43,7 +53,7 @@ const UNITS = { hour: "ч", minute: "мин", second: "с" } as const;
 const RING = 2 * Math.PI * 26;
 const STATUS = { running: "идёт", done: "закончен", cancelled: "отменён" } as const;
 
-/** Режим прогона и, если прогон на агентах идёт или прошёл, его контейнеры. */
+/** Без прогона — путь к нему: агенты, вход и режим, готовность; с прогоном — только он сам. */
 export function ContainersPage() {
   const { runId } = useParams();
   const live = useLive(runId);
@@ -62,23 +72,90 @@ export function ContainersPage() {
           )
         }
       >
-        Попытки задач в настоящих контейнерах на агентах: состояние, чекпоинты, отказы узлов.
+        Расписание на настоящих контейнерах: политика та же, что в симуляции, а длительности, отказы и сбои —
+        настоящие.
       </PageHeader>
-      <ModePanel />
-      <AgentsPanel />
-      {!runId && <LiveRuns />}
-      {runId && live.isError && (
-        <p role="alert" className={styles.error}>
-          {live.error.message}
-        </p>
+      {runId ? (
+        <>
+          {live.isError && (
+            <p role="alert" className={styles.error}>
+              {live.error.message}
+            </p>
+          )}
+          {live.data && <LiveRun runId={runId} live={live.data} />}
+        </>
+      ) : (
+        <Setup />
       )}
-      {runId && live.data && <LiveRun runId={runId} live={live.data} />}
     </>
   );
 }
 
-/** Режим и масштаб времени черновика, назначение агента узлам и запуск. */
-function ModePanel() {
+/** Путь к прогону: шаги, быстрый показ, агенты, вход и режим с готовностью, прошлые прогоны. */
+function Setup() {
+  const { draft } = useDraft();
+  const agents = useAgents().data?.agents ?? [];
+  const validation = useDraftValidation();
+  const checks = readiness(draft, agents, validation.data?.analysis?.lower_bound);
+  return (
+    <>
+      <Steps
+        agents={agents.some((a) => a.alive)}
+        setup={checks.every((c) => c.level !== "block")}
+        run={false}
+      />
+      <DemoPanel />
+      <AgentsPanel />
+      <ModePanel checks={checks} />
+      <LiveRuns />
+    </>
+  );
+}
+
+/** Демо одной кнопкой: два агента fake, пример с машинами разной скорости и хаосом, прогон shadow. */
+function DemoPanel() {
+  const { dispatch } = useDraft();
+  const navigate = useNavigate();
+  const client = useQueryClient();
+  const [step, setStep] = useState<Step | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const run = () => {
+    setError(null);
+    startDemo(setStep)
+      .then(({ problem, runId }) => {
+        dispatch({ type: "replace", draft: problem });
+        void client.invalidateQueries({ queryKey: ["runs"] });
+        void navigate(`/containers/${runId}`);
+      })
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setStep(null));
+  };
+  return (
+    <Section title="Быстрый показ: сбои и восстановление">
+      <p className={styles.note}>
+        Сервер сам запустит двух агентов без контейнеров и пример chaos_demo: две машины разной скорости,
+        длительности задач заранее неизвестны, хаос убивает контейнеры и роняет узлы. Видно, как задачи
+        повторяются с последних чекпоинтов и во что обошлись сбои. Около 15 секунд; ваш черновик заменится
+        примером.
+      </p>
+      <div className={styles.row}>
+        <Button onClick={run} disabled={step !== null}>
+          {step ? STEPS[step] : "Запустить демо"}
+        </Button>
+      </div>
+      {error && (
+        <p role="alert" className={styles.error}>
+          {error}
+        </p>
+      )}
+    </Section>
+  );
+}
+
+const AGENT_MODES = ["emulate", "shadow"] as const;
+
+/** Шаг 2: режим и масштаб времени черновика, агент каждого узла, готовность и запуск. */
+function ModePanel({ checks }: { checks: readonly Check[] }) {
   const { draft, dispatch } = useDraft();
   const navigate = useNavigate();
   const start = useStartOnAgents();
@@ -87,7 +164,6 @@ function ModePanel() {
   const mode: Mode = draft.mode ?? "simulate";
   const scale = draft.time_scale_ms ?? 1000;
   const missing = withoutAgent(draft);
-  const onAgents = mode === "emulate" || mode === "shadow";
   const set = (patch: Partial<typeof draft>) => dispatch({ type: "replace", draft: { ...draft, ...patch } });
   const assign = () =>
     set({ cluster: { workers: draft.cluster.workers.map((w) => ({ ...w, agent: w.agent || agent })) } });
@@ -99,87 +175,85 @@ function ModePanel() {
     });
 
   return (
-    <Section title="Режим прогона">
-      <Segmented
-        label="Режим"
-        options={(Object.keys(MODES) as Mode[]).map((m) => ({ value: m, label: MODES[m].label }))}
-        value={mode}
-        onChange={(next) => set({ mode: next })}
-      />
-      <p className={styles.note}>{MODES[mode].text}</p>
-      {mode === "replay" && (
-        <p className={styles.note}>
-          Проигрывается сохранённый прогон — кнопка «Проиграть журнал» на странице прогона.
-        </p>
-      )}
-      {onAgents && (
-        <div className={styles.controls}>
-          <div className={styles.field}>
-            <span className={styles.caption}>Масштаб: единица модели = {scaleLabel(scale)}</span>
-            <Segmented
-              label="Масштаб времени"
-              options={SCALES.map((ms) => ({ value: String(ms), label: scaleLabel(ms) }))}
-              value={String(scale)}
-              onChange={(ms) => set({ time_scale_ms: Number(ms) })}
-            />
-          </div>
-          {known.length > 0 && (
-            <div role="group" aria-label="Агенты узлов" className={styles.nodes}>
-              {draft.cluster.workers.map((w) => (
-                <label key={w.id} className={styles.node}>
-                  <span className={styles.task}>{w.id}</span>
-                  <select
-                    className={styles.input}
-                    aria-label={`Агент узла ${w.id}`}
-                    value={w.agent ?? ""}
-                    onChange={(e) => choose(w.id, e.target.value)}
-                  >
-                    <option value="">без агента</option>
-                    {[...new Set([...known.map((a) => a.id), ...(w.agent ? [w.agent] : [])])].map((id) => {
-                      const a = known.find((k) => k.id === id);
-                      return (
-                        <option key={id} value={id}>
-                          {id}
-                          {!a ? " — сервер его не видел" : a.alive ? "" : " — нет связи"}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </label>
-              ))}
-            </div>
-          )}
-          {missing.length > 0 && (
-            <div className={styles.field}>
-              <span className={styles.caption}>Без агента: {missing.join(", ")}</span>
-              <div className={styles.row}>
-                <input
-                  className={styles.input}
-                  value={agent}
-                  aria-label="Id агента"
-                  onChange={(e) => setAgent(e.target.value.trim())}
-                />
-                <Button variant="secondary" disabled={!agent} onClick={assign}>
-                  Назначить узлам
-                </Button>
-              </div>
-            </div>
-          )}
-          <Button
-            disabled={draft.tasks.length === 0 || missing.length > 0 || start.isPending}
-            onClick={() =>
-              start.mutate({ problem: draft }, { onSuccess: (r) => void navigate(`/containers/${r.run_id}`) })
-            }
-          >
-            {start.isPending ? "Запускаю…" : "Запустить на агентах"}
-          </Button>
-          {start.isError && (
-            <p role="alert" className={styles.error}>
-              {start.error.message}
-            </p>
-          )}
+    <Section title="2 · Прогон">
+      <p className={styles.note}>
+        Запускается черновик со «Сборки»{draft.name ? ` — ${draft.name}` : ""}. Время модели идёт в масштабе:
+        единица модели длится выбранное время на часах стены.
+      </p>
+      <div className={styles.controls}>
+        <Segmented
+          label="Режим"
+          options={AGENT_MODES.map((m) => ({ value: m, label: MODES[m].label }))}
+          value={mode}
+          onChange={(next) => set({ mode: next })}
+        />
+        {(mode === "emulate" || mode === "shadow") && <p className={styles.note}>{MODES[mode].text}</p>}
+        <div className={styles.field}>
+          <span className={styles.caption}>Масштаб: единица модели = {scaleLabel(scale)}</span>
+          <Segmented
+            label="Масштаб времени"
+            options={SCALES.map((ms) => ({ value: String(ms), label: scaleLabel(ms) }))}
+            value={String(scale)}
+            onChange={(ms) => set({ time_scale_ms: Number(ms) })}
+          />
         </div>
-      )}
+        {known.length > 0 && (
+          <div role="group" aria-label="Агенты узлов" className={styles.nodes}>
+            {draft.cluster.workers.map((w) => (
+              <label key={w.id} className={styles.node}>
+                <span className={styles.task}>{w.id}</span>
+                <select
+                  className={styles.input}
+                  aria-label={`Агент узла ${w.id}`}
+                  value={w.agent ?? ""}
+                  onChange={(e) => choose(w.id, e.target.value)}
+                >
+                  <option value="">без агента</option>
+                  {[...new Set([...known.map((a) => a.id), ...(w.agent ? [w.agent] : [])])].map((id) => {
+                    const a = known.find((k) => k.id === id);
+                    return (
+                      <option key={id} value={id}>
+                        {id}
+                        {!a ? " — сервер его не видел" : a.alive ? "" : " — нет связи"}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
+            ))}
+          </div>
+        )}
+        {missing.length > 0 && (
+          <div className={styles.field}>
+            <span className={styles.caption}>Без агента: {missing.join(", ")}</span>
+            <div className={styles.row}>
+              <input
+                className={styles.input}
+                value={agent}
+                aria-label="Id агента"
+                onChange={(e) => setAgent(e.target.value.trim())}
+              />
+              <Button variant="secondary" disabled={!agent} onClick={assign}>
+                Назначить узлам
+              </Button>
+            </div>
+          </div>
+        )}
+        <Checklist checks={checks} />
+        <Button
+          disabled={checks.some((c) => c.level === "block") || start.isPending}
+          onClick={() =>
+            start.mutate({ problem: draft }, { onSuccess: (r) => void navigate(`/containers/${r.run_id}`) })
+          }
+        >
+          {start.isPending ? "Запускаю…" : "Запустить на агентах"}
+        </Button>
+        {start.isError && (
+          <p role="alert" className={styles.error}>
+            {start.error.message}
+          </p>
+        )}
+      </div>
     </Section>
   );
 }
@@ -193,15 +267,15 @@ function AgentsPanel() {
   // Запущенный только что ещё не представился серверу — карточка есть и у него
   const ids = [...new Set([...known.map((a) => a.id), ...locals.map((l) => l.id)])].sort();
   return (
-    <Section title={`Агенты · ${ids.length}`}>
+    <Section title={`1 · Агенты · ${ids.length}`}>
       {ids.length === 0 ? (
         <p className={styles.note}>
-          Ни один агент ещё не представился серверу. Запустите его здесь, на машине сервера, или на другой
-          машине: <code>python -m expsched.agent --id laptop --scheduler {window.location.origin}</code> с тем
-          же EXPSCHED_AGENT_TOKEN, что у сервера (подробно — docs/agent.md).
+          Агентов пока нет. Запустите его здесь — токен сервер передаст ему сам. На другой машине:{" "}
+          <code>python -m expsched.agent --id gpu-box --scheduler {window.location.origin}</code> с тем же
+          EXPSCHED_AGENT_TOKEN, что у сервера (docs/guide.md).
         </p>
       ) : (
-        <ul className={styles.cards} aria-label="Агенты">
+        <ul className={styles.agents} aria-label="Агенты">
           {ids.map((id) => (
             <AgentCard
               key={id}
@@ -214,7 +288,10 @@ function AgentsPanel() {
           ))}
         </ul>
       )}
-      <LocalAgentForm taken={ids} start={control.start} />
+      <details className={styles.details} open={ids.length === 0}>
+        <summary>Запустить агента на этой машине</summary>
+        <LocalAgentForm taken={ids} start={control.start} />
+      </details>
     </Section>
   );
 }
@@ -248,39 +325,27 @@ function AgentCard({
         ? "запускается"
         : `нет связи · ${Math.round(a?.seen_s_ago ?? 0)} с`;
   return (
-    <li className={styles.card} aria-label={`Агент ${id}: ${short}`}>
-      <span className={styles.cardHead}>
-        <span className={styles.task}>{id}</span>
-        <span
-          className={styles.chip}
-          data-phase={a?.alive ? "running" : local && !exited ? "waiting" : "killed"}
-        >
-          <span className={styles.chipDot} />
-          {state}
-        </span>
+    <li className={styles.agent} aria-label={`Агент ${id}: ${short}`}>
+      <span className={styles.task}>{id}</span>
+      <span
+        className={styles.chip}
+        data-phase={a?.alive ? "running" : local && !exited ? "waiting" : "killed"}
+      >
+        <span className={styles.chipDot} />
+        {state}
       </span>
-      <dl className={styles.facts}>
-        <dt>Среда</dt>
-        <dd>{a?.runtime ?? local?.runtime}</dd>
-        {a && (
-          <>
-            <dt>Отдаёт</dt>
-            <dd>{formatResources(a.capacity)}</dd>
-            <dt>Контейнеры</dt>
-            <dd>
-              {a.running.length} из {a.max_containers}
-            </dd>
-          </>
-        )}
-        {local && (
-          <>
-            <dt>Процесс</dt>
-            <dd>на этой машине · pid {local.pid}</dd>
-          </>
-        )}
-      </dl>
+      <span className={styles.caption}>
+        {[
+          a?.runtime ?? local?.runtime,
+          a && formatResources(a.capacity),
+          a && `занято ${a.running.length} из ${a.max_containers}`,
+          local && `на этой машине · pid ${local.pid}`,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+      </span>
       {local && (
-        <>
+        <span className={styles.row}>
           <details className={styles.details}>
             <summary>Журнал процесса</summary>
             <pre className={styles.console}>{local.log.join("\n") || "пусто"}</pre>
@@ -293,7 +358,7 @@ function AgentCard({
           >
             {stopping ? "Останавливаю…" : exited ? "Убрать" : "Остановить"}
           </Button>
-        </>
+        </span>
       )}
     </li>
   );
@@ -334,7 +399,6 @@ function LocalAgentForm({
         submit();
       }}
     >
-      <span className={styles.caption}>Запустить агента на этой машине</span>
       <div className={styles.row}>
         <input
           className={styles.input}
@@ -391,8 +455,11 @@ function LiveRuns() {
   );
 }
 
+const ORDER: Record<ReturnType<typeof phase>, number> = { running: 0, waiting: 1, killed: 2, done: 3 };
+
 function LiveRun({ runId, live }: { runId: string; live: Live }) {
   const problem = useRunProblem(runId);
+  const agents = useAgents().data?.agents ?? [];
   const events = useLiveEvents(runId, live.status === "running");
   const action = useRunAction(runId);
   const [filter, setFilter] = useState<Filter>("all");
@@ -402,29 +469,58 @@ function LiveRun({ runId, live }: { runId: string; live: Live }) {
     ...(problem.data?.tasks ?? []),
     ...(problem.data?.events ?? []).flatMap((e) => e.task ?? []),
   ];
-  // Без длительности — оценка сервера (её работа в прогоне)
-  const durations = new Map(tasks.map((t) => [t.id, t.duration ?? live.estimates?.[t.id]?.mean]));
+  const durations = new Map(tasks.map((t) => [t.id, t.duration]));
+  // Без длительности — оценка сервера, уточнённая по ходу попытки
+  const expect = (c: Container) =>
+    expectation(events.data ?? [], c, durations.get(c.task), live.estimates?.[c.task]);
+  const workText = (c: Container) => {
+    const e = expect(c);
+    return e ? `${e.approx ? "≈ " : ""}${Math.round(e.expected)}` : "?";
+  };
+  // Закончившейся попытке с оценкой ожидание уже не нужно: сколько ждали — для сравнения
+  const caption = (c: Container) =>
+    c.state === "exited" && !c.detail && expect(c)?.approx
+      ? `закончена · ждали ${workText(c)} ${unit} работы`
+      : `${c.progress} из ${workText(c)} ${unit} работы сохранено`;
   const limits = new Map<string, Resources | undefined>(tasks.map((t) => [t.id, t.resources]));
   const key = (c: Container) => `${c.task}#${c.attempt}`;
-  const shown = live.containers.filter((c) => filter === "all" || phase(c) === filter);
-  const selected = live.containers.find((c) => key(c) === picked) ?? shown.at(-1);
+  // Сначала то, что идёт сейчас: законченные — в конце
+  const shown = live.containers
+    .filter((c) => filter === "all" || phase(c) === filter)
+    .sort((x, y) => ORDER[phase(x)] - ORDER[phase(y)]);
+  const selected = live.containers.find((c) => key(c) === picked);
+  const guess = selected && expect(selected);
   const n = counts(live.containers);
   const running = live.status === "running";
+  const journal = events.data ?? [];
 
   return (
     <>
       <Section
-        title={`Контейнеры · ${live.containers.length}`}
+        title={running ? "Ход прогона" : "Итог прогона"}
         actions={
-          running ? (
+          running && (
             <Button variant="secondary" onClick={() => action.mutate({ kind: "cancel" })}>
               Отменить прогон
             </Button>
-          ) : (
-            live.status === "done" && <Link to={`/runs/${runId}`}>Открыть прогон</Link>
           )
         }
       >
+        <Overview
+          live={live}
+          problem={problem.data}
+          progress={progressOf(problem.data, journal, live.containers)}
+          failures={summary(journal, !running)}
+          agents={agents}
+          unit={unit}
+        />
+      </Section>
+
+      <Section title={`Попытки · ${live.containers.length}`}>
+        <p className={styles.note}>
+          Каждая попытка задачи — свой контейнер. Кольцо — сохранённая работа; нажмите на попытку, чтобы
+          увидеть её журнал и действия над ней.
+        </p>
         <div role="group" aria-label="Состояние" className={styles.filters}>
           {FILTERS.map((f) => (
             <button
@@ -440,14 +536,19 @@ function LiveRun({ runId, live }: { runId: string; live: Live }) {
         </div>
         <div className={styles.cards}>
           {shown.map((c) => {
-            const done = share(c, durations.get(c.task));
+            const e = expect(c);
+            const done = share(c, e?.expected);
+            // Кольцо — до p80: дуга — сделанное, полоса в конце — где задача закончится скорее всего
+            const scale = e && e.p80 > 0 ? e.p80 : 1;
+            const made = c.state === "exited" && !c.detail ? 1 : Math.min(1, c.progress / scale);
+            const pct = `${e?.approx && done < 1 ? "≈" : ""}${Math.round(done * 100)}%`;
             return (
               <button
                 key={key(c)}
                 type="button"
                 className={`${styles.card} motion-lift`}
                 aria-pressed={selected !== undefined && key(selected) === key(c)}
-                aria-label={`${c.task}, попытка ${c.attempt} на ${c.worker}: ${stateLabel(c)}, ${Math.round(done * 100)}%`}
+                aria-label={`${c.task}, попытка ${c.attempt} на ${c.worker}: ${stateLabel(c)}, ${pct}`}
                 onClick={() => setPicked(key(c))}
               >
                 <span className={styles.cardHead}>
@@ -461,6 +562,17 @@ function LiveRun({ runId, live }: { runId: string; live: Live }) {
                 </span>
                 <svg className={styles.ring} viewBox="0 0 64 64" aria-hidden="true">
                   <circle cx="32" cy="32" r="26" className={styles.track} />
+                  {e?.approx && e.p80 > e.expected && phase(c) !== "done" && (
+                    <circle
+                      cx="32"
+                      cy="32"
+                      r="26"
+                      className={styles.band}
+                      data-testid="p80-band"
+                      strokeDasharray={`${RING * (1 - e.expected / e.p80)} ${RING}`}
+                      strokeDashoffset={-RING * (e.expected / e.p80)}
+                    />
+                  )}
                   <circle
                     cx="32"
                     cy="32"
@@ -468,16 +580,14 @@ function LiveRun({ runId, live }: { runId: string; live: Live }) {
                     className={styles.arc}
                     data-phase={phase(c)}
                     strokeDasharray={RING}
-                    strokeDashoffset={RING * (1 - done)}
+                    strokeDashoffset={RING * (1 - (e?.approx ? made : done))}
                   />
                   <text x="32" y="36" textAnchor="middle" className={styles.pct}>
-                    {Math.round(done * 100)}%
+                    {pct}
                   </text>
                 </svg>
                 <span className={styles.task}>{c.task}</span>
-                <span className={styles.caption}>
-                  {c.progress} из {durations.get(c.task) ?? "?"} {unit} работы сохранено · fence {c.attempt}
-                </span>
+                <span className={styles.caption}>{caption(c)}</span>
               </button>
             );
           })}
@@ -488,7 +598,15 @@ function LiveRun({ runId, live }: { runId: string; live: Live }) {
       </Section>
 
       {selected && (
-        <Section title={`Выбранный контейнер · ${selected.task.toUpperCase()}`} tone="raised">
+        <Section
+          title={`Выбранный контейнер · ${selected.task.toUpperCase()}`}
+          tone="raised"
+          actions={
+            <Button variant="secondary" onClick={() => setPicked(null)}>
+              Закрыть
+            </Button>
+          }
+        >
           <dl className={styles.facts}>
             <dt>Узел</dt>
             <dd>
@@ -496,10 +614,21 @@ function LiveRun({ runId, live }: { runId: string; live: Live }) {
             </dd>
             <dt>Чекпоинт</dt>
             <dd>
-              {selected.progress} из {durations.get(selected.task) ?? "?"} {unit}
+              {selected.progress} из {workText(selected)} {unit}
             </dd>
-            <dt>Fence</dt>
-            <dd>{selected.attempt}</dd>
+            {guess?.approx && (
+              <>
+                <dt>Оценка</dt>
+                <dd>
+                  ≈ {Math.round(guess.expected)} {unit}, до {guess.p80} {unit} с вероятностью 80 % ·{" "}
+                  {SOURCES[live.estimates?.[selected.task]?.source ?? "kind"]}
+                </dd>
+              </>
+            )}
+            <dt>Попытка</dt>
+            <dd title="Номер попытки (fence): запоздавшее событие старой попытки не меняет новую">
+              {selected.attempt}
+            </dd>
             <dt>Контейнер</dt>
             <dd>{selected.container_id ?? "—"}</dd>
           </dl>
@@ -525,6 +654,13 @@ function LiveRun({ runId, live }: { runId: string; live: Live }) {
               >
                 Сохранить чекпоинт
               </Button>
+              <Button
+                variant="secondary"
+                disabled={phase(selected) !== "running"}
+                onClick={() => action.mutate({ kind: "kill", task: selected.task })}
+              >
+                Убить контейнер
+              </Button>
               {live.workers[selected.worker]?.dropped ? (
                 <Button onClick={() => action.mutate({ kind: "worker_up", worker: selected.worker })}>
                   Вернуть узел {selected.worker}
@@ -542,13 +678,10 @@ function LiveRun({ runId, live }: { runId: string; live: Live }) {
             container={selected}
             follow={running && phase(selected) !== "done" && phase(selected) !== "killed"}
           />
-          <p className={styles.note}>
-            Fence — номер попытки: команды и события адресуются по нему, поэтому запоздавшее событие старой
-            попытки после отказа узла не меняет новую.
-          </p>
         </Section>
       )}
 
+      <Failures events={journal} unit={unit} done={!running} shadow={live.shadow} />
       {live.shadow && <PlanVsFact shadow={live.shadow} unit={unit} />}
     </>
   );

@@ -1,8 +1,9 @@
 """Агенты на машине сервера, запущенные из интерфейса: сервер сам держит их процессы.
 
 Каждый — обычный `python -m expsched.agent` со своим каталогом состояния и журналом процесса; токен агентов
-сервера передаётся ему через окружение. Перед запуском — `agent check`: не готова среда (нет Docker, нет
-образа нагрузки) или нет связи — агент не запускается, а вывод проверки возвращается как есть.
+сервера (заданный или придуманный при запуске) передаётся ему через окружение. Перед запуском —
+`agent check`: не готова среда (нет Docker, нет образа нагрузки) или нет связи — агент не запускается,
+а вывод проверки возвращается как есть.
 gravesentinel здесь не запускается: его агенту нужен пользователь гипервизора, а сервер работает от обычного.
 """
 
@@ -11,6 +12,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import threading
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -54,17 +56,30 @@ class LocalAgents:
         self.root = root
         self.check, self.spawn, self.limit = check, start, limit
         self.agents: dict[str, LocalAgent] = {}
+        self.starting: set[str] = set()  # идёт проверка: место уже занято, второй запуск того же id — отказ
+        self.lock = threading.Lock()
 
     def start(
-        self, agent_id: str, runtime: Runtime, capacity: Mapping[str, int], scheduler: str
+        self, agent_id: str, runtime: Runtime, capacity: Mapping[str, int], scheduler: str, token: str = ""
     ) -> LocalAgent:
         """Проверить и запустить. ValueError — такой уже идёт или их слишком много; CheckFailed — среда
         или связь не готовы."""
-        current = self.agents.get(agent_id)
-        if current is not None and current.process.poll() is None:
-            raise ValueError(f"local agent {agent_id} is already running")
-        if sum(a.process.poll() is None for a in self.agents.values()) >= self.limit:
-            raise ValueError(f"{self.limit} local agents are already running (EXPSCHED_LOCAL_AGENTS)")
+        with self.lock:
+            current = self.agents.get(agent_id)
+            if agent_id in self.starting or (current is not None and current.process.poll() is None):
+                raise ValueError(f"local agent {agent_id} is already running")
+            if sum(a.process.poll() is None for a in self.agents.values()) + len(self.starting) >= self.limit:
+                raise ValueError(f"{self.limit} local agents are already running (EXPSCHED_LOCAL_AGENTS)")
+            self.starting.add(agent_id)
+        try:
+            return self._start(agent_id, runtime, capacity, scheduler, token)
+        finally:
+            with self.lock:
+                self.starting.discard(agent_id)
+
+    def _start(
+        self, agent_id: str, runtime: Runtime, capacity: Mapping[str, int], scheduler: str, token: str
+    ) -> LocalAgent:
         state = self.root / agent_id
         state.mkdir(parents=True, exist_ok=True)
         args = [
@@ -80,18 +95,20 @@ class LocalAgents:
         for name, flag in (("cpu", "--cpu"), ("ram_mb", "--ram-mb"), ("gpu", "--gpu")):
             if capacity.get(name) is not None:
                 args += [flag, str(capacity[name])]
-        env = {**os.environ}
+        env = {**os.environ, **({"EXPSCHED_AGENT_TOKEN": token} if token else {})}
         code, output = self.check([sys.executable, "-m", "expsched.agent", "check", "--no-hello", *args], env)
         if code != 0:
             raise CheckFailed(output[-2000:] or f"agent check exited with {code}")
         log = state / "agent.log"
         process = self.spawn([sys.executable, "-m", "expsched.agent", *args], env, log)
-        self.agents[agent_id] = LocalAgent(agent_id, runtime, process, log, time.time())
-        return self.agents[agent_id]
+        with self.lock:
+            self.agents[agent_id] = LocalAgent(agent_id, runtime, process, log, time.time())
+            return self.agents[agent_id]
 
     def stop(self, agent_id: str, timeout_s: float = 15) -> bool:
         """SIGTERM (на Windows — завершение процесса), ожидание, затем kill. False — такого агента нет."""
-        agent = self.agents.pop(agent_id, None)
+        with self.lock:
+            agent = self.agents.pop(agent_id, None)
         if agent is None:
             return False
         if agent.process.poll() is None:

@@ -38,32 +38,35 @@ export function PlanVsFact({ shadow, unit }: { shadow: Shadow; unit: string }) {
           </li>
         ))}
       </ul>
-      <div className={table.scroll} tabIndex={0} role="region" aria-label="План и факт по задачам">
-        <table className={table.table}>
-          <thead>
-            <tr>
-              <th scope="col">Задача</th>
-              <th scope="col">План, {unit}</th>
-              <th scope="col">Факт, {unit}</th>
-              <th scope="col">Сдвиг финиша</th>
-              <th scope="col">Причина</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(([task, t]) => (
-              <tr key={task}>
-                <th scope="row">
-                  <code>{task}</code>
-                </th>
-                <td>{span(t.plan_start, t.plan_finish)}</td>
-                <td>{span(t.fact_start, t.fact_finish)}</td>
-                <td>{delta(t.finish_delta)}</td>
-                <td>{CAUSES[t.cause]}</td>
+      <details className={styles.details}>
+        <summary>По задачам</summary>
+        <div className={table.scroll} tabIndex={0} role="region" aria-label="План и факт по задачам">
+          <table className={table.table}>
+            <thead>
+              <tr>
+                <th scope="col">Задача</th>
+                <th scope="col">План, {unit}</th>
+                <th scope="col">Факт, {unit}</th>
+                <th scope="col">Сдвиг финиша</th>
+                <th scope="col">Причина</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {rows.map(([task, t]) => (
+                <tr key={task}>
+                  <th scope="row">
+                    <code>{task}</code>
+                  </th>
+                  <td>{span(t.plan_start, t.plan_finish)}</td>
+                  <td>{span(t.fact_start, t.fact_finish)}</td>
+                  <td>{delta(t.finish_delta)}</td>
+                  <td>{CAUSES[t.cause]}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
     </Section>
   );
 }

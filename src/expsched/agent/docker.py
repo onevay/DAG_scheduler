@@ -57,18 +57,17 @@ class DockerRuntime:
         if sys.platform != "win32":
             args += ["--user", f"{os.getuid()}:{os.getgid()}"]
         args += ["-v", f"{checkpoint_dir.resolve()}:/checkpoint"]
-        env = {
+        own = {  # что агент сообщает нагрузке; окружение задачи этого не перекрывает
             "EXPSCHED_CHECKPOINT_DIR": "/checkpoint",
             "EXPSCHED_RESUME_FROM": str(command.resume_from),
             "EXPSCHED_WORK": str(command.work),
             "EXPSCHED_TIME_SCALE_MS": str(command.time_scale_ms),
             "EXPSCHED_CHECKPOINT_INTERVAL": str(command.checkpoint_interval or 0),
         }
+        env = {**(command.container.env if command.container else {}), **own}
         if command.container and command.container.image != self.workload_image:
-            env.update(command.container.env)
             image, tail = command.container.image, list(command.container.command)
         else:
-            env.update(command.container.env if command.container else {})
             args += ["--network", "none"]
             image, tail = self.workload_image, []
         for key, value in sorted(env.items()):
@@ -81,6 +80,11 @@ class DockerRuntime:
     def stop(self, key: str) -> None:
         self.run([self.name, "rm", "-f", _name(key)])  # остановить и убрать; нет контейнера — не ошибка
         self.seen.pop(key, None)
+
+    def kill(self, key: str) -> None:
+        self.run(
+            [self.name, "kill", _name(key)]
+        )  # SIGKILL: контейнер остаётся с кодом 137, его увидит inspect
 
     def checkpoint(self, key: str) -> None:
         self.run([self.name, "kill", "--signal", "USR1", _name(key)])

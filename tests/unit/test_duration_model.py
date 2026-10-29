@@ -131,8 +131,10 @@ def test_interrupt_on_a_fast_worker_saves_work_at_its_speed():
 def test_examples_before_the_speed_model_keep_the_reference_speed():
     for path in sorted(SCENARIOS.glob("*.json")):
         p = load(path.read_bytes())
-        assert all(w.speed == 1 for w in p.cluster.workers) or path.stem == "ml_hetero", path.stem
-    # их журналы сверяются с эталонами в их собственных тестах; разные скорости — только у примера ml_hetero
+        assert all(w.speed == 1 for w in p.cluster.workers) or path.stem in ("ml_hetero", "chaos_demo"), (
+            path.stem
+        )
+    # их журналы сверяются с эталонами в их собственных тестах; разные скорости — у ml_hetero и chaos_demo
 
 
 def test_run_on_agents_with_unknown_durations_goes_to_the_end(tmp_path):

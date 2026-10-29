@@ -173,3 +173,47 @@ export function comparisonRows(results: Readonly<Record<string, Result>>) {
     };
   });
 }
+
+export interface EstimateRow {
+  task: string;
+  source: string;
+  mean: number;
+  p80: number;
+  /** Наблюдённая работа: позиция старта законченной попытки плюс её время, умноженное на скорость узла. */
+  actual: number | null;
+  /** (факт − среднее) / среднее. */
+  error: number | null;
+}
+
+/** Оценки задач без длительности против того, сколько работы они заняли на самом деле. */
+export function estimateRows(result: Result, problem: Problem): EstimateRow[] {
+  const speed = new Map(problem.cluster.workers.map((w) => [w.id, w.speed ?? 1]));
+  const done = new Map(
+    result.attempts.flatMap((a) =>
+      a.outcome === "DONE" && a.end !== null
+        ? [[a.task, a.resume_from + (a.end - a.start) * (speed.get(a.worker) ?? 1)] as const]
+        : [],
+    ),
+  );
+  return Object.entries(result.estimates ?? {})
+    .sort(([a], [b]) => cmp(a, b))
+    .map(([task, e]) => {
+      const actual = done.get(task) ?? null;
+      return {
+        task,
+        source: e.source,
+        mean: e.mean,
+        p80: e.p80,
+        actual,
+        error: actual === null || e.mean <= 0 ? null : (actual - e.mean) / e.mean,
+      };
+    });
+}
+
+/** Средняя абсолютная ошибка и сколько задач уложилось в квантиль 0,8. */
+export function estimateSummary(rows: readonly EstimateRow[]) {
+  const seen = rows.filter((r) => r.error !== null);
+  const mean = seen.length ? seen.reduce((s, r) => s + Math.abs(r.error ?? 0), 0) / seen.length : null;
+  const within = seen.filter((r) => (r.actual ?? 0) <= r.p80).length;
+  return { mean, within, seen: seen.length };
+}

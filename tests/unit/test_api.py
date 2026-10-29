@@ -70,7 +70,19 @@ def test_validate_accepts_the_demo(client):
             "lower_bound": 21,
             "critical_path": ["prep_data", "pretrain_vit", "ft_det", "distill", "infer_bench"],
         },
+        "estimates": {},
     }
+
+
+def test_validate_shows_the_estimate_of_a_task_without_duration(client):
+    body = {
+        "mode": "emulate",
+        "cluster": {"workers": [{"id": "w", "resources": {"gpu": 1}, "agent": "a"}]},
+        "tasks": [{"id": "train", "kind": "train", "resources": {"gpu": 1}, "estimate": {"median": 20}}],
+    }
+    out = client.post("/v1/validate", json=body).json()
+    assert out["valid"] and out["estimates"]["train"]["source"] == "estimate"
+    assert out["estimates"]["train"]["median"] == 20
 
 
 def test_validate_reports_graph_errors_with_200_in_both_modes(client):

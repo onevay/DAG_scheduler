@@ -36,11 +36,14 @@ class ContainerSpec(Strict):
     ] = {}
 
 
+MAX_SPREAD = 3.0  # σ логарифма работы: больше — оценка уже ничего не говорит, а среднее растёт как exp(σ²/2)
+
+
 class EstimateIn(Strict):
     """Работа задачи, когда точно она неизвестна: логнормальное с медианой и разбросом (σ логарифма)."""
 
     median: Annotated[float, Field(gt=0, le=10_000_000)]
-    spread: Annotated[float, Field(ge=0, le=3)] | None = None  # None — по виду задачи
+    spread: Annotated[float, Field(ge=0, le=MAX_SPREAD)] | None = None  # None — по виду задачи
 
 
 class ScalingIn(Strict):
@@ -111,6 +114,17 @@ class PolicyIn(Strict):
     validation_mode: Literal["strict", "lenient"] = "lenient"
 
 
+class ChaosIn(Strict):
+    """Сбои напоказ на агентах: в среднем раз в `crash_every` единиц убивается случайная идущая попытка, раз
+    в `node_down_every` падает случайный узел на `node_down_for` единиц. Расписание — по `seed`: прогон с тем
+    же seed даёт ту же последовательность сбоев."""
+
+    crash_every: Annotated[int, Field(ge=1)] | None = None
+    node_down_every: Annotated[int, Field(ge=1)] | None = None
+    node_down_for: Annotated[int, Field(ge=1)] = 5
+    seed: int = 0
+
+
 class ClusterIn(Strict):
     workers: list[WorkerIn] = Field(min_length=1)
 
@@ -127,6 +141,7 @@ class ProblemIn(Strict):
     mode: Literal["simulate", "emulate", "shadow", "replay"] = "simulate"
     # Для прогона на агентах: длительность единицы времени модели, мс (1000 — единица модели идёт секунду).
     time_scale_ms: Annotated[int, Field(ge=1, le=3_600_000)] = 1000
+    chaos: ChaosIn | None = None  # только на агентах: в симуляции не действует
 
     @model_validator(mode="after")
     def _ids_and_limits(self) -> ProblemIn:

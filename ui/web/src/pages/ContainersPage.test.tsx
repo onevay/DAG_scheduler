@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -133,12 +133,24 @@ const server = setupServer(
     deleted.push(String(params.id));
     return new HttpResponse(null, { status: 204 });
   }),
+  http.post("/v1/validate", () =>
+    HttpResponse.json({
+      valid: true,
+      diagnostics: [],
+      analysis: { lower_bound: 75, critical_path: [] },
+      estimates: {},
+    }),
+  ),
   http.get(`/v1/runs/${RUN}/containers`, () => HttpResponse.json(LIVE)),
   http.get(`/v1/runs/${RUN}/problem`, () => HttpResponse.json(PROBLEM)),
   http.get(`/v1/runs/${RUN}/containers/train_small/1/logs`, () =>
     HttpResponse.json({ lines: ["start: 0 of 40 units", "checkpoint: 20 units"] }),
   ),
-  http.get(`/v1/runs/${RUN}/events`, () => HttpResponse.json({ events: EVENTS, total: 1, next_seq: null })),
+  // Как сервер: страница с from_seq — журнал дочитывается, а не повторяется
+  http.get(`/v1/runs/${RUN}/events`, ({ request }) => {
+    const from = Number(new URL(request.url).searchParams.get("from_seq") ?? 0);
+    return HttpResponse.json({ events: EVENTS.slice(from), total: EVENTS.length, next_seq: null });
+  }),
   http.post(`/v1/runs/${RUN}/actions`, async ({ request }) => {
     const action = (await request.json()) as { kind: string };
     posted.push(action);
@@ -200,6 +212,17 @@ describe("ContainersPage", () => {
   it("shows containers of a running run, filters them and acts on the selected one", async () => {
     renderAt(`/containers/${RUN}`, PROBLEM as Draft);
     expect(await screen.findByText("идёт · момент модели 37")).toBeInTheDocument();
+    // Ход прогона наверху: цель, сколько задач готово, что идёт, сбои, агенты
+    const overview = screen.getByRole("region", { name: "Ход прогона" });
+    expect(overview).toHaveTextContent("Цель — выполнить расписание политики на настоящих контейнерах");
+    await waitFor(() =>
+      expect(within(overview).getByRole("progressbar", { name: "Задачи выполнены" })).toHaveAttribute(
+        "aria-valuemax",
+        "3",
+      ),
+    );
+    expect(within(overview).getByRole("listitem", { name: /^Агент laptop:/ })).toBeInTheDocument();
+    expect(within(overview).getByRole("button", { name: "Отменить прогон" })).toBeInTheDocument();
     await screen.findByRole("button", {
       name: /^train_small, попытка 1 на laptop: идёт, чекпоинт сохранён, 50%$/,
     });
@@ -212,9 +235,11 @@ describe("ContainersPage", () => {
     expect(within(panel).getByText("3f2a")).toBeInTheDocument();
     expect(await within(panel).findByText("35 мин · старт на laptop с позиции 0")).toBeInTheDocument();
     await userEvent.click(within(panel).getByRole("button", { name: "Сохранить чекпоинт" }));
+    await userEvent.click(within(panel).getByRole("button", { name: "Убить контейнер" }));
     await userEvent.click(within(panel).getByRole("button", { name: "Уронить узел laptop" }));
     expect(posted).toEqual([
       { kind: "checkpoint", task: "train_small" },
+      { kind: "kill", task: "train_small" },
       { kind: "worker_down", worker: "laptop" },
     ]);
     expect(await within(panel).findByRole("button", { name: "Вернуть узел laptop" })).toBeInTheDocument();
@@ -224,6 +249,9 @@ describe("ContainersPage", () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
     renderAt(`/containers/${RUN}`, PROBLEM as Draft);
+    // Панель попытки — только по выбору: без него страница не загромождена
+    expect(screen.queryByRole("region", { name: /Выбранный контейнер/ })).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: /^train_small/ }));
     const panel = await screen.findByRole("region", { name: "Выбранный контейнер · TRAIN_SMALL" });
     expect(await within(panel).findByRole("meter", { name: "CPU: 1,5 из 2 ядер" })).toHaveAttribute(
       "aria-valuenow",
@@ -253,7 +281,13 @@ describe("ContainersPage", () => {
     await userEvent.click(screen.getByRole("radio", { name: "100 мс" }));
     expect(screen.getByRole("button", { name: "Запустить на агентах" })).toBeDisabled();
     expect(screen.getByText("Без агента: laptop")).toBeInTheDocument();
+    const checks = screen.getByRole("list", { name: "Готовность к запуску" });
+    expect(within(checks).getByText("Узлам нужен агент: laptop")).toBeInTheDocument();
+    expect(
+      await within(checks).findByText(/Займёт не меньше 8 с: граница 75 единиц модели/),
+    ).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Назначить узлам" }));
+    expect(within(checks).getByText("Режим: shadow")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Запустить на агентах" }));
     expect(posted).toEqual([
       {

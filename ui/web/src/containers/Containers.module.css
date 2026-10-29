@@ -165,6 +165,15 @@
   transform-origin: 50% 50%;
 }
 
+/* Где задача закончится скорее всего: от ожидаемой работы до квантиля 0,8 */
+.band {
+  fill: none;
+  stroke: var(--color-accent-soft);
+  stroke-width: 6;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+}
+
 .arc[data-phase="killed"] {
   stroke: var(--color-warning);
 }
@@ -302,4 +311,162 @@ li.card {
 .details summary {
   cursor: pointer;
   margin-bottom: var(--space-2);
+}
+
+/* Путь к прогону: три шага с отметкой готовности */
+.steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  list-style: none;
+  font: var(--text-small);
+  color: var(--color-ink-2);
+}
+
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.step strong {
+  color: var(--color-ink);
+}
+
+.stepMark,
+.checkMark {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-surface-control);
+  color: var(--color-ink);
+  font: 600 12px var(--font-sans);
+}
+
+.step[data-done="true"] .stepMark,
+.check[data-level="ok"] .checkMark {
+  background: var(--color-accent);
+}
+
+.checks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: var(--text-small);
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.check[data-level="warn"] .checkMark {
+  background: var(--color-warning);
+}
+
+.check[data-level="block"] .checkMark {
+  background: var(--color-error-soft);
+  color: var(--color-error);
+}
+
+/* Агенты — строками: имя, состояние, что отдаёт; журнал процесса — по требованию */
+.agents {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agent {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-nested);
+  background: var(--color-surface-control);
+}
+
+.agent .row {
+  margin-left: auto;
+}
+
+.agent .details {
+  width: auto;
+}
+
+/* Ход прогона: цель, шкала задач, четыре числа, итог, агенты */
+.overview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.goal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  font: var(--text-body);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.stats dt {
+  font: var(--text-small);
+  color: var(--color-ink-2);
+}
+
+.stats dd {
+  margin: 0;
+  font: 600 20px/1.3 var(--font-sans);
+}
+
+.outcome {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-nested);
+  background: var(--color-accent-soft);
+  font: var(--text-body);
+}
+
+.agentLine {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: var(--text-small);
+}
+
+.agentLine li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.agentLine li[data-alive="true"] .dot {
+  background: var(--color-success);
+}
+
+.next {
+  align-self: flex-start;
+  font: var(--text-label);
 }
